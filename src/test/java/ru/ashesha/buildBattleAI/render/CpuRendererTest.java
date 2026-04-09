@@ -1,0 +1,378 @@
+package ru.ashesha.buildBattleAI.render;
+
+import com.cryptomorin.xseries.XMaterial;
+import org.junit.jupiter.api.Test;
+import ru.ashesha.buildBattleAI.render.data.FlatScene;
+
+import java.awt.image.BufferedImage;
+import java.util.Arrays;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class CpuRendererTest {
+
+    private static final short AIR = (short) XMaterial.AIR.ordinal();
+
+    private static short[] airArray(int size) {
+        short[] data = new short[size];
+        Arrays.fill(data, AIR);
+        return data;
+    }
+
+    // ===== Constants =====
+
+    @Test
+    void outputDimensions() {
+        assertEquals(224, CpuRenderer.WIDTH);
+        assertEquals(224, CpuRenderer.HEIGHT);
+    }
+
+    @Test
+    void fieldOfView() {
+        assertEquals(70.0, CpuRenderer.FOV, 1e-9);
+    }
+
+    // ===== render() output format =====
+
+    @Test
+    void renderReturnsCorrectArraySize() {
+        FlatScene scene = emptyScene();
+        byte[] pixels = CpuRenderer.render(scene, 0, 0, 0, 0, 0);
+        assertEquals(224 * 224 * 3, pixels.length);
+    }
+
+    @Test
+    void renderEmptySceneProducesBackgroundColor() {
+        FlatScene scene = emptyScene();
+        byte[] pixels = CpuRenderer.render(scene, 5, 5, 5, 0, 0);
+
+        // Background: 0xC8D8E8 = R=200, G=216, B=232
+        int bgR = 0xC8;
+        int bgG = 0xD8;
+        int bgB = 0xE8;
+
+        // Check center pixel
+        int centerIdx = (112 * 224 + 112) * 3;
+        assertEquals(bgR, pixels[centerIdx] & 0xFF);
+        assertEquals(bgG, pixels[centerIdx + 1] & 0xFF);
+        assertEquals(bgB, pixels[centerIdx + 2] & 0xFF);
+    }
+
+    @Test
+    void renderEmptySceneAllPixelsSameBackground() {
+        FlatScene scene = emptyScene();
+        byte[] pixels = CpuRenderer.render(scene, 5, 5, 5, 0, 0);
+
+        byte expectedR = (byte) 0xC8;
+        byte expectedG = (byte) 0xD8;
+        byte expectedB = (byte) 0xE8;
+
+        for (int i = 0; i < pixels.length; i += 3) {
+            assertEquals(expectedR, pixels[i], "Pixel at " + (i / 3) + " R mismatch");
+            assertEquals(expectedG, pixels[i + 1], "Pixel at " + (i / 3) + " G mismatch");
+            assertEquals(expectedB, pixels[i + 2], "Pixel at " + (i / 3) + " B mismatch");
+        }
+    }
+
+    // ===== Rendering blocks =====
+
+    @Test
+    void renderSolidBlockProducesNonBackgroundPixels() {
+        // Create a 16x16x16 scene filled with stone, camera inside looking at it
+        int size = 16;
+        short[] data = new short[size * size * size];
+        Arrays.fill(data, (short) XMaterial.STONE.ordinal());
+        // Clear a 3x3x3 area in the center for the camera
+        for (int x = 7; x <= 9; x++) {
+            for (int y = 7; y <= 9; y++) {
+                for (int z = 7; z <= 9; z++) {
+                    data[x * size * size + y * size + z] = (short) XMaterial.AIR.ordinal();
+                }
+            }
+        }
+
+        FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
+        byte[] pixels = CpuRenderer.render(scene, 8.5, 8.5, 8.5, 0, 0);
+
+        // At least some pixels should differ from background
+        boolean hasNonBackground = false;
+        for (int i = 0; i < pixels.length; i += 3) {
+            if ((pixels[i] & 0xFF) != 0xC8 || (pixels[i + 1] & 0xFF) != 0xD8 || (pixels[i + 2] & 0xFF) != 0xE8) {
+                hasNonBackground = true;
+                break;
+            }
+        }
+        assertTrue(hasNonBackground, "Rendering a stone room should produce non-background pixels");
+    }
+
+    @Test
+    void renderSingleBlockInFrontOfCamera() {
+        // Place a single stone block at (5,0,5) and camera at (5,0,0) looking south (yaw=0)
+        int size = 11;
+        short[] data = airArray(size * size * size);
+        // Place stone at (5, 5, 8) in scene starting at (0,0,0)
+        data[5 * size * size + 5 * size + 8] = (short) XMaterial.STONE.ordinal();
+
+        FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
+        // Camera at (5.5, 5.5, 5.5), looking south (yaw=0 => +Z direction)
+        byte[] pixels = CpuRenderer.render(scene, 5.5, 5.5, 5.5, 0, 0);
+
+        // Center pixel should be stone-colored, not background
+        int centerIdx = (112 * 224 + 112) * 3;
+        int r = pixels[centerIdx] & 0xFF;
+        int g = pixels[centerIdx + 1] & 0xFF;
+        int b = pixels[centerIdx + 2] & 0xFF;
+
+        // Stone is gray (~0x7D7D7D * brightness), should not be background blue
+        assertNotEquals(0xC8, r, "Center pixel R should not be background");
+        assertNotEquals(0xD8, g, "Center pixel G should not be background");
+    }
+
+    @Test
+    void renderDifferentYawDirections() {
+        // Fill a 10x10x10 box with stone, hollow center
+        int size = 10;
+        short[] data = new short[size * size * size];
+        Arrays.fill(data, (short) XMaterial.STONE.ordinal());
+        for (int x = 3; x <= 6; x++) {
+            for (int y = 3; y <= 6; y++) {
+                for (int z = 3; z <= 6; z++) {
+                    data[x * size * size + y * size + z] = (short) XMaterial.AIR.ordinal();
+                }
+            }
+        }
+
+        FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
+
+        // Render at four different yaw angles
+        byte[] south = CpuRenderer.render(scene, 5, 5, 5, 0, 0);
+        byte[] west = CpuRenderer.render(scene, 5, 5, 5, 90, 0);
+        byte[] north = CpuRenderer.render(scene, 5, 5, 5, 180, 0);
+        byte[] east = CpuRenderer.render(scene, 5, 5, 5, -90, 0);
+
+        // All should have non-background pixels (the stone walls)
+        assertTrue(hasNonBackgroundPixels(south), "South view should see walls");
+        assertTrue(hasNonBackgroundPixels(west), "West view should see walls");
+        assertTrue(hasNonBackgroundPixels(north), "North view should see walls");
+        assertTrue(hasNonBackgroundPixels(east), "East view should see walls");
+    }
+
+    @Test
+    void renderPitchLookingDown() {
+        // Place stone floor below camera
+        int size = 10;
+        short[] data = airArray(size * size * size);
+        // Fill y=0 layer with stone
+        for (int x = 0; x < size; x++) {
+            for (int z = 0; z < size; z++) {
+                data[x * size * size + 0 * size + z] = (short) XMaterial.STONE.ordinal();
+            }
+        }
+
+        FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
+        // Camera at y=5 looking straight down (pitch=90)
+        byte[] pixels = CpuRenderer.render(scene, 5, 5, 5, 0, 90);
+
+        assertTrue(hasNonBackgroundPixels(pixels), "Looking down at floor should see stone");
+    }
+
+    // ===== Translucent blocks =====
+
+    @Test
+    void renderTranslucentBlockBlends() {
+        // Place glass in front of stone
+        int size = 11;
+        short[] data = airArray(size * size * size);
+        // Stone at z=9
+        data[5 * size * size + 5 * size + 9] = (short) XMaterial.STONE.ordinal();
+        // Glass at z=7
+        data[5 * size * size + 5 * size + 7] = (short) XMaterial.GLASS.ordinal();
+
+        FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
+        byte[] withGlass = CpuRenderer.render(scene, 5.5, 5.5, 5.5, 0, 0);
+
+        // Render same scene without glass
+        data[5 * size * size + 5 * size + 7] = AIR;
+        FlatScene sceneNoGlass = new FlatScene(data, 0, 0, 0, size, size, size);
+        byte[] withoutGlass = CpuRenderer.render(sceneNoGlass, 5.5, 5.5, 5.5, 0, 0);
+
+        // The center pixel should differ between the two renders
+        int centerIdx = (112 * 224 + 112) * 3;
+        boolean differs = (withGlass[centerIdx] != withoutGlass[centerIdx])
+                || (withGlass[centerIdx + 1] != withoutGlass[centerIdx + 1])
+                || (withGlass[centerIdx + 2] != withoutGlass[centerIdx + 2]);
+        assertTrue(differs, "Glass should affect the rendered color");
+    }
+
+    // ===== toBufferedImage() =====
+
+    @Test
+    void toBufferedImageDimensions() {
+        byte[] rgb = new byte[224 * 224 * 3];
+        BufferedImage image = CpuRenderer.toBufferedImage(rgb);
+        assertEquals(224, image.getWidth());
+        assertEquals(224, image.getHeight());
+        assertEquals(BufferedImage.TYPE_INT_RGB, image.getType());
+    }
+
+    @Test
+    void toBufferedImagePreservesColors() {
+        byte[] rgb = new byte[224 * 224 * 3];
+        // Set first pixel to red
+        rgb[0] = (byte) 0xFF;
+        rgb[1] = 0;
+        rgb[2] = 0;
+        // Set last pixel to blue
+        int lastIdx = (224 * 224 - 1) * 3;
+        rgb[lastIdx] = 0;
+        rgb[lastIdx + 1] = 0;
+        rgb[lastIdx + 2] = (byte) 0xFF;
+
+        BufferedImage image = CpuRenderer.toBufferedImage(rgb);
+
+        // First pixel (0,0) should be red
+        int firstColor = image.getRGB(0, 0) & 0xFFFFFF;
+        assertEquals(0xFF0000, firstColor);
+
+        // Last pixel (223,223) should be blue
+        int lastColor = image.getRGB(223, 223) & 0xFFFFFF;
+        assertEquals(0x0000FF, lastColor);
+    }
+
+    @Test
+    void toBufferedImageMidPixelColor() {
+        byte[] rgb = new byte[224 * 224 * 3];
+        // Set pixel at (100, 50)
+        int idx = (50 * 224 + 100) * 3;
+        rgb[idx] = (byte) 128;
+        rgb[idx + 1] = (byte) 64;
+        rgb[idx + 2] = (byte) 32;
+
+        BufferedImage image = CpuRenderer.toBufferedImage(rgb);
+        int color = image.getRGB(100, 50) & 0xFFFFFF;
+        assertEquals(128, (color >> 16) & 0xFF);
+        assertEquals(64, (color >> 8) & 0xFF);
+        assertEquals(32, color & 0xFF);
+    }
+
+    // ===== Emissive rendering =====
+
+    @Test
+    void emissiveBlocksRenderBrighter() {
+        // Compare glowstone vs stone rendering (both in same position)
+        int size = 11;
+        short[] data1 = airArray(size * size * size);
+        data1[5 * size * size + 5 * size + 8] = (short) XMaterial.GLOWSTONE.ordinal();
+        FlatScene scene1 = new FlatScene(data1, 0, 0, 0, size, size, size);
+        byte[] glowRender = CpuRenderer.render(scene1, 5.5, 5.5, 5.5, 0, 0);
+
+        short[] data2 = airArray(size * size * size);
+        data2[5 * size * size + 5 * size + 8] = (short) XMaterial.STONE.ordinal();
+        FlatScene scene2 = new FlatScene(data2, 0, 0, 0, size, size, size);
+        byte[] stoneRender = CpuRenderer.render(scene2, 5.5, 5.5, 5.5, 0, 0);
+
+        // Both should have non-background at center
+        int centerIdx = (112 * 224 + 112) * 3;
+        assertTrue(hasNonBackgroundPixels(glowRender), "Glowstone should be visible");
+        assertTrue(hasNonBackgroundPixels(stoneRender), "Stone should be visible");
+
+        // Glowstone (emissive) should not have face-shading dimming
+        // so at minimum the actual block pixels should differ from stone
+        // (different base colors and brightness models)
+        boolean differs = (glowRender[centerIdx] != stoneRender[centerIdx])
+                || (glowRender[centerIdx + 1] != stoneRender[centerIdx + 1])
+                || (glowRender[centerIdx + 2] != stoneRender[centerIdx + 2]);
+        assertTrue(differs, "Glowstone and stone should render differently");
+    }
+
+    // ===== Camera outside scene =====
+
+    @Test
+    void cameraOutsideSceneLookingIn() {
+        // Scene is a 4x4x4 stone cube at origin
+        int size = 4;
+        short[] data = new short[size * size * size];
+        Arrays.fill(data, (short) XMaterial.STONE.ordinal());
+
+        FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
+        // Camera at (2, 2, -5) looking south (into scene)
+        byte[] pixels = CpuRenderer.render(scene, 2, 2, -5, 0, 0);
+
+        assertTrue(hasNonBackgroundPixels(pixels), "Should see stone cube from outside");
+    }
+
+    @Test
+    void cameraFarFromSceneSeesBackground() {
+        // Scene is a single block at origin
+        short[] data = {(short) XMaterial.STONE.ordinal()};
+        FlatScene scene = new FlatScene(data, 0, 0, 0, 1, 1, 1);
+        // Camera at (1000, 1000, 1000) looking away
+        byte[] pixels = CpuRenderer.render(scene, 1000, 1000, 1000, 0, 0);
+
+        // Most/all pixels should be background
+        int nonBg = 0;
+        for (int i = 0; i < pixels.length; i += 3) {
+            if ((pixels[i] & 0xFF) != 0xC8 || (pixels[i + 1] & 0xFF) != 0xD8 || (pixels[i + 2] & 0xFF) != 0xE8) {
+                nonBg++;
+            }
+        }
+        // Should be almost all background (block is tiny at this distance)
+        assertTrue(nonBg < 100, "Far camera should mostly see background, but saw " + nonBg + " non-bg pixels");
+    }
+
+    // ===== Sub-block shapes =====
+
+    @Test
+    void renderSlabProducesPartialBlockPixels() {
+        int size = 11;
+        short[] data = airArray(size * size * size);
+        // Place a slab at (5, 5, 8)
+        data[5 * size * size + 5 * size + 8] = (short) XMaterial.OAK_SLAB.ordinal();
+
+        FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
+        byte[] pixels = CpuRenderer.render(scene, 5.5, 5.5, 5.5, 0, 0);
+
+        // Should see something (the slab)
+        assertTrue(hasNonBackgroundPixels(pixels), "Should see the slab");
+    }
+
+    // ===== Parallel rendering consistency =====
+
+    @Test
+    void renderIsDeterministic() {
+        int size = 8;
+        short[] data = new short[size * size * size];
+        Arrays.fill(data, (short) XMaterial.STONE.ordinal());
+        for (int x = 3; x <= 4; x++) {
+            for (int y = 3; y <= 4; y++) {
+                for (int z = 3; z <= 4; z++) {
+                    data[x * size * size + y * size + z] = (short) XMaterial.AIR.ordinal();
+                }
+            }
+        }
+
+        FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
+
+        byte[] render1 = CpuRenderer.render(scene, 3.5, 3.5, 3.5, 45, 10);
+        byte[] render2 = CpuRenderer.render(scene, 3.5, 3.5, 3.5, 45, 10);
+
+        assertArrayEquals(render1, render2, "Two renders with same parameters should be identical");
+    }
+
+    // ===== Helpers =====
+
+    private static FlatScene emptyScene() {
+        int size = 10;
+        short[] data = airArray(size * size * size);
+        return new FlatScene(data, 0, 0, 0, size, size, size);
+    }
+
+    private static boolean hasNonBackgroundPixels(byte[] pixels) {
+        for (int i = 0; i < pixels.length; i += 3) {
+            if ((pixels[i] & 0xFF) != 0xC8 || (pixels[i + 1] & 0xFF) != 0xD8 || (pixels[i + 2] & 0xFF) != 0xE8) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
