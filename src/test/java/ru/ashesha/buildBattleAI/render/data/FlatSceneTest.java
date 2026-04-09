@@ -302,7 +302,53 @@ class FlatSceneTest {
         assertEquals(XMaterial.AIR, scene.getBlockType(1, 1, 1));
     }
 
+    // ===== Sign-extension safety (Bug fix: & 0xFFFF mask) =====
+
+    @Test
+    void getBlockDataSnapshotMasksSignExtendedShort() {
+        // Use a high ordinal near Short.MAX_VALUE to verify the & 0xFFFF mask
+        // prevents sign-extension from producing a negative array index.
+        XMaterial[] allMats = XMaterial.values();
+        int highOrdinal = Math.min(allMats.length - 1, Short.MAX_VALUE);
+        XMaterial expected = allMats[highOrdinal];
+
+        short[] data = {(short) highOrdinal};
+        FlatScene scene = new FlatScene(data, null, null, 0, 0, 0, 1, 1, 1,
+                FlatScene.SourceFormat.DIRECT, "test");
+
+        FlatScene.BlockDataSnapshot snapshot = scene.getBlockDataSnapshot(0, 0, 0);
+        assertEquals(expected, snapshot.material());
+    }
+
     // ===== Boundary checks =====
+
+    @Test
+    void sizeYZPrecomputeDoesNotBreakIndexing() {
+        // Verify that the pre-computed sizeYZ field produces correct indexOf results
+        // by testing a non-trivial scene with asymmetric dimensions
+        int sizeX = 5, sizeY = 7, sizeZ = 3;
+        short[] data = airArray(sizeX * sizeY * sizeZ);
+
+        // Place blocks at specific coordinates and verify retrieval
+        XMaterial[] testMats = {XMaterial.STONE, XMaterial.DIRT, XMaterial.SAND, XMaterial.COBBLESTONE};
+        int[][] coords = {{0, 0, 0}, {4, 6, 2}, {2, 3, 1}, {1, 0, 2}};
+        for (int i = 0; i < testMats.length; i++) {
+            int x = coords[i][0], y = coords[i][1], z = coords[i][2];
+            int index = x * sizeY * sizeZ + y * sizeZ + z;
+            data[index] = (short) testMats[i].ordinal();
+        }
+
+        FlatScene scene = new FlatScene(data, 10, 20, 30, sizeX, sizeY, sizeZ);
+        for (int i = 0; i < testMats.length; i++) {
+            assertEquals(testMats[i],
+                    scene.getBlockType(coords[i][0] + 10, coords[i][1] + 20, coords[i][2] + 30),
+                    "Block at (" + coords[i][0] + "," + coords[i][1] + "," + coords[i][2] + ")");
+        }
+
+        // Out-of-bounds still returns AIR
+        assertEquals(XMaterial.AIR, scene.getBlockType(9, 20, 30));
+        assertEquals(XMaterial.AIR, scene.getBlockType(15, 20, 30));
+    }
 
     @Test
     void boundsExactEdges() {

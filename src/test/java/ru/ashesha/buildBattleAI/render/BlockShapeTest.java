@@ -1,6 +1,7 @@
 package ru.ashesha.buildBattleAI.render;
 
 import com.cryptomorin.xseries.XMaterial;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import ru.ashesha.buildBattleAI.render.data.FlatScene;
 import ru.ashesha.buildBattleAI.render.data.SceneData;
@@ -10,6 +11,12 @@ import java.util.Arrays;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BlockShapeTest {
+
+    @BeforeEach
+    void clearCaches() {
+        BlockShape.clearStateShapeCache();
+        BlockRenderState.clearCache();
+    }
 
     private static final short AIR = (short) XMaterial.AIR.ordinal();
 
@@ -600,6 +607,90 @@ class BlockShapeTest {
         assertNotNull(shape);
         // Isolated pane shows full cross (crossWhenIsolated=true)
         assertEquals(3, shape.length); // center + 2 arms
+    }
+
+    // ===== Long-key STATE_SHAPE_CACHE correctness =====
+
+    @Test
+    void oakStairsNorthBottomShapeWithLongKey() {
+        SceneData scene = sceneWithState(XMaterial.OAK_STAIRS,
+                "minecraft:oak_stairs[facing=north,half=bottom,shape=straight]");
+        double[][] shape = BlockShape.getShape(scene, 0, 0, 0, XMaterial.OAK_STAIRS);
+        assertNotNull(shape);
+        assertEquals(2, shape.length);
+        // Base: {0, 0, 0, 1, 0.5, 1}
+        assertArrayEquals(new double[]{0, 0, 0, 1, 0.5, 1}, shape[0], 1e-9);
+        // Step north: {0, 0.5, 0, 1, 1, 0.5}
+        assertArrayEquals(new double[]{0, 0.5, 0, 1, 1, 0.5}, shape[1], 1e-9);
+    }
+
+    @Test
+    void topSlabShapeWithLongKey() {
+        SceneData scene = sceneWithState(XMaterial.OAK_SLAB, "minecraft:oak_slab[half=top]");
+        double[][] shape = BlockShape.getShape(scene, 0, 0, 0, XMaterial.OAK_SLAB);
+        assertNotNull(shape);
+        assertEquals(1, shape.length);
+        assertArrayEquals(new double[]{0, 0.5, 0, 1, 1, 1}, shape[0], 1e-9);
+    }
+
+    @Test
+    void openTrapdoorSouthShapeWithLongKey() {
+        SceneData scene = sceneWithState(XMaterial.OAK_TRAPDOOR,
+                "minecraft:oak_trapdoor[facing=south,half=bottom,open=true]");
+        double[][] shape = BlockShape.getShape(scene, 0, 0, 0, XMaterial.OAK_TRAPDOOR);
+        assertNotNull(shape);
+        assertEquals(1, shape.length);
+        assertEquals(13 / 16.0, shape[0][2], 1e-9); // minZ = 13/16
+    }
+
+    @Test
+    void cachedStatefulShapeReturnsSameResult() {
+        // Call twice to exercise cache hit path with long keys
+        SceneData scene = sceneWithState(XMaterial.OAK_STAIRS,
+                "minecraft:oak_stairs[facing=east,half=bottom,shape=straight]");
+        double[][] first = BlockShape.getShape(scene, 0, 0, 0, XMaterial.OAK_STAIRS);
+        double[][] second = BlockShape.getShape(scene, 0, 0, 0, XMaterial.OAK_STAIRS);
+        assertNotNull(first);
+        assertSame(first, second, "Cache hit should return the same array instance");
+    }
+
+    @Test
+    void fullBlockSkipsStatefulShapeLookup() {
+        // Stone has no FLAG_NEEDS_STATE, so getStatefulShape should be skipped entirely
+        SceneData scene = sceneWithState(XMaterial.STONE, "minecraft:stone");
+        double[][] shape = BlockShape.getShape(scene, 0, 0, 0, XMaterial.STONE);
+        assertNull(shape, "Full blocks should return null even with block state present");
+    }
+
+    // ===== State shape cache eviction =====
+
+    @Test
+    void stateShapeCacheStaysBounded() {
+        int insertCount = BlockShape.MAX_STATE_SHAPE_CACHE_SIZE + 500;
+        for (int i = 0; i < insertCount; i++) {
+            // Each unique block state string produces a unique cache key
+            SceneData scene = sceneWithState(XMaterial.OAK_SLAB,
+                    "minecraft:oak_slab[half=top,waterlogged=false,tag=" + i + "]");
+            BlockShape.getShape(scene, 0, 0, 0, XMaterial.OAK_SLAB);
+        }
+        assertTrue(BlockShape.stateShapeCacheSize() <= BlockShape.MAX_STATE_SHAPE_CACHE_SIZE + 1,
+                "State shape cache should be bounded, was: " + BlockShape.stateShapeCacheSize());
+    }
+
+    @Test
+    void stateShapeCorrectnessAfterEviction() {
+        // Fill past the limit to trigger a clear
+        for (int i = 0; i < BlockShape.MAX_STATE_SHAPE_CACHE_SIZE + 100; i++) {
+            SceneData scene = sceneWithState(XMaterial.OAK_STAIRS,
+                    "minecraft:oak_stairs[facing=north,half=bottom,shape=straight,tag=" + i + "]");
+            BlockShape.getShape(scene, 0, 0, 0, XMaterial.OAK_STAIRS);
+        }
+        // Verify correctness after eviction
+        SceneData scene = sceneWithState(XMaterial.OAK_SLAB, "minecraft:oak_slab[half=top]");
+        double[][] shape = BlockShape.getShape(scene, 0, 0, 0, XMaterial.OAK_SLAB);
+        assertNotNull(shape);
+        assertEquals(1, shape.length);
+        assertArrayEquals(new double[]{0, 0.5, 0, 1, 1, 1}, shape[0], 1e-9);
     }
 
     // ===== Helper =====

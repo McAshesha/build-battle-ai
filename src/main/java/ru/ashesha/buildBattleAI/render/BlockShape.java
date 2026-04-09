@@ -16,8 +16,18 @@ import java.util.concurrent.ConcurrentHashMap;
 @UtilityClass
 public class BlockShape {
 
-    /** Cache for shapes resolved from block state properties (slabs, stairs, trapdoors, etc.). */
-    private static final Map<String, double[][]> STATE_SHAPE_CACHE = new ConcurrentHashMap<String, double[][]>();
+    /**
+     * Cache for shapes resolved from block state properties (slabs, stairs, trapdoors, etc.).
+     * Keyed by {@code (ordinal << 32) | hashCode}. Volatile for atomic swap eviction.
+     */
+    private static volatile Map<Long, double[][]> STATE_SHAPE_CACHE = new ConcurrentHashMap<Long, double[][]>();
+
+    /**
+     * Maximum state shape cache size before eviction. Higher than BlockRenderState's limit
+     * because keys include the material ordinal, producing more unique entries.
+     * Clearing is safe — entries are purely a performance cache and will be recomputed on miss.
+     */
+    static final int MAX_STATE_SHAPE_CACHE_SIZE = 2048;
 
     /** Cache for shapes resolved from neighbor connectivity (fences, walls, panes). */
     private static final Map<String, double[][]> CONNECTIVITY_SHAPE_CACHE = new ConcurrentHashMap<String, double[][]>();
@@ -384,8 +394,8 @@ public class BlockShape {
      * @return the connectivity-based shape, or {@code null} if the block is not a connectable type
      */
     private static double[][] getConnectivityShape(SceneData scene, int x, int y, int z, XMaterial material) {
-        String name = material.name();
-        if (!isPaneBlock(name) && !isFenceBlock(name) && !isWallBlock(name)) {
+        int flags = BlockPalette.BLOCK_FLAGS[material.ordinal()];
+        if ((flags & (BlockPalette.FLAG_PANE | BlockPalette.FLAG_FENCE | BlockPalette.FLAG_WALL)) == 0) {
             return null;
         }
 
@@ -395,7 +405,8 @@ public class BlockShape {
         if (connects(scene, x, y, z + 1, material)) mask |= 4;
         if (connects(scene, x - 1, y, z, material)) mask |= 8;
 
-        String family = isPaneBlock(name) ? "pane" : (isFenceBlock(name) ? "fence" : "wall");
+        String family = (flags & BlockPalette.FLAG_PANE) != 0 ? "pane"
+                : (flags & BlockPalette.FLAG_FENCE) != 0 ? "fence" : "wall";
         String key = family + "|" + mask;
         double[][] cached = CONNECTIVITY_SHAPE_CACHE.get(key);
         if (cached != null) {
@@ -414,12 +425,16 @@ public class BlockShape {
      * @return the state-dependent shape, or {@code null} if no state-based shape applies
      */
     private static double[][] getStatefulShape(SceneData scene, int x, int y, int z, XMaterial material) {
+        if ((BlockPalette.BLOCK_FLAGS[material.ordinal()] & BlockPalette.FLAG_NEEDS_STATE) == 0) {
+            return null;
+        }
+
         String blockState = scene.getBlockState(x, y, z);
         if (blockState == null || blockState.isEmpty()) {
             return null;
         }
 
-        String key = material.ordinal() + "|" + blockState;
+        long key = ((long) material.ordinal() << 32) | (blockState.hashCode() & 0xFFFFFFFFL);
         double[][] cached = STATE_SHAPE_CACHE.get(key);
         if (cached != null) {
             return cached;
@@ -428,6 +443,9 @@ public class BlockShape {
         BlockRenderState state = BlockRenderState.of(scene, x, y, z);
         double[][] resolved = buildStatefulShape(material, state);
         if (resolved != null) {
+            if (STATE_SHAPE_CACHE.size() > MAX_STATE_SHAPE_CACHE_SIZE) {
+                STATE_SHAPE_CACHE = new ConcurrentHashMap<Long, double[][]>();
+            }
             STATE_SHAPE_CACHE.put(key, resolved);
         }
         return resolved;
@@ -495,18 +513,19 @@ public class BlockShape {
             return false;
         }
 
-        String sourceName = source.name();
-        String neighborName = neighbor.name();
-        if (isPaneBlock(sourceName)) {
-            return isPaneBlock(neighborName) || (BlockPalette.getAlpha(neighbor) >= 255 && BlockShape.getShape(neighbor) == null);
-        }
-        if (isFenceBlock(sourceName)) {
-            return isFenceBlock(neighborName)
-                    || neighborName.endsWith("_FENCE_GATE")
+        int sourceFlags = BlockPalette.BLOCK_FLAGS[source.ordinal()];
+        int neighborFlags = BlockPalette.BLOCK_FLAGS[neighbor.ordinal()];
+        if ((sourceFlags & BlockPalette.FLAG_PANE) != 0) {
+            return (neighborFlags & BlockPalette.FLAG_PANE) != 0
                     || (BlockPalette.getAlpha(neighbor) >= 255 && BlockShape.getShape(neighbor) == null);
         }
-        if (isWallBlock(sourceName)) {
-            return isWallBlock(neighborName)
+        if ((sourceFlags & BlockPalette.FLAG_FENCE) != 0) {
+            return (neighborFlags & BlockPalette.FLAG_FENCE) != 0
+                    || neighbor.name().endsWith("_FENCE_GATE")
+                    || (BlockPalette.getAlpha(neighbor) >= 255 && BlockShape.getShape(neighbor) == null);
+        }
+        if ((sourceFlags & BlockPalette.FLAG_WALL) != 0) {
+            return (neighborFlags & BlockPalette.FLAG_WALL) != 0
                     || (BlockPalette.getAlpha(neighbor) >= 255 && BlockShape.getShape(neighbor) == null);
         }
         return false;
@@ -731,6 +750,16 @@ public class BlockShape {
     private static double[][] snowShape(int layers) {
         double height = Math.max(1, Math.min(8, layers)) / 8.0;
         return new double[][]{{0, 0, 0, 1, height, 1}};
+    }
+
+    /** Returns the current number of state shape cache entries. Package-visible for testing. */
+    static int stateShapeCacheSize() {
+        return STATE_SHAPE_CACHE.size();
+    }
+
+    /** Replaces the state shape cache with a fresh empty map. Package-visible for testing. */
+    static void clearStateShapeCache() {
+        STATE_SHAPE_CACHE = new ConcurrentHashMap<Long, double[][]>();
     }
 
 }

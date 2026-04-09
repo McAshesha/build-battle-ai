@@ -1,12 +1,18 @@
 package ru.ashesha.buildBattleAI.render;
 
 import com.cryptomorin.xseries.XMaterial;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import ru.ashesha.buildBattleAI.render.data.SceneData;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class BlockRenderStateTest {
+
+    @BeforeEach
+    void clearCaches() {
+        BlockRenderState.clearCache();
+    }
 
     // ===== Default state =====
 
@@ -177,6 +183,37 @@ class BlockRenderStateTest {
         BlockRenderState s1 = BlockRenderState.of(scene1, 0, 0, 0);
         BlockRenderState s2 = BlockRenderState.of(scene2, 0, 0, 0);
         assertEquals(s1, s2);
+    }
+
+    // ===== Cache eviction =====
+
+    @Test
+    void cacheStaysBoundedAfterManyUniqueInserts() {
+        // Insert more entries than the max cache size
+        int insertCount = BlockRenderState.MAX_CACHE_SIZE + 500;
+        for (int i = 0; i < insertCount; i++) {
+            SceneData scene = singleBlockScene("minecraft:block_" + i + "[facing=north]");
+            BlockRenderState state = BlockRenderState.of(scene, 0, 0, 0);
+            assertNotNull(state);
+        }
+        // Cache should have been cleared and only holds the post-clear entries
+        assertTrue(BlockRenderState.cacheSize() <= BlockRenderState.MAX_CACHE_SIZE + 1,
+                "Cache size should be bounded, was: " + BlockRenderState.cacheSize());
+    }
+
+    @Test
+    void correctnessPreservedAfterEviction() {
+        // Fill past the limit to trigger a clear
+        for (int i = 0; i < BlockRenderState.MAX_CACHE_SIZE + 100; i++) {
+            SceneData scene = singleBlockScene("minecraft:filler_" + i + "[facing=east]");
+            BlockRenderState.of(scene, 0, 0, 0);
+        }
+        // Now parse a specific block state and verify correctness
+        SceneData scene = singleBlockScene("minecraft:oak_stairs[facing=south,half=top,shape=inner_left]");
+        BlockRenderState state = BlockRenderState.of(scene, 0, 0, 0);
+        assertEquals("south", state.facing());
+        assertEquals("top", state.half());
+        assertEquals("inner_left", state.shape());
     }
 
     // ===== Helper =====

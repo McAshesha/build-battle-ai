@@ -269,6 +269,20 @@ class BlockPaletteTest {
         assertFalse(BlockPalette.canMergeTranslucent(XMaterial.FROSTED_ICE, XMaterial.ICE));
     }
 
+    // ===== hashedFallbackColor safety (Bug fix: & 0x7FFFFFFF mask) =====
+
+    @Test
+    void getColorNeverThrowsForAnyMaterial() {
+        // Exercises the hashed-fallback path for unmapped materials. Before the fix,
+        // a name whose hashCode() == Integer.MIN_VALUE caused a negative array index.
+        for (XMaterial mat : XMaterial.values()) {
+            assertDoesNotThrow(
+                    () -> BlockPalette.getColor(mat),
+                    "getColor threw for " + mat.name()
+            );
+        }
+    }
+
     // ===== Context-sensitive getColor() =====
 
     @Test
@@ -396,6 +410,155 @@ class BlockPaletteTest {
         assertNotEquals(-1, BlockPalette.getColor(XMaterial.BUBBLE_CORAL_BLOCK));
         assertNotEquals(-1, BlockPalette.getColor(XMaterial.FIRE_CORAL_BLOCK));
         assertNotEquals(-1, BlockPalette.getColor(XMaterial.HORN_CORAL_BLOCK));
+    }
+
+    // ===== BLOCK_FLAGS consistency =====
+
+    @Test
+    void blockFlagsAxisBlockConsistent() {
+        // Verify FLAG_AXIS_BLOCK matches the string-based isAxisBlock logic for all materials
+        for (XMaterial mat : XMaterial.values()) {
+            String name = mat.name();
+            boolean expected = name.endsWith("_LOG")
+                    || name.endsWith("_WOOD")
+                    || name.endsWith("_STEM")
+                    || name.endsWith("_HYPHAE")
+                    || name.equals("BAMBOO_BLOCK")
+                    || name.equals("STRIPPED_BAMBOO_BLOCK")
+                    || name.endsWith("_PILLAR")
+                    || name.equals("CHAIN");
+            boolean actual = (BlockPalette.BLOCK_FLAGS[mat.ordinal()] & BlockPalette.FLAG_AXIS_BLOCK) != 0;
+            assertEquals(expected, actual, "FLAG_AXIS_BLOCK mismatch for " + name);
+        }
+    }
+
+    @Test
+    void blockFlagsFacingFrontConsistent() {
+        for (XMaterial mat : XMaterial.values()) {
+            String name = mat.name();
+            boolean expected = name.equals("FURNACE")
+                    || name.equals("BLAST_FURNACE")
+                    || name.equals("SMOKER")
+                    || name.equals("OBSERVER")
+                    || name.equals("DROPPER")
+                    || name.equals("DISPENSER")
+                    || name.equals("CARVED_PUMPKIN")
+                    || name.equals("JACK_O_LANTERN");
+            boolean actual = (BlockPalette.BLOCK_FLAGS[mat.ordinal()] & BlockPalette.FLAG_FACING_FRONT) != 0;
+            assertEquals(expected, actual, "FLAG_FACING_FRONT mismatch for " + name);
+        }
+    }
+
+    @Test
+    void blockFlagsPaneConsistent() {
+        for (XMaterial mat : XMaterial.values()) {
+            String name = mat.name();
+            boolean expected = name.endsWith("_PANE") || name.equals("IRON_BARS");
+            boolean actual = (BlockPalette.BLOCK_FLAGS[mat.ordinal()] & BlockPalette.FLAG_PANE) != 0;
+            assertEquals(expected, actual, "FLAG_PANE mismatch for " + name);
+        }
+    }
+
+    @Test
+    void blockFlagsFenceConsistent() {
+        for (XMaterial mat : XMaterial.values()) {
+            String name = mat.name();
+            boolean expected = name.endsWith("_FENCE") && !name.contains("GATE");
+            boolean actual = (BlockPalette.BLOCK_FLAGS[mat.ordinal()] & BlockPalette.FLAG_FENCE) != 0;
+            assertEquals(expected, actual, "FLAG_FENCE mismatch for " + name);
+        }
+    }
+
+    @Test
+    void blockFlagsWallConsistent() {
+        for (XMaterial mat : XMaterial.values()) {
+            String name = mat.name();
+            boolean expected = name.endsWith("_WALL");
+            boolean actual = (BlockPalette.BLOCK_FLAGS[mat.ordinal()] & BlockPalette.FLAG_WALL) != 0;
+            assertEquals(expected, actual, "FLAG_WALL mismatch for " + name);
+        }
+    }
+
+    @Test
+    void blockFlagsNeedsStateConsistent() {
+        for (XMaterial mat : XMaterial.values()) {
+            String name = mat.name();
+            boolean expected = name.endsWith("_SLAB")
+                    || name.endsWith("_STAIRS")
+                    || name.endsWith("_TRAPDOOR")
+                    || name.endsWith("_DOOR")
+                    || name.endsWith("_FENCE_GATE")
+                    || name.endsWith("_SIGN")
+                    || name.endsWith("_HANGING_SIGN")
+                    || name.equals("CHAIN")
+                    || name.equals("END_ROD")
+                    || name.equals("LIGHTNING_ROD")
+                    || name.equals("LADDER")
+                    || name.equals("VINE")
+                    || name.equals("WALL_TORCH")
+                    || name.equals("SOUL_WALL_TORCH")
+                    || name.equals("REDSTONE_WALL_TORCH")
+                    || name.equals("SNOW");
+            boolean actual = (BlockPalette.BLOCK_FLAGS[mat.ordinal()] & BlockPalette.FLAG_NEEDS_STATE) != 0;
+            assertEquals(expected, actual, "FLAG_NEEDS_STATE mismatch for " + name);
+        }
+    }
+
+    @Test
+    void stoneHasNoFlags() {
+        assertEquals(0, BlockPalette.BLOCK_FLAGS[XMaterial.STONE.ordinal()]);
+    }
+
+    @Test
+    void oakLogHasAxisFlag() {
+        assertTrue((BlockPalette.BLOCK_FLAGS[XMaterial.OAK_LOG.ordinal()] & BlockPalette.FLAG_AXIS_BLOCK) != 0);
+    }
+
+    @Test
+    void furnaceHasFacingFrontFlag() {
+        assertTrue((BlockPalette.BLOCK_FLAGS[XMaterial.FURNACE.ordinal()] & BlockPalette.FLAG_FACING_FRONT) != 0);
+    }
+
+    @Test
+    void glassPaneHasPaneFlag() {
+        assertTrue((BlockPalette.BLOCK_FLAGS[XMaterial.GLASS_PANE.ordinal()] & BlockPalette.FLAG_PANE) != 0);
+    }
+
+    @Test
+    void ironBarsHasPaneFlag() {
+        assertTrue((BlockPalette.BLOCK_FLAGS[XMaterial.IRON_BARS.ordinal()] & BlockPalette.FLAG_PANE) != 0);
+    }
+
+    @Test
+    void oakFenceHasFenceFlag() {
+        assertTrue((BlockPalette.BLOCK_FLAGS[XMaterial.OAK_FENCE.ordinal()] & BlockPalette.FLAG_FENCE) != 0);
+    }
+
+    @Test
+    void cobblestoneWallHasWallFlag() {
+        assertTrue((BlockPalette.BLOCK_FLAGS[XMaterial.COBBLESTONE_WALL.ordinal()] & BlockPalette.FLAG_WALL) != 0);
+    }
+
+    @Test
+    void oakSlabHasNeedsStateFlag() {
+        assertTrue((BlockPalette.BLOCK_FLAGS[XMaterial.OAK_SLAB.ordinal()] & BlockPalette.FLAG_NEEDS_STATE) != 0);
+    }
+
+    @Test
+    void oakStairsHasNeedsStateFlag() {
+        assertTrue((BlockPalette.BLOCK_FLAGS[XMaterial.OAK_STAIRS.ordinal()] & BlockPalette.FLAG_NEEDS_STATE) != 0);
+    }
+
+    @Test
+    void oakTrapdoorHasNeedsStateFlag() {
+        assertTrue((BlockPalette.BLOCK_FLAGS[XMaterial.OAK_TRAPDOOR.ordinal()] & BlockPalette.FLAG_NEEDS_STATE) != 0);
+    }
+
+    @Test
+    void fenceGateHasNeedsStateButNotFenceFlag() {
+        int flags = BlockPalette.BLOCK_FLAGS[XMaterial.OAK_FENCE_GATE.ordinal()];
+        assertTrue((flags & BlockPalette.FLAG_NEEDS_STATE) != 0, "Fence gate should have FLAG_NEEDS_STATE");
+        assertEquals(0, flags & BlockPalette.FLAG_FENCE, "Fence gate should NOT have FLAG_FENCE");
     }
 
     // ===== Helper =====

@@ -9,6 +9,7 @@ import ru.ashesha.buildBattleAI.commands.ShotCommand;
 import ru.ashesha.buildBattleAI.game.GameManager;
 import ru.ashesha.buildBattleAI.listeners.PlayerJoinListener;
 import ru.ashesha.buildBattleAI.message.MessageService;
+import ru.ashesha.buildBattleAI.render.CpuRenderer;
 
 /**
  * Centralized startup and shutdown coordinator for the plugin.
@@ -63,5 +64,6 @@ public class PluginBootstrap {
     public void disable() {
         gameManager.shutdown();
         arenaManager.shutdown();
+        CpuRenderer.shutdown();
     }
 }

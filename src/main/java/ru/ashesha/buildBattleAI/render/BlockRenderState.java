@@ -30,8 +30,11 @@ public class BlockRenderState {
             0
     );
 
-    /** Thread-safe cache keyed by raw block state strings. */
-    private static final Map<String, BlockRenderState> CACHE = new ConcurrentHashMap<String, BlockRenderState>();
+    /**
+     * Thread-safe cache keyed by raw block state strings.
+     * Volatile so that atomic swap (for eviction) is visible to all render threads.
+     */
+    private static volatile Map<String, BlockRenderState> CACHE = new ConcurrentHashMap<String, BlockRenderState>();
 
     /** Horizontal direction the block faces (north/south/east/west). */
     String facing;
@@ -60,6 +63,14 @@ public class BlockRenderState {
      * @param z     world Z coordinate
      * @return the parsed render state, never {@code null}
      */
+    /**
+     * Maximum cache size before eviction. Generous for steady-state working sets
+     * (a typical build scene uses a few hundred unique block states) but prevents
+     * unbounded growth on long-running servers. Clearing is safe — entries are purely
+     * a performance optimization and will be recomputed on next access.
+     */
+    static final int MAX_CACHE_SIZE = 1024;
+
     public static BlockRenderState of(SceneData scene, int x, int y, int z) {
         String blockState = scene.getBlockState(x, y, z);
         if (blockState == null || blockState.isEmpty()) {
@@ -69,9 +80,22 @@ public class BlockRenderState {
         if (cached != null) {
             return cached;
         }
+        if (CACHE.size() > MAX_CACHE_SIZE) {
+            CACHE = new ConcurrentHashMap<String, BlockRenderState>();
+        }
         BlockRenderState parsed = parse(blockState);
         CACHE.put(blockState, parsed);
         return parsed;
+    }
+
+    /** Returns the current number of cached entries. Package-visible for testing. */
+    static int cacheSize() {
+        return CACHE.size();
+    }
+
+    /** Replaces the cache with a fresh empty map. Package-visible for testing. */
+    static void clearCache() {
+        CACHE = new ConcurrentHashMap<String, BlockRenderState>();
     }
 
     /** Parses all render-relevant properties from a raw block state string. */

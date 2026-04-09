@@ -46,6 +46,27 @@ public class BlockPalette {
     /** Whether each material emits light and bypasses face shading. */
     private static final boolean[] EMISSIVE = new boolean[XMaterial.values().length];
 
+    /** Bit flag: block has an orientation axis (logs, pillars, chains, stems, hyphae). */
+    static final int FLAG_AXIS_BLOCK = 1;
+
+    /** Bit flag: block has a distinct front face (furnace, observer, dispenser, carved pumpkin, etc.). */
+    static final int FLAG_FACING_FRONT = 1 << 1;
+
+    /** Bit flag: glass pane or iron bars (connects to neighbors via pane connectivity). */
+    static final int FLAG_PANE = 1 << 2;
+
+    /** Bit flag: fence post, not gates (connects to neighbors via fence connectivity). */
+    static final int FLAG_FENCE = 1 << 3;
+
+    /** Bit flag: wall block (connects to neighbors via wall connectivity). */
+    static final int FLAG_WALL = 1 << 4;
+
+    /** Bit flag: block whose shape depends on block state (slabs, stairs, trapdoors, doors, gates, signs, snow, chains, end rods, ladders, vines, wall torches). */
+    static final int FLAG_NEEDS_STATE = 1 << 5;
+
+    /** Pre-computed per-material flag bits, indexed by {@link XMaterial#ordinal()}. Eliminates runtime string checks in the render hot path. */
+    static final int[] BLOCK_FLAGS = new int[XMaterial.values().length];
+
     /** Prefix strings for Minecraft's 16 dye colors, used for name-based color inference. */
     private static final String[] DYE_PREFIXES = {
             "LIGHT_BLUE_", "LIGHT_GRAY_",
@@ -590,6 +611,19 @@ public class BlockPalette {
                 EMISSIVE[mat.ordinal()] = true;
             }
         }
+
+        // Populate per-material flag bits from name-based helpers (executed once at class load)
+        for (XMaterial mat : XMaterial.values()) {
+            String name = mat.name();
+            int flags = 0;
+            if (isAxisBlock(name)) flags |= FLAG_AXIS_BLOCK;
+            if (isFacingFrontBlock(name)) flags |= FLAG_FACING_FRONT;
+            if (isPaneBlock(name)) flags |= FLAG_PANE;
+            if (isFenceBlock(name)) flags |= FLAG_FENCE;
+            if (isWallBlock(name)) flags |= FLAG_WALL;
+            if (isNeedsStateBlock(name)) flags |= FLAG_NEEDS_STATE;
+            BLOCK_FLAGS[mat.ordinal()] = flags;
+        }
     }
 
     /**
@@ -644,15 +678,15 @@ public class BlockPalette {
             return 0x70552E;
         }
 
-        String name = material.name();
+        int flags = BLOCK_FLAGS[material.ordinal()];
+        if ((flags & (FLAG_AXIS_BLOCK | FLAG_FACING_FRONT)) == 0) {
+            return color;
+        }
         BlockRenderState state = BlockRenderState.of(scene, x, y, z);
-        if (isAxisBlock(name)) {
+        if ((flags & FLAG_AXIS_BLOCK) != 0) {
             return colorForAxisBlock(color, state.axis(), hitFace);
         }
-        if (isFacingFrontBlock(name)) {
-            return colorForFacingBlock(color, frontColor(material, color), state.facing(), hitFace, dx, dy, dz);
-        }
-        return color;
+        return colorForFacingBlock(color, frontColor(material, color), state.facing(), hitFace, dx, dy, dz);
     }
 
     /**
@@ -979,7 +1013,8 @@ public class BlockPalette {
      */
     private static int hashedFallbackColor(String name) {
         int hash = name.hashCode();
-        int seed = Math.abs(hash);
+        // Bitmask instead of Math.abs: Math.abs(Integer.MIN_VALUE) is still negative (two's complement overflow)
+        int seed = hash & 0x7FFFFFFF;
 
         int[] palette = {
                 0x7D7D7D, 0x8A8177, 0x9A6C50, 0xA88654,
@@ -1046,6 +1081,41 @@ public class BlockPalette {
                 || name.equals("DISPENSER")
                 || name.equals("CARVED_PUMPKIN")
                 || name.equals("JACK_O_LANTERN");
+    }
+
+    /** Returns whether the block is a glass pane or iron bars. Used in static initializer for flag computation. */
+    private static boolean isPaneBlock(String name) {
+        return name.endsWith("_PANE") || name.equals("IRON_BARS");
+    }
+
+    /** Returns whether the block is a fence (not a gate). Used in static initializer for flag computation. */
+    private static boolean isFenceBlock(String name) {
+        return name.endsWith("_FENCE") && !name.contains("GATE");
+    }
+
+    /** Returns whether the block is a wall. Used in static initializer for flag computation. */
+    private static boolean isWallBlock(String name) {
+        return name.endsWith("_WALL");
+    }
+
+    /** Returns whether the block's shape depends on block state properties. Used in static initializer for flag computation. */
+    private static boolean isNeedsStateBlock(String name) {
+        return name.endsWith("_SLAB")
+                || name.endsWith("_STAIRS")
+                || name.endsWith("_TRAPDOOR")
+                || name.endsWith("_DOOR")
+                || name.endsWith("_FENCE_GATE")
+                || name.endsWith("_SIGN")
+                || name.endsWith("_HANGING_SIGN")
+                || name.equals("CHAIN")
+                || name.equals("END_ROD")
+                || name.equals("LIGHTNING_ROD")
+                || name.equals("LADDER")
+                || name.equals("VINE")
+                || name.equals("WALL_TORCH")
+                || name.equals("SOUL_WALL_TORCH")
+                || name.equals("REDSTONE_WALL_TORCH")
+                || name.equals("SNOW");
     }
 
     /**
