@@ -85,6 +85,7 @@ public class FlatScene implements SceneData {
     /**
      * Convert a {@link ChunkScene} into a flat array scene.
      * Can be called from any thread (SceneSnapshot is thread-safe).
+     * Preserves legacy block data on 1.8–1.12 servers for sub-type and state resolution.
      */
     public static FlatScene fromSnapshot(ChunkScene snapshot) {
         int minX = snapshot.minX(), minY = snapshot.minY(), minZ = snapshot.minZ();
@@ -94,6 +95,9 @@ public class FlatScene implements SceneData {
 
         short[] data = new short[sizeX * sizeY * sizeZ];
         String[] blockStates = new String[data.length];
+        boolean hasLegacy = snapshot.hasLegacyBlockData();
+        byte[] legacyBlockData = hasLegacy ? new byte[data.length] : null;
+
         for (int x = 0; x < sizeX; x++) {
             for (int y = 0; y < sizeY; y++) {
                 for (int z = 0; z < sizeZ; z++) {
@@ -103,11 +107,14 @@ public class FlatScene implements SceneData {
                     int worldZ = z + minZ;
                     data[index] = (short) snapshot.getBlockType(worldX, worldY, worldZ).ordinal();
                     blockStates[index] = snapshot.getBlockState(worldX, worldY, worldZ);
+                    if (legacyBlockData != null) {
+                        legacyBlockData[index] = snapshot.getLegacyBlockData(worldX, worldY, worldZ);
+                    }
                 }
             }
         }
 
-        return new FlatScene(data, null, blockStates, minX, minY, minZ,
+        return new FlatScene(data, legacyBlockData, blockStates, minX, minY, minZ,
                 sizeX, sizeY, sizeZ, SourceFormat.RUNTIME, "runtime");
     }
 

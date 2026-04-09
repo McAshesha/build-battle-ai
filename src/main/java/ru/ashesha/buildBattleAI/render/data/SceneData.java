@@ -57,6 +57,16 @@ public interface SceneData {
     }
 
     /**
+     * Returns whether this scene contains meaningful legacy block data values.
+     * Only true on 1.8–1.12 captures where data values distinguish sub-types.
+     *
+     * @return {@code true} if {@link #getLegacyBlockData(int, int, int)} may return non-zero values
+     */
+    default boolean hasLegacyBlockData() {
+        return false;
+    }
+
+    /**
      * Returns the block state string at the given world coordinates
      * (e.g., {@code "minecraft:oak_stairs[facing=north,half=bottom]"}).
      * Default returns {@code null} (no state information available).

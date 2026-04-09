@@ -1,6 +1,8 @@
 package ru.ashesha.buildBattleAI.render.data;
 
 import com.cryptomorin.xseries.XMaterial;
+import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.Accessors;
@@ -8,10 +10,19 @@ import org.bukkit.ChunkSnapshot;
 import org.bukkit.Material;
 import org.bukkit.World;
 
+import java.lang.reflect.Method;
+import java.util.Optional;
+
 /**
  * Thread-safe snapshot of block data within a render region.
  * Must be created on the main server thread via {@link #capture(RenderRegion)}.
  * Once created, all methods are safe to call from any thread.
+ * <p>
+ * Multi-version: works on 1.8–1.21+.
+ * <ul>
+ *     <li>1.13+: uses {@code BlockData.getAsString()} for block states</li>
+ *     <li>1.8–1.12: uses legacy data values + {@link LegacyBlockStates} for synthetic state strings</li>
+ * </ul>
  */
 @Accessors(fluent = true)
 public class ChunkScene implements SceneData {
@@ -21,6 +32,13 @@ public class ChunkScene implements SceneData {
 
     /** Flat array of material ordinals, indexed by {@link #indexOf(int, int, int)}. */
     private final short[] data;
+
+    /**
+     * Legacy block data values (0–15) for each voxel. Only populated on 1.8–1.12 servers
+     * where data values encode sub-types (wool colors, slab positions, stair facing, etc.).
+     * {@code null} on 1.13+ servers.
+     */
+    private final byte[] legacyData;
 
     /**
      * Stored chunk snapshots for lazy block state resolution.
@@ -43,12 +61,13 @@ public class ChunkScene implements SceneData {
     @Getter
     private final int minX, minY, minZ, maxX, maxY, maxZ;
 
-    private ChunkScene(short[] data, ChunkSnapshot[] snapshots,
+    private ChunkScene(short[] data, byte[] legacyData, ChunkSnapshot[] snapshots,
                        int minCx, int minCz, int czCount,
                        int sizeY, int sizeZ, int sizeYZ,
                        int minX, int minY, int minZ,
                        int maxX, int maxY, int maxZ) {
         this.data = data;
+        this.legacyData = legacyData;
         this.snapshots = snapshots;
         this.minCx = minCx;
         this.minCz = minCz;
@@ -64,11 +83,82 @@ public class ChunkScene implements SceneData {
         this.maxZ = maxZ;
     }
 
+    // ── Version detection ────────────────────────────────────────────────────
+
+    /**
+     * Lazily-initialized version state. The inner class is loaded (and its static
+     * initializer runs) on first access to any of its fields — guaranteed to happen
+     * after PacketEvents is initialized, because {@link #capture(RenderRegion)} is
+     * only called from commands/game logic (post-enable).
+     * <p>
+     * Thread-safe: JVM guarantees that class initialization is synchronized.
+     */
+    private static class Version {
+        /** {@code true} on 1.8–1.12 servers (pre-flattening). */
+        static final boolean IS_LEGACY;
+
+        /**
+         * Reflective handle to the legacy {@code ChunkSnapshot.getBlockData(int, int, int)}
+         * which returns {@code int} (0–15) on 1.8–1.12. {@code null} on 1.13+.
+         * <p>
+         * On 1.13+ the same method name returns {@code org.bukkit.block.data.BlockData},
+         * so we must use reflection to call the int-returning version on legacy servers.
+         */
+        static final Method GET_LEGACY_DATA;
+
+        static {
+            ServerVersion sv = PacketEvents.getAPI().getServerManager().getVersion();
+            IS_LEGACY = !sv.isNewerThanOrEquals(ServerVersion.V_1_13);
+            if (IS_LEGACY) {
+                try {
+                    GET_LEGACY_DATA = ChunkSnapshot.class.getMethod("getBlockData",
+                            int.class, int.class, int.class);
+                } catch (NoSuchMethodException e) {
+                    throw new ExceptionInInitializerError(e);
+                }
+            } else {
+                GET_LEGACY_DATA = null;
+            }
+        }
+
+        /**
+         * Invokes the legacy {@code getBlockData(int,int,int)} via reflection.
+         *
+         * @return the legacy data value (0–15), or 0 on failure
+         */
+        static int getLegacyData(ChunkSnapshot snapshot, int x, int y, int z) {
+            try {
+                return (Integer) GET_LEGACY_DATA.invoke(snapshot, x, y, z);
+            } catch (Exception e) {
+                return 0;
+            }
+        }
+    }
+
+    /**
+     * Isolates the 1.13+ {@code BlockData} reference into a separate inner class
+     * so that the JVM never attempts to resolve {@code org.bukkit.block.data.BlockData}
+     * on 1.8–1.12 servers (where the class does not exist).
+     */
+    private static class ModernBlockState {
+        static String resolve(ChunkSnapshot snapshot, int x, int y, int z) {
+            return snapshot.getBlockData(x, y, z).getAsString();
+        }
+    }
+
+    // ── Capture ──────────────────────────────────────────────────────────────
+
     /**
      * Capture chunk snapshots for the given region.
      * MUST be called on the main server thread.
+     * <p>
+     * On 1.8–1.12 servers, additionally captures legacy data values via reflection
+     * and resolves materials through {@code XMaterial.matchXMaterial("NAME:data")}
+     * for correct sub-type mapping (e.g., colored wool, wood variants).
      */
     public static ChunkScene capture(RenderRegion region) {
+        boolean legacy = Version.IS_LEGACY;
+
         int minCx = region.minX() >> 4;
         int minCz = region.minZ() >> 4;
         int maxCx = region.maxX() >> 4;
@@ -77,6 +167,7 @@ public class ChunkScene implements SceneData {
         int sizeY = region.maxY() - region.minY() + 1;
         int sizeZ = region.maxZ() - region.minZ() + 1;
         short[] data = new short[sizeX * sizeY * sizeZ];
+        byte[] legacyDataArray = legacy ? new byte[data.length] : null;
 
         int cxCount = maxCx - minCx + 1;
         int czCount = maxCz - minCz + 1;
@@ -105,18 +196,60 @@ public class ChunkScene implements SceneData {
                             + (y - region.minY()) * sizeZ
                             + (z - region.minZ());
 
-                    Material material = snapshot.getBlockType(localX, y, localZ);
-                    XMaterial xMaterial = XMaterial.matchXMaterial(material);
-                    data[flatIndex] = (short) (xMaterial == null ? XMaterial.AIR.ordinal() : xMaterial.ordinal());
+                    if (legacy) {
+                        Material material = snapshot.getBlockType(localX, y, localZ);
+                        int ld = Version.getLegacyData(snapshot, localX, y, localZ);
+                        XMaterial xMaterial = matchLegacyMaterial(material, ld);
+                        data[flatIndex] = (short) xMaterial.ordinal();
+                        legacyDataArray[flatIndex] = (byte) ld;
+                    } else {
+                        Material material = snapshot.getBlockType(localX, y, localZ);
+                        XMaterial xMaterial = XMaterial.matchXMaterial(material);
+                        data[flatIndex] = (short) xMaterial.ordinal();
+                    }
                 }
             }
         }
 
-        return new ChunkScene(data, snapshots, minCx, minCz, czCount,
+        return new ChunkScene(data, legacyDataArray, snapshots, minCx, minCz, czCount,
                 sizeY, sizeZ, sizeY * sizeZ,
                 region.minX(), region.minY(), region.minZ(),
                 region.maxX(), region.maxY(), region.maxZ());
     }
+
+    /**
+     * Matches a legacy Material + data value to XMaterial using the {@code "NAME:data"} format.
+     * Falls back to data-less matching, then to {@link XMaterial#AIR} on failure.
+     * <p>
+     * Handles blocks where data values encode both sub-type and state (e.g., slabs
+     * use bits 0–2 for material variant and bit 3 for top/bottom position).
+     */
+    private static XMaterial matchLegacyMaterial(Material material, int data) {
+        // Full data match handles most blocks: colored wool, stained glass, etc.
+        Optional<XMaterial> opt = XMaterial.matchXMaterial(material.name() + ":" + data);
+        if (opt.isPresent()) {
+            return opt.get();
+        }
+
+        // For blocks with mixed type+state data (slabs with bit 3 = position,
+        // logs with bits 2–3 = axis), mask out state bits and retry.
+        if (data > 7) {
+            opt = XMaterial.matchXMaterial(material.name() + ":" + (data & 7));
+            if (opt.isPresent()) {
+                return opt.get();
+            }
+        }
+
+        // Final fallback: material-only match (loses sub-type but won't return AIR
+        // for valid blocks)
+        try {
+            return XMaterial.matchXMaterial(material);
+        } catch (IllegalArgumentException e) {
+            return XMaterial.AIR;
+        }
+    }
+
+    // ── SceneData implementation ─────────────────────────────────────────────
 
     /**
      * Get block material at world coordinates. Thread-safe.
@@ -127,21 +260,43 @@ public class ChunkScene implements SceneData {
         return MATERIAL_VALUES[data[index] & 0xFFFF];
     }
 
-    // legacyBlockData removed — unused on 1.13+ servers, and the SceneData default returns 0.
+    @Override
+    public byte getLegacyBlockData(int wx, int wy, int wz) {
+        if (legacyData == null) return 0;
+        int index = indexOf(wx, wy, wz);
+        if (index < 0) return 0;
+        return legacyData[index];
+    }
+
+    @Override
+    public boolean hasLegacyBlockData() {
+        return legacyData != null;
+    }
 
     /**
-     * Lazily resolves the block state string from the stored ChunkSnapshot.
-     * Only called by the renderer for stateful blocks (stairs, slabs, etc.),
-     * so the vast majority of voxels never allocate a String.
-     * Thread-safe: ChunkSnapshot is immutable, and getAsString() creates a new String each call.
+     * Lazily resolves the block state string.
+     * <ul>
+     *     <li>1.13+: delegates to {@code ChunkSnapshot.getBlockData().getAsString()}
+     *         via {@link ModernBlockState} (isolated to avoid loading {@code BlockData} on legacy servers)</li>
+     *     <li>1.8–1.12: converts stored legacy data values to synthetic state strings
+     *         via {@link LegacyBlockStates}</li>
+     * </ul>
+     * Thread-safe: ChunkSnapshot is immutable, and LegacyBlockStates is stateless.
      */
     @Override
     public String getBlockState(int wx, int wy, int wz) {
-        if (indexOf(wx, wy, wz) < 0) return null;
+        int index = indexOf(wx, wy, wz);
+        if (index < 0) return null;
+
+        if (legacyData != null) {
+            XMaterial material = MATERIAL_VALUES[data[index] & 0xFFFF];
+            return LegacyBlockStates.toBlockState(material, legacyData[index]);
+        }
+
         int cx = wx >> 4;
         int cz = wz >> 4;
         ChunkSnapshot snapshot = snapshots[(cx - minCx) * czCount + (cz - minCz)];
-        return snapshot.getBlockData(wx & 15, wy, wz & 15).getAsString();
+        return ModernBlockState.resolve(snapshot, wx & 15, wy, wz & 15);
     }
 
     /**
