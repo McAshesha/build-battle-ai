@@ -4,6 +4,7 @@ import com.cryptomorin.xseries.XMaterial;
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.Accessors;
 import org.bukkit.ChunkSnapshot;
@@ -156,7 +157,7 @@ public class ChunkScene implements SceneData {
      * and resolves materials through {@code XMaterial.matchXMaterial("NAME:data")}
      * for correct sub-type mapping (e.g., colored wool, wood variants).
      */
-    public static ChunkScene capture(RenderRegion region) {
+    public static ChunkScene capture(@NonNull RenderRegion region) {
         boolean legacy = Version.IS_LEGACY;
 
         int minCx = region.minX() >> 4;

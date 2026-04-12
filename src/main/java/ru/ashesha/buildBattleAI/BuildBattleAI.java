@@ -4,7 +4,6 @@ import com.github.retrooper.packetevents.PacketEvents;
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
 import lombok.Getter;
 import org.bukkit.plugin.java.JavaPlugin;
-import ru.ashesha.buildBattleAI.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.core.PluginBootstrap;
 
 /**
@@ -32,6 +31,7 @@ public final class BuildBattleAI extends JavaPlugin {
     public void onLoad() {
         PacketEvents.setAPI(SpigotPacketEventsBuilder.build(this));
         PacketEvents.getAPI().load();
+        bootstrap = new PluginBootstrap(this);
     }
 
     /**
@@ -41,10 +41,7 @@ public final class BuildBattleAI extends JavaPlugin {
     @Override
     public void onEnable() {
         PacketEvents.getAPI().init();
-
-        bootstrap = new PluginBootstrap(this);
         bootstrap.enable();
-
         getLogger().info("BuildBattleAI v" + getDescription().getVersion() + " has been enabled!");
     }
 
@@ -54,20 +51,9 @@ public final class BuildBattleAI extends JavaPlugin {
      */
     @Override
     public void onDisable() {
-        if (bootstrap != null) {
-            bootstrap.disable();
-        }
+        bootstrap.disable();
         PacketEvents.getAPI().terminate();
         getLogger().info("BuildBattleAI has been disabled.");
     }
 
-    /**
-     * Returns the message service for sending packet-based messages to players,
-     * or {@code null} if the plugin has not finished enabling yet.
-     *
-     * @return the active message service, or {@code null}
-     */
-    public BBAIMessageService getMessageService() {
-        return bootstrap == null ? null : bootstrap.getMessageService();
-    }
 }

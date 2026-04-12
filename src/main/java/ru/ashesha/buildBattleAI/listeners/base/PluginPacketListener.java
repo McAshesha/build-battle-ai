@@ -4,7 +4,8 @@ import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.event.PacketListener;
 import com.github.retrooper.packetevents.event.PacketListenerCommon;
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
-import lombok.Getter;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 
 /**
@@ -15,38 +16,17 @@ import ru.ashesha.buildBattleAI.BuildBattleAI;
  * Subclasses override PacketEvents handler methods
  * (e.g., {@code onPacketReceive}, {@code onPacketSend}).
  */
-@Getter
+@RequiredArgsConstructor
 public abstract class PluginPacketListener implements PacketListener {
 
     /** Reference to the plugin instance for accessing managers and server API. */
-    protected final BuildBattleAI plugin;
+    @NonNull protected final BuildBattleAI plugin;
 
     /** The priority at which this listener intercepts packets. */
-    private final PacketListenerPriority priority;
+    @NonNull private final PacketListenerPriority priority;
 
     /** Handle to the registered listener, used for unregistration. */
     private PacketListenerCommon registeredListener;
-
-    /**
-     * Creates a packet listener with {@link PacketListenerPriority#NORMAL} priority.
-     *
-     * @param plugin the plugin instance
-     */
-    protected PluginPacketListener(BuildBattleAI plugin) {
-        this.plugin = plugin;
-        this.priority = PacketListenerPriority.NORMAL;
-    }
-
-    /**
-     * Creates a packet listener with a custom priority.
-     *
-     * @param plugin   the plugin instance
-     * @param priority the packet interception priority
-     */
-    protected PluginPacketListener(BuildBattleAI plugin, PacketListenerPriority priority) {
-        this.plugin = plugin;
-        this.priority = priority;
-    }
 
     /**
      * Registers this listener with the PacketEvents event manager.

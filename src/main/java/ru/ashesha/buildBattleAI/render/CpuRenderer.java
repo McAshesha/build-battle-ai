@@ -1,6 +1,7 @@
 package ru.ashesha.buildBattleAI.render;
 
 import com.cryptomorin.xseries.XMaterial;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.UtilityClass;
 import ru.ashesha.buildBattleAI.render.data.SceneData;
@@ -93,7 +94,7 @@ public class CpuRenderer {
      * @param pitch camera pitch (-90=up, 0=horizontal, 90=down)
      * @return byte array of size 224*224*3 containing RGB pixel data in row-major HWC order
      */
-    public static byte[] render(SceneData scene,
+    public static byte[] render(@NonNull SceneData scene,
                                 double camX, double camY, double camZ,
                                 float yaw, float pitch) {
         byte[] pixels = new byte[WIDTH * HEIGHT * 3];
@@ -666,7 +667,7 @@ public class CpuRenderer {
     /**
      * Convert raw RGB byte array to a BufferedImage for saving as PNG.
      */
-    public static BufferedImage toBufferedImage(byte[] rgb) {
+    public static BufferedImage toBufferedImage(@NonNull byte[] rgb) {
         BufferedImage image = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
         int[] pixels = new int[WIDTH * HEIGHT];
         for (int i = 0; i < WIDTH * HEIGHT; i++) {

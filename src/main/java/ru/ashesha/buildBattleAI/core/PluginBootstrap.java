@@ -1,6 +1,7 @@
 package ru.ashesha.buildBattleAI.core;
 
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.ArenaManager;
@@ -8,6 +9,7 @@ import ru.ashesha.buildBattleAI.commands.BBAICommand;
 import ru.ashesha.buildBattleAI.commands.ShotCommand;
 import ru.ashesha.buildBattleAI.game.GameManager;
 import ru.ashesha.buildBattleAI.listeners.PlayerJoinListener;
+import ru.ashesha.buildBattleAI.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.message.MessageService;
 import ru.ashesha.buildBattleAI.render.CpuRenderer;
 
@@ -24,14 +26,13 @@ import ru.ashesha.buildBattleAI.render.CpuRenderer;
  * Shutdown occurs in reverse dependency order (game manager before arena manager).
  */
 @RequiredArgsConstructor
-@Getter
 public class PluginBootstrap {
 
-    private final BuildBattleAI plugin;
+    @NonNull private final BuildBattleAI plugin;
 
-    private ArenaManager arenaManager;
-    private GameManager gameManager;
-    private MessageService messageService;
+    @Getter private ArenaManager arenaManager;
+    @Getter private GameManager gameManager;
+    @Getter private BBAIMessageService messageService;
 
     /**
      * Initializes all plugin subsystems, registers commands and event listeners.

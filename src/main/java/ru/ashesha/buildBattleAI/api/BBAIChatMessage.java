@@ -3,6 +3,7 @@ package ru.ashesha.buildBattleAI.api;
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 import java.util.ArrayList;
@@ -48,7 +49,7 @@ public class BBAIChatMessage {
      * @param text the message text (supports {@code &} color codes)
      * @return a new message containing a single text segment
      */
-    public static BBAIChatMessage of(String text) {
+    public static BBAIChatMessage of(@NonNull String text) {
         return builder().append(text).build();
     }
 
@@ -60,7 +61,7 @@ public class BBAIChatMessage {
      * @param replacement the string to substitute in
      * @return a new message with replacements applied
      */
-    public BBAIChatMessage replace(String target, String replacement) {
+    public BBAIChatMessage replace(@NonNull String target, @NonNull String replacement) {
         List<Segment> replacedSegments = new ArrayList<Segment>(segments.size());
         for (Segment segment : segments) {
             replacedSegments.add(segment.replace(target, replacement));
@@ -90,7 +91,7 @@ public class BBAIChatMessage {
     public static class Segment {
 
         /** The display text for this segment (supports {@code &} color codes). */
-        private final String text;
+        @NonNull private final String text;
         /** The action triggered on click, or {@code null} for no click behavior. */
         private final ClickAction clickAction;
         /** The value associated with the click action (URL, command, etc.), or {@code null}. */
@@ -138,7 +139,7 @@ public class BBAIChatMessage {
          * @param text the display text
          * @return this builder for chaining
          */
-        public Builder append(String text) {
+        public Builder append(@NonNull String text) {
             return append(text, null, null, null);
         }
 
@@ -149,7 +150,7 @@ public class BBAIChatMessage {
          * @param hoverText the tooltip shown on hover
          * @return this builder for chaining
          */
-        public Builder append(String text, String hoverText) {
+        public Builder append(@NonNull String text, String hoverText) {
             return append(text, null, null, hoverText);
         }
 
@@ -161,7 +162,7 @@ public class BBAIChatMessage {
          * @param clickValue  the value for the click action (URL or command)
          * @return this builder for chaining
          */
-        public Builder append(String text, ClickAction clickAction, String clickValue) {
+        public Builder append(@NonNull String text, ClickAction clickAction, String clickValue) {
             return append(text, clickAction, clickValue, null);
         }
 
@@ -174,7 +175,7 @@ public class BBAIChatMessage {
          * @param hoverText   the tooltip shown on hover, or {@code null}
          * @return this builder for chaining
          */
-        public Builder append(String text, ClickAction clickAction, String clickValue, String hoverText) {
+        public Builder append(@NonNull String text, ClickAction clickAction, String clickValue, String hoverText) {
             segments.add(new Segment(text, clickAction, clickValue, hoverText));
             return this;
         }

@@ -11,6 +11,7 @@ import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.api.BBAIChatMessage;
 import ru.ashesha.buildBattleAI.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.api.BBAITitleTimes;
+import ru.ashesha.buildBattleAI.core.PluginBootstrap;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -24,11 +25,14 @@ import static org.mockito.Mockito.*;
 class BBAICommandTest {
 
     private BuildBattleAI plugin;
+    private PluginBootstrap bootstrap;
     private BBAICommand command;
 
     @BeforeEach
     void setUp() {
         plugin = mock(BuildBattleAI.class);
+        bootstrap = mock(PluginBootstrap.class);
+        when(plugin.getBootstrap()).thenReturn(bootstrap);
         when(plugin.getLogger()).thenReturn(mock(Logger.class));
         command = new BBAICommand(plugin);
     }
@@ -67,7 +71,7 @@ class BBAICommandTest {
     @Test
     void demoWithNullMessageServiceSendsError() {
         Player player = mock(Player.class);
-        when(plugin.getMessageService()).thenReturn(null);
+        when(bootstrap.getMessageService()).thenReturn(null);
         command.onCommand(player, null, "bbai", new String[]{"demo"});
         verify(player).sendMessage("\u00a7cMessageService is not available.");
     }
@@ -76,7 +80,7 @@ class BBAICommandTest {
     void demoUnknownModeSendsError() {
         Player player = mock(Player.class);
         BBAIMessageService ms = mock(BBAIMessageService.class);
-        when(plugin.getMessageService()).thenReturn(ms);
+        when(bootstrap.getMessageService()).thenReturn(ms);
         command.onCommand(player, null, "bbai", new String[]{"demo", "invalid"});
         verify(player).sendMessage(contains("Unknown demo mode"));
     }
@@ -94,7 +98,7 @@ class BBAICommandTest {
     void demoChatSendsChatMessage() {
         Player player = mock(Player.class);
         BBAIMessageService ms = mock(BBAIMessageService.class);
-        when(plugin.getMessageService()).thenReturn(ms);
+        when(bootstrap.getMessageService()).thenReturn(ms);
 
         command.onCommand(player, null, "bbai", new String[]{"demo", "chat"});
 
@@ -106,7 +110,7 @@ class BBAICommandTest {
     void demoRichSendsRichMessage() {
         Player player = mock(Player.class);
         BBAIMessageService ms = mock(BBAIMessageService.class);
-        when(plugin.getMessageService()).thenReturn(ms);
+        when(bootstrap.getMessageService()).thenReturn(ms);
 
         command.onCommand(player, null, "bbai", new String[]{"demo", "rich"});
 
@@ -118,7 +122,7 @@ class BBAICommandTest {
     void demoBarSendsActionBar() {
         Player player = mock(Player.class);
         BBAIMessageService ms = mock(BBAIMessageService.class);
-        when(plugin.getMessageService()).thenReturn(ms);
+        when(bootstrap.getMessageService()).thenReturn(ms);
 
         command.onCommand(player, null, "bbai", new String[]{"demo", "bar"});
 
@@ -130,7 +134,7 @@ class BBAICommandTest {
     void demoTitleSendsTitle() {
         Player player = mock(Player.class);
         BBAIMessageService ms = mock(BBAIMessageService.class);
-        when(plugin.getMessageService()).thenReturn(ms);
+        when(bootstrap.getMessageService()).thenReturn(ms);
 
         command.onCommand(player, null, "bbai", new String[]{"demo", "title"});
 
@@ -142,7 +146,7 @@ class BBAICommandTest {
     void demoTabSendsTabWithPlayerName() {
         Player player = mock(Player.class);
         BBAIMessageService ms = mock(BBAIMessageService.class);
-        when(plugin.getMessageService()).thenReturn(ms);
+        when(bootstrap.getMessageService()).thenReturn(ms);
         when(player.getName()).thenReturn("Steve");
 
         command.onCommand(player, null, "bbai", new String[]{"demo", "tab"});
@@ -159,7 +163,7 @@ class BBAICommandTest {
         Player player = mock(Player.class);
         Server server = mock(Server.class);
         BBAIMessageService ms = mock(BBAIMessageService.class);
-        when(plugin.getMessageService()).thenReturn(ms);
+        when(bootstrap.getMessageService()).thenReturn(ms);
         when(player.getName()).thenReturn("Steve");
         when(player.getServer()).thenReturn(server);
         doReturn(Collections.<Player>emptyList()).when(server).getOnlinePlayers();
@@ -177,7 +181,7 @@ class BBAICommandTest {
         Player player = mock(Player.class);
         Server server = mock(Server.class);
         BBAIMessageService ms = mock(BBAIMessageService.class);
-        when(plugin.getMessageService()).thenReturn(ms);
+        when(bootstrap.getMessageService()).thenReturn(ms);
         when(player.getServer()).thenReturn(server);
         doReturn(Collections.<Player>emptyList()).when(server).getOnlinePlayers();
 
@@ -194,7 +198,7 @@ class BBAICommandTest {
         Player player = mock(Player.class);
         Server server = mock(Server.class);
         BBAIMessageService ms = mock(BBAIMessageService.class);
-        when(plugin.getMessageService()).thenReturn(ms);
+        when(bootstrap.getMessageService()).thenReturn(ms);
         when(player.getName()).thenReturn("Steve");
         when(player.getServer()).thenReturn(server);
         doReturn(Collections.<Player>emptyList()).when(server).getOnlinePlayers();
@@ -216,7 +220,7 @@ class BBAICommandTest {
         Player player = mock(Player.class);
         Server server = mock(Server.class);
         BBAIMessageService ms = mock(BBAIMessageService.class);
-        when(plugin.getMessageService()).thenReturn(ms);
+        when(bootstrap.getMessageService()).thenReturn(ms);
         when(player.getName()).thenReturn("Steve");
         when(player.getServer()).thenReturn(server);
         doReturn(Collections.<Player>emptyList()).when(server).getOnlinePlayers();

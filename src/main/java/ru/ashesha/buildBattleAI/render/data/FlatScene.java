@@ -2,6 +2,7 @@ package ru.ashesha.buildBattleAI.render.data;
 
 import com.cryptomorin.xseries.XMaterial;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.Value;
 import lombok.experimental.Accessors;
 
@@ -39,7 +40,7 @@ public class FlatScene implements SceneData {
      * @param sizeY region size along Y axis
      * @param sizeZ region size along Z axis
      */
-    public FlatScene(short[] data, int minX, int minY, int minZ, int sizeX, int sizeY, int sizeZ) {
+    public FlatScene(@NonNull short[] data, int minX, int minY, int minZ, int sizeX, int sizeY, int sizeZ) {
         this(data, null, null, minX, minY, minZ, sizeX, sizeY, sizeZ, SourceFormat.DIRECT, "direct");
     }
 
@@ -58,13 +59,13 @@ public class FlatScene implements SceneData {
      * @param sourceFormat    how the scene data was created
      * @param sourceName      human-readable label for the data source
      */
-    public FlatScene(short[] data,
+    public FlatScene(@NonNull short[] data,
                      byte[] legacyBlockData,
                      String[] blockStates,
                      int minX, int minY, int minZ,
                      int sizeX, int sizeY, int sizeZ,
-                     SourceFormat sourceFormat,
-                     String sourceName) {
+                     @NonNull SourceFormat sourceFormat,
+                     @NonNull String sourceName) {
         this.data = data;
         this.legacyBlockData = legacyBlockData;
         this.blockStates = blockStates;
@@ -87,7 +88,7 @@ public class FlatScene implements SceneData {
      * Can be called from any thread (SceneSnapshot is thread-safe).
      * Preserves legacy block data on 1.8–1.12 servers for sub-type and state resolution.
      */
-    public static FlatScene fromSnapshot(ChunkScene snapshot) {
+    public static FlatScene fromSnapshot(@NonNull ChunkScene snapshot) {
         int minX = snapshot.minX(), minY = snapshot.minY(), minZ = snapshot.minZ();
         int sizeX = snapshot.maxX() - minX + 1;
         int sizeY = snapshot.maxY() - minY + 1;

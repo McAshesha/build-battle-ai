@@ -49,13 +49,13 @@ public class BBAICommand extends PluginCommand {
     @Override
     protected List<String> suggest(CommandSender sender, String[] args) {
         if (args.length == 1) {
-            List<String> suggestions = new ArrayList<String>();
+            List<String> suggestions = new ArrayList<>();
             suggestions.add("demo");
             return suggestions;
         }
 
         if (args.length == 2 && "demo".equalsIgnoreCase(args[0])) {
-            List<String> suggestions = new ArrayList<String>();
+            List<String> suggestions = new ArrayList<>();
             suggestions.add("all");
             suggestions.add("chat");
             suggestions.add("rich");
@@ -80,14 +80,14 @@ public class BBAICommand extends PluginCommand {
             return;
         }
 
-        if (plugin.getMessageService() == null) {
+        if (plugin.getBootstrap().getMessageService() == null) {
             sender.sendMessage("§cMessageService is not available.");
             return;
         }
 
         Player player = (Player) sender;
         String mode = args.length > 1 ? args[1].toLowerCase() : "all";
-        BBAIMessageService messageService = plugin.getMessageService();
+        BBAIMessageService messageService = plugin.getBootstrap().getMessageService();
 
         if ("all".equals(mode)) {
             runChatDemo(player, messageService);

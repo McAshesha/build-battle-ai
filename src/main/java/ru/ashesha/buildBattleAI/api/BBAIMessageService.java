@@ -1,5 +1,6 @@
 package ru.ashesha.buildBattleAI.api;
 
+import lombok.NonNull;
 import org.bukkit.entity.Player;
 
 import java.util.Arrays;
@@ -25,7 +26,7 @@ public interface BBAIMessageService {
      * @param recipient the target player
      * @param message   the message text (supports {@code &} color codes)
      */
-    void sendChat(Player recipient, String message);
+    void sendChat(@NonNull Player recipient, @NonNull String message);
 
     /**
      * Sends a plain-text chat message to multiple players.
@@ -33,7 +34,7 @@ public interface BBAIMessageService {
      * @param recipients the target players
      * @param message    the message text (supports {@code &} color codes)
      */
-    void sendChat(Collection<? extends Player> recipients, String message);
+    void sendChat(@NonNull Collection<? extends Player> recipients, @NonNull String message);
 
     /**
      * Sends a rich chat message to a single player.
@@ -41,7 +42,7 @@ public interface BBAIMessageService {
      * @param recipient the target player
      * @param message   the rich message with segments, click actions, and tooltips
      */
-    void sendChat(Player recipient, BBAIChatMessage message);
+    void sendChat(@NonNull Player recipient, @NonNull BBAIChatMessage message);
 
     /**
      * Sends a rich chat message to multiple players.
@@ -49,7 +50,7 @@ public interface BBAIMessageService {
      * @param recipients the target players
      * @param message    the rich message with segments, click actions, and tooltips
      */
-    void sendChat(Collection<? extends Player> recipients, BBAIChatMessage message);
+    void sendChat(@NonNull Collection<? extends Player> recipients, @NonNull BBAIChatMessage message);
 
     /**
      * Sends an action bar message displayed above the hotbar.
@@ -57,7 +58,7 @@ public interface BBAIMessageService {
      * @param recipient the target player
      * @param message   the message text (supports {@code &} color codes)
      */
-    void sendActionBar(Player recipient, String message);
+    void sendActionBar(@NonNull Player recipient, @NonNull String message);
 
     /**
      * Sends an action bar message to multiple players.
@@ -65,7 +66,7 @@ public interface BBAIMessageService {
      * @param recipients the target players
      * @param message    the message text (supports {@code &} color codes)
      */
-    void sendActionBar(Collection<? extends Player> recipients, String message);
+    void sendActionBar(@NonNull Collection<? extends Player> recipients, @NonNull String message);
 
     /**
      * Sends a title and subtitle overlay to a single player.
@@ -75,7 +76,7 @@ public interface BBAIMessageService {
      * @param subtitle  the subtitle text, or {@code null} to skip
      * @param times     fade-in, stay, and fade-out durations in ticks
      */
-    void sendTitle(Player recipient, String title, String subtitle, BBAITitleTimes times);
+    void sendTitle(@NonNull Player recipient, String title, String subtitle, BBAITitleTimes times);
 
     /**
      * Sends a title and subtitle overlay to multiple players.
@@ -85,7 +86,7 @@ public interface BBAIMessageService {
      * @param subtitle   the subtitle text, or {@code null} to skip
      * @param times      fade-in, stay, and fade-out durations in ticks
      */
-    void sendTitle(Collection<? extends Player> recipients, String title, String subtitle, BBAITitleTimes times);
+    void sendTitle(@NonNull Collection<? extends Player> recipients, String title, String subtitle, BBAITitleTimes times);
 
     /**
      * Sets the player list (tab) header and footer for a single player.
@@ -94,7 +95,7 @@ public interface BBAIMessageService {
      * @param header    the header text (supports {@code &} color codes and {@code \n})
      * @param footer    the footer text (supports {@code &} color codes and {@code \n})
      */
-    void sendTab(Player recipient, String header, String footer);
+    void sendTab(@NonNull Player recipient, String header, String footer);
 
     /**
      * Updates a player's display name in the player list (tab) for the specified viewers.
@@ -104,7 +105,7 @@ public interface BBAIMessageService {
      *                       or {@code null} to reset to the default name
      * @param viewers        the players who will see the updated name
      */
-    void sendPlayerListName(Player target, String playerListName, Collection<? extends Player> viewers);
+    void sendPlayerListName(@NonNull Player target, String playerListName, @NonNull Collection<? extends Player> viewers);
 
     /** Varargs convenience overload for {@link #sendChat(Collection, String)}. */
     default void sendChat(String message, Player... recipients) {

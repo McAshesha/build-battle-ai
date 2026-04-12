@@ -1,5 +1,6 @@
 package ru.ashesha.buildBattleAI.commands.base;
 
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -22,10 +23,10 @@ import java.util.List;
 public abstract class PluginCommand implements CommandExecutor, TabCompleter {
 
     /** Reference to the plugin instance for accessing managers and server API. */
-    protected final BuildBattleAI plugin;
+    @NonNull protected final BuildBattleAI plugin;
 
     /** The command name as declared in plugin.yml. */
-    private final String name;
+    @NonNull private final String name;
 
     /**
      * Executes the command logic.

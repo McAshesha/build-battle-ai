@@ -1,5 +1,6 @@
 package ru.ashesha.buildBattleAI.game;
 
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.api.BBAIGameManager;
@@ -14,7 +15,7 @@ import ru.ashesha.buildBattleAI.api.BBAIGameManager;
 @RequiredArgsConstructor
 public class GameManager implements BBAIGameManager {
 
-    private final BuildBattleAI plugin;
+    @NonNull private final BuildBattleAI plugin;
 
     @Override
     public void initialize() {

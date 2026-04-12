@@ -1,5 +1,6 @@
 package ru.ashesha.buildBattleAI.listeners.base;
 
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
@@ -16,7 +17,7 @@ import ru.ashesha.buildBattleAI.BuildBattleAI;
 public abstract class PluginListener implements Listener {
 
     /** Reference to the plugin instance for accessing managers and server API. */
-    protected final BuildBattleAI plugin;
+    @NonNull protected final BuildBattleAI plugin;
 
     /**
      * Registers all {@code @EventHandler} methods in this listener with Bukkit.

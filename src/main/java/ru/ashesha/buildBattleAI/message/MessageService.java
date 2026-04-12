@@ -14,6 +14,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import lombok.NonNull;
 import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.api.BBAIChatMessage;
@@ -57,7 +58,7 @@ public class MessageService implements BBAIMessageService {
      *
      * @param plugin the plugin instance
      */
-    public MessageService(BuildBattleAI plugin) {
+    public MessageService(@NonNull BuildBattleAI plugin) {
         this.plugin = plugin;
         ServerVersion version = PacketEvents.getAPI().getServerManager().getVersion();
         this.chatPacketFactory = resolveChatFactory(version);
@@ -68,14 +69,12 @@ public class MessageService implements BBAIMessageService {
     // ── sendChat ─────────────────────────────────────────────────────────────
 
     @Override
-    public void sendChat(Player recipient, String message) {
-        if (recipient == null) return;
+    public void sendChat(@NonNull Player recipient, @NonNull String message) {
         sendChatPacket(recipient, toComponent(message), false);
     }
 
     @Override
-    public void sendChat(Collection<? extends Player> recipients, String message) {
-        if (recipients == null) return;
+    public void sendChat(@NonNull Collection<? extends Player> recipients, @NonNull String message) {
         Component component = toComponent(message);
         for (Player recipient : recipients) {
             sendChatPacket(recipient, component, false);
@@ -83,14 +82,12 @@ public class MessageService implements BBAIMessageService {
     }
 
     @Override
-    public void sendChat(Player recipient, BBAIChatMessage message) {
-        if (recipient == null || message == null) return;
+    public void sendChat(@NonNull Player recipient, @NonNull BBAIChatMessage message) {
         sendChatPacket(recipient, toComponent(message), false);
     }
 
     @Override
-    public void sendChat(Collection<? extends Player> recipients, BBAIChatMessage message) {
-        if (recipients == null || message == null) return;
+    public void sendChat(@NonNull Collection<? extends Player> recipients, @NonNull BBAIChatMessage message) {
         Component component = toComponent(message);
         for (Player recipient : recipients) {
             sendChatPacket(recipient, component, false);
@@ -100,14 +97,12 @@ public class MessageService implements BBAIMessageService {
     // ── sendActionBar ────────────────────────────────────────────────────────
 
     @Override
-    public void sendActionBar(Player recipient, String message) {
-        if (recipient == null) return;
+    public void sendActionBar(@NonNull Player recipient, @NonNull String message) {
         sendPacket(recipient, new WrapperPlayServerActionBar(toComponent(message)));
     }
 
     @Override
-    public void sendActionBar(Collection<? extends Player> recipients, String message) {
-        if (recipients == null) return;
+    public void sendActionBar(@NonNull Collection<? extends Player> recipients, @NonNull String message) {
         WrapperPlayServerActionBar packet = new WrapperPlayServerActionBar(toComponent(message));
         for (Player recipient : recipients) {
             sendPacket(recipient, packet);
@@ -117,14 +112,12 @@ public class MessageService implements BBAIMessageService {
     // ── sendTitle ────────────────────────────────────────────────────────────
 
     @Override
-    public void sendTitle(Player recipient, String title, String subtitle, BBAITitleTimes times) {
-        if (recipient == null) return;
+    public void sendTitle(@NonNull Player recipient, String title, String subtitle, BBAITitleTimes times) {
         sendTitleSequence(recipient, title, subtitle, times == null ? BBAITitleTimes.DEFAULT : times);
     }
 
     @Override
-    public void sendTitle(Collection<? extends Player> recipients, String title, String subtitle, BBAITitleTimes times) {
-        if (recipients == null) return;
+    public void sendTitle(@NonNull Collection<? extends Player> recipients, String title, String subtitle, BBAITitleTimes times) {
         BBAITitleTimes effectiveTimes = times == null ? BBAITitleTimes.DEFAULT : times;
         for (Player recipient : recipients) {
             sendTitleSequence(recipient, title, subtitle, effectiveTimes);
@@ -134,8 +127,7 @@ public class MessageService implements BBAIMessageService {
     // ── sendTab ──────────────────────────────────────────────────────────────
 
     @Override
-    public void sendTab(Player recipient, String header, String footer) {
-        if (recipient == null) return;
+    public void sendTab(@NonNull Player recipient, String header, String footer) {
         sendPacket(recipient, new WrapperPlayServerPlayerListHeaderAndFooter(
                 toComponent(header), toComponent(footer)));
     }
@@ -143,8 +135,7 @@ public class MessageService implements BBAIMessageService {
     // ── sendPlayerListName ───────────────────────────────────────────────────
 
     @Override
-    public void sendPlayerListName(Player target, String playerListName, Collection<? extends Player> viewers) {
-        if (target == null || viewers == null) return;
+    public void sendPlayerListName(@NonNull Player target, String playerListName, @NonNull Collection<? extends Player> viewers) {
         Component displayName = playerListName == null ? null : toComponent(playerListName);
         PacketWrapper<?> packet = createPlayerListNamePacket(target, displayName);
         if (packet == null) return;
@@ -343,11 +334,10 @@ public class MessageService implements BBAIMessageService {
 
     /**
      * Sends a packet to a player via their PacketEvents network channel.
-     * Silently returns if the player or packet is null, or if the channel is unavailable.
+     * Silently returns if the channel is unavailable (e.g. player disconnecting).
      * Exceptions are caught and logged rather than propagated.
      */
     private void sendPacket(Player player, PacketWrapper<?> packet) {
-        if (player == null || packet == null) return;
         try {
             Object channel = PacketEvents.getAPI().getPlayerManager().getChannel(player.getUniqueId());
             if (channel == null) return;
