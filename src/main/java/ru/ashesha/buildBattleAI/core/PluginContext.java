@@ -10,11 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.ArenaManager;
-import ru.ashesha.buildBattleAI.commands.BBAICommand;
-import ru.ashesha.buildBattleAI.commands.ShotCommand;
 import ru.ashesha.buildBattleAI.core.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.game.GameManager;
-import ru.ashesha.buildBattleAI.listeners.PlayerJoinListener;
 import ru.ashesha.buildBattleAI.render.CpuRenderer;
 
 /**
@@ -53,14 +50,7 @@ public class PluginContext {
 
         messageService = new MessageService(plugin);
 
-        // Register commands (must be declared in plugin.yml)
-        new BBAICommand(plugin).register();
-        new ShotCommand(plugin).register();
-        plugin.getLogger().info("Commands registered.");
-
-        // Register event listeners
-        new PlayerJoinListener(plugin).register();
-        plugin.getLogger().info("Listeners registered.");
+        // TODO: register commands and listeners here
     }
 
     /**

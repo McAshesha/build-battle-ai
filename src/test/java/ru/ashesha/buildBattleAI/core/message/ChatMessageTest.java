@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests for {@link ChatMessage} and {@link ClickAction}.
  * <p>
  * Since {@code ChatMessage.getSegments()} is private, segment content
- * is verified indirectly through {@code BBAICommandTest} integration tests.
+ * is verified indirectly through integration tests.
  * These tests cover construction, fluent API, null safety, and the enum.
  */
 class ChatMessageTest {
