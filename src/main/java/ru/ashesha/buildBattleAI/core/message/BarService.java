@@ -1,8 +1,13 @@
 package ru.ashesha.buildBattleAI.core.message;
 
+import com.github.retrooper.packetevents.manager.server.ServerVersion;
+import com.github.retrooper.packetevents.protocol.chat.ChatTypes;
+import com.github.retrooper.packetevents.protocol.chat.message.ChatMessageLegacy;
+import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerActionBar;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerChatMessage;
+import net.kyori.adventure.text.Component;
 import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
 import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.util.MessageUtils;
@@ -14,11 +19,28 @@ import java.util.Collection;
  * <p>
  * Action bar messages are displayed above the player's hotbar and fade
  * out automatically after a short duration.
+ * <p>
+ * Multi-version: on 1.8–1.10 servers, where no dedicated action bar packet exists,
+ * messages are sent via the chat packet with {@code GAME_INFO} position. On 1.11+,
+ * the dedicated {@link WrapperPlayServerActionBar} wrapper is used.
  */
-@RequiredArgsConstructor
 public class BarService {
 
-    @NonNull private final BuildBattleAI plugin;
+    private final BuildBattleAI plugin;
+
+    /** Version-resolved factory for creating action bar packets. */
+    private final BarPacketFactory barPacketFactory;
+
+    /**
+     * Creates the bar service and resolves the version-appropriate packet factory.
+     *
+     * @param plugin  the plugin instance
+     * @param version the current server version
+     */
+    public BarService(@NonNull BuildBattleAI plugin, @NonNull ServerVersion version) {
+        this.plugin = plugin;
+        this.barPacketFactory = resolveBarFactory(version);
+    }
 
     /**
      * Sends an action bar message to a single player.
@@ -27,7 +49,7 @@ public class BarService {
      * @param message   the message text (supports {@code &} color codes)
      */
     public void sendActionBar(@NonNull Player recipient, @NonNull String message) {
-        plugin.getContext().sendPacket(recipient, new WrapperPlayServerActionBar(MessageUtils.toComponent(message)));
+        plugin.getContext().sendPacket(recipient, barPacketFactory.create(MessageUtils.toComponent(message)));
     }
 
     /**
@@ -37,9 +59,38 @@ public class BarService {
      * @param message    the message text (supports {@code &} color codes)
      */
     public void sendActionBar(@NonNull Collection<? extends Player> recipients, @NonNull String message) {
-        WrapperPlayServerActionBar packet = new WrapperPlayServerActionBar(MessageUtils.toComponent(message));
+        PacketWrapper<?> packet = barPacketFactory.create(MessageUtils.toComponent(message));
         for (Player recipient : recipients) {
             plugin.getContext().sendPacket(recipient, packet);
         }
+    }
+
+    // ── version-resolved factory ────────────────────────────────────────────
+
+    /**
+     * Resolves the correct action bar packet factory for the running server version.
+     * <ul>
+     *     <li>1.11+ — uses {@link WrapperPlayServerActionBar} (dedicated packet)</li>
+     *     <li>1.8–1.10 — uses {@link WrapperPlayServerChatMessage} with
+     *         {@code GAME_INFO} position (action bar via chat packet)</li>
+     * </ul>
+     */
+    private BarPacketFactory resolveBarFactory(ServerVersion version) {
+        if (version.isNewerThanOrEquals(ServerVersion.V_1_11)) {
+            return WrapperPlayServerActionBar::new;
+        }
+        // 1.8–1.10: no dedicated action bar packet; use chat with GAME_INFO position
+        return component -> new WrapperPlayServerChatMessage(
+                new ChatMessageLegacy(component, ChatTypes.GAME_INFO));
+    }
+
+    // ── version-dispatched functional interface ─────────────────────────────
+
+    /**
+     * Factory for creating version-appropriate action bar packets.
+     */
+    @FunctionalInterface
+    private interface BarPacketFactory {
+        PacketWrapper<?> create(Component component);
     }
 }

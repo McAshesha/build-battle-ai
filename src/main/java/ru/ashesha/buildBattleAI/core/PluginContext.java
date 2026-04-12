@@ -77,8 +77,7 @@ public class PluginContext {
      * @return the player's user profile
      */
     public UserProfile getUserProfile(@NonNull Player player) {
-        Object channel = PacketEvents.getAPI().getPlayerManager().getChannel(player.getUniqueId());
-        User user = PacketEvents.getAPI().getPlayerManager().getUser(channel);
+        User user = PacketEvents.getAPI().getPlayerManager().getUser(player);
         return user.getProfile();
     }
 
@@ -92,8 +91,7 @@ public class PluginContext {
      */
     public void sendPacket(@NonNull Player player, @NonNull PacketWrapper<?> packet) {
         try {
-            Object channel = PacketEvents.getAPI().getPlayerManager().getChannel(player.getUniqueId());
-            User user = PacketEvents.getAPI().getPlayerManager().getUser(channel);
+            User user = PacketEvents.getAPI().getPlayerManager().getUser(player);
             user.sendPacket(packet);
         } catch (Throwable e) {
             plugin.getLogger().warning("Failed to send " + packet.getClass().getSimpleName()

@@ -99,6 +99,15 @@ public class ChunkScene implements SceneData {
         static final boolean IS_LEGACY;
 
         /**
+         * Reflective handle to the legacy {@code ChunkSnapshot.getBlockTypeId(int, int, int)}
+         * which returns {@code int} (block ID) on 1.8–1.12. {@code null} on 1.13+.
+         * <p>
+         * On 1.13+, the equivalent is {@code getBlockType(int, int, int)} returning
+         * {@link Material}, but that method does not exist on 1.8–1.12.
+         */
+        static final Method GET_BLOCK_TYPE_ID;
+
+        /**
          * Reflective handle to the legacy {@code ChunkSnapshot.getBlockData(int, int, int)}
          * which returns {@code int} (0–15) on 1.8–1.12. {@code null} on 1.13+.
          * <p>
@@ -107,18 +116,58 @@ public class ChunkScene implements SceneData {
          */
         static final Method GET_LEGACY_DATA;
 
+        /**
+         * Reflective handle to {@code Material.getMaterial(int)} which resolves a
+         * numeric block ID to its {@link Material} enum constant. Only available
+         * on 1.8–1.12; removed in 1.13+ (post-flattening). {@code null} on 1.13+.
+         */
+        static final Method GET_MATERIAL_BY_ID;
+
         static {
             ServerVersion sv = PacketEvents.getAPI().getServerManager().getVersion();
             IS_LEGACY = !sv.isNewerThanOrEquals(ServerVersion.V_1_13);
             if (IS_LEGACY) {
                 try {
+                    GET_BLOCK_TYPE_ID = ChunkSnapshot.class.getMethod("getBlockTypeId",
+                            int.class, int.class, int.class);
                     GET_LEGACY_DATA = ChunkSnapshot.class.getMethod("getBlockData",
                             int.class, int.class, int.class);
+                    GET_MATERIAL_BY_ID = Material.class.getMethod("getMaterial", int.class);
                 } catch (NoSuchMethodException e) {
                     throw new ExceptionInInitializerError(e);
                 }
             } else {
+                GET_BLOCK_TYPE_ID = null;
                 GET_LEGACY_DATA = null;
+                GET_MATERIAL_BY_ID = null;
+            }
+        }
+
+        /**
+         * Resolves a legacy numeric block ID to its {@link Material} via reflection.
+         * Falls back to {@code Material.AIR} if the ID is unknown or reflection fails.
+         *
+         * @return the corresponding Material, or {@code Material.AIR} on failure
+         */
+        static Material getMaterialById(int id) {
+            try {
+                Material material = (Material) GET_MATERIAL_BY_ID.invoke(null, id);
+                return material != null ? material : Material.AIR;
+            } catch (Throwable e) {
+                return Material.AIR;
+            }
+        }
+
+        /**
+         * Invokes the legacy {@code getBlockTypeId(int,int,int)} via reflection.
+         *
+         * @return the legacy block type ID, or 0 (AIR) on failure
+         */
+        static int getBlockTypeId(ChunkSnapshot snapshot, int x, int y, int z) {
+            try {
+                return (Integer) GET_BLOCK_TYPE_ID.invoke(snapshot, x, y, z);
+            } catch (Throwable e) {
+                return 0;
             }
         }
 
@@ -198,7 +247,8 @@ public class ChunkScene implements SceneData {
                             + (z - region.minZ());
 
                     if (legacy) {
-                        Material material = snapshot.getBlockType(localX, y, localZ);
+                        Material material = Version.getMaterialById(
+                                Version.getBlockTypeId(snapshot, localX, y, localZ));
                         int ld = Version.getLegacyData(snapshot, localX, y, localZ);
                         XMaterial xMaterial = matchLegacyMaterial(material, ld);
                         data[flatIndex] = (short) xMaterial.ordinal();

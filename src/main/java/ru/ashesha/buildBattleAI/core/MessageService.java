@@ -56,7 +56,7 @@ class MessageService implements BBAIMessageService {
     MessageService(@NonNull BuildBattleAI plugin) {
         ServerVersion version = PacketEvents.getAPI().getServerManager().getVersion();
         this.chatService = new ChatService(plugin, version);
-        this.barService = new BarService(plugin);
+        this.barService = new BarService(plugin, version);
         this.titleService = new TitleService(plugin, version);
         this.tabService = new TabService(plugin);
         this.nameService = new NameService(plugin, version);

@@ -90,6 +90,9 @@
                                 <copy file="${project.build.directory}/${project.build.finalName}.jar"
                                       todir="${user.home}/Servers/1.21/plugins"
                                       overwrite="true" />
+                                <copy file="${project.build.directory}/${project.build.finalName}.jar"
+                                      todir="${user.home}/Servers/1.8/plugins"
+                                      overwrite="true" />
                             </target>
                         </configuration>
                     </execution>
