@@ -105,7 +105,7 @@ public class ShotCommand extends PluginCommand {
                 plugin.getServer().getScheduler().runTask(plugin, () ->
                         player.sendMessage("§aRender done (" + renderMs + "ms). Saved: " + outputFile.getPath())
                 );
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 plugin.getLogger().warning("Failed to save render: " + e.getMessage());
                 plugin.getServer().getScheduler().runTask(plugin, () ->
                         player.sendMessage("§cFailed to save image: " + e.getMessage())

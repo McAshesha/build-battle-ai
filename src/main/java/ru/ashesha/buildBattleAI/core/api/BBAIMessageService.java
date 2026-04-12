@@ -2,6 +2,7 @@ package ru.ashesha.buildBattleAI.core.api;
 
 import lombok.NonNull;
 import org.bukkit.entity.Player;
+import ru.ashesha.buildBattleAI.core.message.ChatService;
 
 import java.util.Collection;
 
@@ -14,7 +15,7 @@ import java.util.Collection;
  * <p>
  * Text parameters support legacy {@code &} color codes (e.g., {@code &a} for green).
  *
- * @see BBAIChatMessage
+ * @see ChatService.ChatMessage
  */
 public interface BBAIMessageService {
 
@@ -40,7 +41,7 @@ public interface BBAIMessageService {
      * @param recipient the target player
      * @param message   the rich message with segments, click actions, and tooltips
      */
-    void sendChat(@NonNull Player recipient, @NonNull BBAIChatMessage message);
+    void sendChat(@NonNull Player recipient, @NonNull ChatService.ChatMessage message);
 
     /**
      * Sends a rich chat message to multiple players.
@@ -48,7 +49,7 @@ public interface BBAIMessageService {
      * @param recipients the target players
      * @param message    the rich message with segments, click actions, and tooltips
      */
-    void sendChat(@NonNull Collection<? extends Player> recipients, @NonNull BBAIChatMessage message);
+    void sendChat(@NonNull Collection<? extends Player> recipients, @NonNull ChatService.ChatMessage message);
 
     /**
      * Sends an action bar message displayed above the hotbar.

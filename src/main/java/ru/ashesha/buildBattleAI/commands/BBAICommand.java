@@ -5,8 +5,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginDescriptionFile;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
-import ru.ashesha.buildBattleAI.core.api.BBAIChatMessage;
 import ru.ashesha.buildBattleAI.core.api.BBAIMessageService;
+import ru.ashesha.buildBattleAI.core.message.ChatService;
 import ru.ashesha.buildBattleAI.commands.base.PluginCommand;
 
 import java.util.ArrayList;
@@ -75,12 +75,12 @@ public class BBAICommand extends PluginCommand {
      */
     private void executeDemo(CommandSender sender, String[] args) {
         if (!(sender instanceof Player)) {
-            sender.sendMessage("§cDemo commands can only be used by a player.");
+            sender.sendMessage("\u00a7cDemo commands can only be used by a player.");
             return;
         }
 
         if (plugin.getContext().getMessageService() == null) {
-            sender.sendMessage("§cMessageService is not available.");
+            sender.sendMessage("\u00a7cMessageService is not available.");
             return;
         }
 
@@ -95,7 +95,7 @@ public class BBAICommand extends PluginCommand {
             runTitleDemo(player, messageService);
             runTabDemo(player, messageService);
             runListNameDemo(player, messageService);
-            player.sendMessage("§aAll messaging demos were sent.");
+            player.sendMessage("\u00a7aAll messaging demos were sent.");
             return;
         }
 
@@ -134,39 +134,38 @@ public class BBAICommand extends PluginCommand {
             return;
         }
 
-        player.sendMessage("§cUnknown demo mode. Use /bbai demo <all|chat|rich|bar|title|tab|listname|reset>");
+        player.sendMessage("\u00a7cUnknown demo mode. Use /bbai demo <all|chat|rich|bar|title|tab|listname|reset>");
     }
 
     /** Sends a plain chat message via PacketEvents. */
     private void runChatDemo(Player player, BBAIMessageService messageService) {
         messageService.sendChat(player, "&6[Chat Demo] &fPlain PacketEvents chat message with &acolors&f.");
-        player.sendMessage("§aChat demo sent.");
+        player.sendMessage("\u00a7aChat demo sent.");
     }
 
     /** Sends a rich chat message with clickable segments and hover tooltips. */
     private void runRichDemo(Player player, BBAIMessageService messageService) {
-        BBAIChatMessage message = BBAIChatMessage.builder()
+        ChatService.ChatMessage message = new ChatService.ChatMessage()
                 .append("&6[Rich Demo] &f")
-                .append("&a[RUN /bbai]", BBAIChatMessage.ClickAction.RUN_COMMAND, "/bbai", "&7Runs the base plugin command")
+                .append("&a[RUN /bbai]", ChatService.ClickAction.RUN_COMMAND, "/bbai", "&7Runs the base plugin command")
                 .append(" &7| ")
-                .append("&b[SUGGEST /shot screenshot]", BBAIChatMessage.ClickAction.SUGGEST_COMMAND, "/shot screenshot", "&7Only inserts the command into chat")
+                .append("&b[SUGGEST /shot screenshot]", ChatService.ClickAction.SUGGEST_COMMAND, "/shot screenshot", "&7Only inserts the command into chat")
                 .append(" &7| ")
-                .append("&d[OPEN URL]", BBAIChatMessage.ClickAction.OPEN_URL, "https://github.com/retrooper/packetevents", "&7Open PacketEvents page")
-                .build();
+                .append("&d[OPEN URL]", ChatService.ClickAction.OPEN_URL, "https://github.com/retrooper/packetevents", "&7Open PacketEvents page");
         messageService.sendChat(player, message);
-        player.sendMessage("§aRich chat demo sent.");
+        player.sendMessage("\u00a7aRich chat demo sent.");
     }
 
     /** Displays a message on the action bar above the hotbar. */
     private void runActionBarDemo(Player player, BBAIMessageService messageService) {
         messageService.sendActionBar(player, "&e[Bar Demo] &fPacketEvents action bar test");
-        player.sendMessage("§aAction bar demo sent.");
+        player.sendMessage("\u00a7aAction bar demo sent.");
     }
 
     /** Displays a title and subtitle overlay on the player's screen. */
     private void runTitleDemo(Player player, BBAIMessageService messageService) {
         messageService.sendTitle(player, "&6BuildBattleAI", "&fPacketEvents title/subtitle demo", 10, 50, 15);
-        player.sendMessage("§aTitle demo sent.");
+        player.sendMessage("\u00a7aTitle demo sent.");
     }
 
     /** Sets custom header and footer in the player list (tab) overlay. */
@@ -176,19 +175,19 @@ public class BBAICommand extends PluginCommand {
                 "&6BuildBattleAI Test Header\n&fPacketEvents tab demo",
                 "&7Player: &e" + player.getName() + "\n&aFooter line 2"
         );
-        player.sendMessage("§aTab demo sent.");
+        player.sendMessage("\u00a7aTab demo sent.");
     }
 
     /** Changes the player's display name in the tab list for all online viewers. */
     private void runListNameDemo(Player player, BBAIMessageService messageService) {
         messageService.sendPlayerListName(player, "&b[AI] &f" + player.getName(), player.getServer().getOnlinePlayers());
-        player.sendMessage("§aPlayer list name demo sent to all online viewers.");
+        player.sendMessage("\u00a7aPlayer list name demo sent to all online viewers.");
     }
 
     /** Resets tab header/footer and player list name to defaults. */
     private void resetDemo(Player player, BBAIMessageService messageService) {
         messageService.sendTab(player, "", "");
         messageService.sendPlayerListName(player, null, player.getServer().getOnlinePlayers());
-        player.sendMessage("§aTab header/footer and player list name were reset.");
+        player.sendMessage("\u00a7aTab header/footer and player list name were reset.");
     }
 }

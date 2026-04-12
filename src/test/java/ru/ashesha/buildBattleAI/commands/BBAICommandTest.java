@@ -8,8 +8,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
-import ru.ashesha.buildBattleAI.core.api.BBAIChatMessage;
 import ru.ashesha.buildBattleAI.core.api.BBAIMessageService;
+import ru.ashesha.buildBattleAI.core.message.ChatService;
 import ru.ashesha.buildBattleAI.core.PluginContext;
 
 import java.util.Arrays;
@@ -113,7 +113,7 @@ class BBAICommandTest {
 
         command.onCommand(player, null, "bbai", new String[]{"demo", "rich"});
 
-        verify(ms).sendChat(eq(player), any(BBAIChatMessage.class));
+        verify(ms).sendChat(eq(player), any(ChatService.ChatMessage.class));
         verify(player).sendMessage("\u00a7aRich chat demo sent.");
     }
 
@@ -205,7 +205,7 @@ class BBAICommandTest {
         command.onCommand(player, null, "bbai", new String[]{"demo", "all"});
 
         verify(ms).sendChat(eq(player), anyString());
-        verify(ms).sendChat(eq(player), any(BBAIChatMessage.class));
+        verify(ms).sendChat(eq(player), any(ChatService.ChatMessage.class));
         verify(ms).sendActionBar(eq(player), anyString());
         verify(ms).sendTitle(eq(player), anyString(), anyString(), anyInt(), anyInt(), anyInt());
         verify(ms).sendTab(eq(player), anyString(), anyString());

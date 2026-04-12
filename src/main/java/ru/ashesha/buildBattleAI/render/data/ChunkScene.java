@@ -130,7 +130,7 @@ public class ChunkScene implements SceneData {
         static int getLegacyData(ChunkSnapshot snapshot, int x, int y, int z) {
             try {
                 return (Integer) GET_LEGACY_DATA.invoke(snapshot, x, y, z);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 return 0;
             }
         }
