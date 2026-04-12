@@ -5,9 +5,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginDescriptionFile;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
-import ru.ashesha.buildBattleAI.api.BBAIChatMessage;
-import ru.ashesha.buildBattleAI.api.BBAIMessageService;
-import ru.ashesha.buildBattleAI.api.BBAITitleTimes;
+import ru.ashesha.buildBattleAI.core.api.BBAIChatMessage;
+import ru.ashesha.buildBattleAI.core.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.commands.base.PluginCommand;
 
 import java.util.ArrayList;
@@ -80,14 +79,14 @@ public class BBAICommand extends PluginCommand {
             return;
         }
 
-        if (plugin.getBootstrap().getMessageService() == null) {
+        if (plugin.getContext().getMessageService() == null) {
             sender.sendMessage("§cMessageService is not available.");
             return;
         }
 
         Player player = (Player) sender;
         String mode = args.length > 1 ? args[1].toLowerCase() : "all";
-        BBAIMessageService messageService = plugin.getBootstrap().getMessageService();
+        BBAIMessageService messageService = plugin.getContext().getMessageService();
 
         if ("all".equals(mode)) {
             runChatDemo(player, messageService);
@@ -154,7 +153,6 @@ public class BBAICommand extends PluginCommand {
                 .append(" &7| ")
                 .append("&d[OPEN URL]", BBAIChatMessage.ClickAction.OPEN_URL, "https://github.com/retrooper/packetevents", "&7Open PacketEvents page")
                 .build();
-
         messageService.sendChat(player, message);
         player.sendMessage("§aRich chat demo sent.");
     }
@@ -167,7 +165,7 @@ public class BBAICommand extends PluginCommand {
 
     /** Displays a title and subtitle overlay on the player's screen. */
     private void runTitleDemo(Player player, BBAIMessageService messageService) {
-        messageService.sendTitle(player, "&6BuildBattleAI", "&fPacketEvents title/subtitle demo", new BBAITitleTimes(10, 50, 15));
+        messageService.sendTitle(player, "&6BuildBattleAI", "&fPacketEvents title/subtitle demo", 10, 50, 15);
         player.sendMessage("§aTitle demo sent.");
     }
 

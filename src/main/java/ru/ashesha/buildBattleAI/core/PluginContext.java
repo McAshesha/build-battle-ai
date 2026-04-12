@@ -1,16 +1,20 @@
 package ru.ashesha.buildBattleAI.core;
 
+import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.protocol.player.User;
+import com.github.retrooper.packetevents.protocol.player.UserProfile;
+import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.ArenaManager;
 import ru.ashesha.buildBattleAI.commands.BBAICommand;
 import ru.ashesha.buildBattleAI.commands.ShotCommand;
+import ru.ashesha.buildBattleAI.core.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.game.GameManager;
 import ru.ashesha.buildBattleAI.listeners.PlayerJoinListener;
-import ru.ashesha.buildBattleAI.api.BBAIMessageService;
-import ru.ashesha.buildBattleAI.message.MessageService;
 import ru.ashesha.buildBattleAI.render.CpuRenderer;
 
 /**
@@ -26,7 +30,7 @@ import ru.ashesha.buildBattleAI.render.CpuRenderer;
  * Shutdown occurs in reverse dependency order (game manager before arena manager).
  */
 @RequiredArgsConstructor
-public class PluginBootstrap {
+public class PluginContext {
 
     @NonNull private final BuildBattleAI plugin;
 
@@ -41,10 +45,7 @@ public class PluginBootstrap {
     public void enable() {
         // Initialize managers in dependency order
         arenaManager = new ArenaManager(plugin);
-        arenaManager.initialize();
-
         gameManager = new GameManager(plugin);
-        gameManager.initialize();
 
         messageService = new MessageService(plugin);
 
@@ -66,5 +67,37 @@ public class PluginBootstrap {
         gameManager.shutdown();
         arenaManager.shutdown();
         CpuRenderer.shutdown();
+    }
+
+    /**
+     * Resolves the PacketEvents {@link UserProfile} for the given player
+     * by looking up their network channel.
+     *
+     * @param player the player to resolve
+     * @return the player's user profile
+     */
+    public UserProfile getUserProfile(@NonNull Player player) {
+        Object channel = PacketEvents.getAPI().getPlayerManager().getChannel(player.getUniqueId());
+        User user = PacketEvents.getAPI().getPlayerManager().getUser(channel);
+        return user.getProfile();
+    }
+
+    /**
+     * Sends a packet to a player via their PacketEvents network channel.
+     * Silently returns if the channel is unavailable (e.g. player disconnecting).
+     * Exceptions are caught and logged rather than propagated.
+     *
+     * @param player the target player
+     * @param packet the packet to send
+     */
+    public void sendPacket(@NonNull Player player, @NonNull PacketWrapper<?> packet) {
+        try {
+            Object channel = PacketEvents.getAPI().getPlayerManager().getChannel(player.getUniqueId());
+            User user = PacketEvents.getAPI().getPlayerManager().getUser(channel);
+            user.sendPacket(packet);
+        } catch (Throwable e) {
+            plugin.getLogger().warning("Failed to send " + packet.getClass().getSimpleName()
+                    + " to " + player.getName() + ": " + e.getMessage());
+        }
     }
 }

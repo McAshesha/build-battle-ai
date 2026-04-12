@@ -3,7 +3,7 @@ package ru.ashesha.buildBattleAI.arena;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
-import ru.ashesha.buildBattleAI.api.BBAIArenaManager;
+import ru.ashesha.buildBattleAI.arena.api.BBAIArenaManager;
 
 /**
  * Default implementation of {@link BBAIArenaManager}.
@@ -15,11 +15,6 @@ import ru.ashesha.buildBattleAI.api.BBAIArenaManager;
 public class ArenaManager implements BBAIArenaManager {
 
     @NonNull private final BuildBattleAI plugin;
-
-    @Override
-    public void initialize() {
-        plugin.getLogger().info("ArenaManager initialized.");
-    }
 
     @Override
     public void shutdown() {

@@ -1,8 +1,8 @@
-package ru.ashesha.buildBattleAI.api;
+package ru.ashesha.buildBattleAI.core.api;
 
 import org.junit.jupiter.api.Test;
-import ru.ashesha.buildBattleAI.api.BBAIChatMessage.ClickAction;
-import ru.ashesha.buildBattleAI.api.BBAIChatMessage.Segment;
+import ru.ashesha.buildBattleAI.core.api.BBAIChatMessage.ClickAction;
+import ru.ashesha.buildBattleAI.core.api.BBAIChatMessage.Segment;
 
 import java.util.List;
 
@@ -92,7 +92,7 @@ class BBAIChatMessageTest {
         BBAIChatMessage msg = BBAIChatMessage.of("test");
         List<Segment> segments = msg.getSegments();
         assertThrows(UnsupportedOperationException.class, () -> segments.add(
-                new BBAIChatMessage.Builder().append("hack").build().getSegments().get(0)
+                BBAIChatMessage.builder().append("hack").build().getSegments().get(0)
         ));
     }
 
@@ -100,87 +100,6 @@ class BBAIChatMessageTest {
     void segmentsListIsUnmodifiableRemove() {
         BBAIChatMessage msg = BBAIChatMessage.of("test");
         assertThrows(UnsupportedOperationException.class, () -> msg.getSegments().remove(0));
-    }
-
-    // ===== replace() =====
-
-    @Test
-    void replaceSubstitutesInText() {
-        BBAIChatMessage msg = BBAIChatMessage.of("Hello {player}!");
-        BBAIChatMessage replaced = msg.replace("{player}", "Steve");
-        assertEquals("Hello Steve!", replaced.getSegments().get(0).getText());
-    }
-
-    @Test
-    void replacePreservesOriginalMessage() {
-        BBAIChatMessage msg = BBAIChatMessage.of("Hello {player}!");
-        msg.replace("{player}", "Steve");
-        assertEquals("Hello {player}!", msg.getSegments().get(0).getText());
-    }
-
-    @Test
-    void replaceSubstitutesInClickValue() {
-        BBAIChatMessage msg = BBAIChatMessage.builder()
-                .append("Click", ClickAction.RUN_COMMAND, "/tp {player}")
-                .build();
-        BBAIChatMessage replaced = msg.replace("{player}", "Alex");
-        assertEquals("/tp Alex", replaced.getSegments().get(0).getClickValue());
-    }
-
-    @Test
-    void replaceSubstitutesInHoverText() {
-        BBAIChatMessage msg = BBAIChatMessage.builder()
-                .append("Info", null, null, "Player: {player}")
-                .build();
-        BBAIChatMessage replaced = msg.replace("{player}", "Notch");
-        assertEquals("Player: Notch", replaced.getSegments().get(0).getHoverText());
-    }
-
-    @Test
-    void replaceHandlesNullFieldsGracefully() {
-        BBAIChatMessage msg = BBAIChatMessage.builder()
-                .append("{x}")
-                .build();
-        BBAIChatMessage replaced = msg.replace("{x}", "val");
-        Segment seg = replaced.getSegments().get(0);
-        assertEquals("val", seg.getText());
-        assertNull(seg.getClickAction());
-        assertNull(seg.getClickValue());
-        assertNull(seg.getHoverText());
-    }
-
-    @Test
-    void replaceAcrossMultipleSegments() {
-        BBAIChatMessage msg = BBAIChatMessage.builder()
-                .append("A {v}")
-                .append("B {v}")
-                .append("C {v}")
-                .build();
-        BBAIChatMessage replaced = msg.replace("{v}", "X");
-        assertEquals("A X", replaced.getSegments().get(0).getText());
-        assertEquals("B X", replaced.getSegments().get(1).getText());
-        assertEquals("C X", replaced.getSegments().get(2).getText());
-    }
-
-    @Test
-    void replaceWithEmptyString() {
-        BBAIChatMessage msg = BBAIChatMessage.of("prefix{tag}suffix");
-        BBAIChatMessage replaced = msg.replace("{tag}", "");
-        assertEquals("prefixsuffix", replaced.getSegments().get(0).getText());
-    }
-
-    @Test
-    void replaceMultipleOccurrencesInSameSegment() {
-        BBAIChatMessage msg = BBAIChatMessage.of("{a} and {a}");
-        BBAIChatMessage replaced = msg.replace("{a}", "X");
-        assertEquals("X and X", replaced.getSegments().get(0).getText());
-    }
-
-    @Test
-    void replaceNoMatchReturnsEquivalentMessage() {
-        BBAIChatMessage msg = BBAIChatMessage.of("Hello World");
-        BBAIChatMessage replaced = msg.replace("{missing}", "val");
-        assertEquals("Hello World", replaced.getSegments().get(0).getText());
     }
 
     // ===== Equality =====

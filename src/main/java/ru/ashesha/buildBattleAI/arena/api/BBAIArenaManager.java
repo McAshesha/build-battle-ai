@@ -1,4 +1,4 @@
-package ru.ashesha.buildBattleAI.api;
+package ru.ashesha.buildBattleAI.arena.api;
 
 /**
  * Service contract for managing build arenas.
@@ -7,12 +7,6 @@ package ru.ashesha.buildBattleAI.api;
  * Implementations handle arena creation, allocation to players/teams, and cleanup.
  */
 public interface BBAIArenaManager {
-
-    /**
-     * Initializes the arena manager, loading arena definitions from configuration
-     * and preparing them for game use.
-     */
-    void initialize();
 
     /**
      * Shuts down the arena manager, releasing all arena resources

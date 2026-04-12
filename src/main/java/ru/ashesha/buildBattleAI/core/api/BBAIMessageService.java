@@ -1,9 +1,8 @@
-package ru.ashesha.buildBattleAI.api;
+package ru.ashesha.buildBattleAI.core.api;
 
 import lombok.NonNull;
 import org.bukkit.entity.Player;
 
-import java.util.Arrays;
 import java.util.Collection;
 
 /**
@@ -16,7 +15,6 @@ import java.util.Collection;
  * Text parameters support legacy {@code &} color codes (e.g., {@code &a} for green).
  *
  * @see BBAIChatMessage
- * @see BBAITitleTimes
  */
 public interface BBAIMessageService {
 
@@ -74,9 +72,11 @@ public interface BBAIMessageService {
      * @param recipient the target player
      * @param title     the main title text, or {@code null} to skip
      * @param subtitle  the subtitle text, or {@code null} to skip
-     * @param times     fade-in, stay, and fade-out durations in ticks
+     * @param fadeIn    fade-in duration in ticks
+     * @param stay      stay duration in ticks
+     * @param fadeOut   fade-out duration in ticks
      */
-    void sendTitle(@NonNull Player recipient, String title, String subtitle, BBAITitleTimes times);
+    void sendTitle(@NonNull Player recipient, String title, String subtitle, int fadeIn, int stay, int fadeOut);
 
     /**
      * Sends a title and subtitle overlay to multiple players.
@@ -84,9 +84,11 @@ public interface BBAIMessageService {
      * @param recipients the target players
      * @param title      the main title text, or {@code null} to skip
      * @param subtitle   the subtitle text, or {@code null} to skip
-     * @param times      fade-in, stay, and fade-out durations in ticks
+     * @param fadeIn     fade-in duration in ticks
+     * @param stay       stay duration in ticks
+     * @param fadeOut    fade-out duration in ticks
      */
-    void sendTitle(@NonNull Collection<? extends Player> recipients, String title, String subtitle, BBAITitleTimes times);
+    void sendTitle(@NonNull Collection<? extends Player> recipients, String title, String subtitle, int fadeIn, int stay, int fadeOut);
 
     /**
      * Sets the player list (tab) header and footer for a single player.
@@ -107,23 +109,4 @@ public interface BBAIMessageService {
      */
     void sendPlayerListName(@NonNull Player target, String playerListName, @NonNull Collection<? extends Player> viewers);
 
-    /** Varargs convenience overload for {@link #sendChat(Collection, String)}. */
-    default void sendChat(String message, Player... recipients) {
-        sendChat(Arrays.asList(recipients), message);
-    }
-
-    /** Varargs convenience overload for {@link #sendChat(Collection, BBAIChatMessage)}. */
-    default void sendChat(BBAIChatMessage message, Player... recipients) {
-        sendChat(Arrays.asList(recipients), message);
-    }
-
-    /** Varargs convenience overload for {@link #sendActionBar(Collection, String)}. */
-    default void sendActionBar(String message, Player... recipients) {
-        sendActionBar(Arrays.asList(recipients), message);
-    }
-
-    /** Varargs convenience overload for {@link #sendTitle(Collection, String, String, BBAITitleTimes)}. */
-    default void sendTitle(String title, String subtitle, BBAITitleTimes times, Player... recipients) {
-        sendTitle(Arrays.asList(recipients), title, subtitle, times);
-    }
 }

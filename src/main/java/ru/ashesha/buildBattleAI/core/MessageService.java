@@ -1,4 +1,4 @@
-package ru.ashesha.buildBattleAI.message;
+package ru.ashesha.buildBattleAI.core;
 
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
@@ -6,7 +6,6 @@ import com.github.retrooper.packetevents.protocol.chat.ChatTypes;
 import com.github.retrooper.packetevents.protocol.chat.message.ChatMessageLegacy;
 import com.github.retrooper.packetevents.protocol.chat.message.ChatMessage_v1_16;
 import com.github.retrooper.packetevents.protocol.player.GameMode;
-import com.github.retrooper.packetevents.protocol.player.User;
 import com.github.retrooper.packetevents.protocol.player.UserProfile;
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import com.github.retrooper.packetevents.wrapper.play.server.*;
@@ -17,9 +16,8 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import lombok.NonNull;
 import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
-import ru.ashesha.buildBattleAI.api.BBAIChatMessage;
-import ru.ashesha.buildBattleAI.api.BBAIMessageService;
-import ru.ashesha.buildBattleAI.api.BBAITitleTimes;
+import ru.ashesha.buildBattleAI.core.api.BBAIChatMessage;
+import ru.ashesha.buildBattleAI.core.api.BBAIMessageService;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -36,7 +34,7 @@ import java.util.UUID;
  * is resolved once at startup via lambda factories (see {@link ChatPacketFactory},
  * {@link TitleSender}, {@link PlayerListPacketFactory}), avoiding runtime version checks.
  */
-public class MessageService implements BBAIMessageService {
+class MessageService implements BBAIMessageService {
 
     /** Serializer for converting legacy {@code &}-prefixed color codes into Adventure components. */
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacyAmpersand();
@@ -58,7 +56,7 @@ public class MessageService implements BBAIMessageService {
      *
      * @param plugin the plugin instance
      */
-    public MessageService(@NonNull BuildBattleAI plugin) {
+    MessageService(@NonNull BuildBattleAI plugin) {
         this.plugin = plugin;
         ServerVersion version = PacketEvents.getAPI().getServerManager().getVersion();
         this.chatPacketFactory = resolveChatFactory(version);
@@ -89,38 +87,36 @@ public class MessageService implements BBAIMessageService {
     @Override
     public void sendChat(@NonNull Collection<? extends Player> recipients, @NonNull BBAIChatMessage message) {
         Component component = toComponent(message);
-        for (Player recipient : recipients) {
+        for (Player recipient : recipients)
             sendChatPacket(recipient, component, false);
-        }
     }
 
     // ── sendActionBar ────────────────────────────────────────────────────────
 
     @Override
     public void sendActionBar(@NonNull Player recipient, @NonNull String message) {
-        sendPacket(recipient, new WrapperPlayServerActionBar(toComponent(message)));
+        plugin.getContext().sendPacket(recipient, new WrapperPlayServerActionBar(toComponent(message)));
     }
 
     @Override
     public void sendActionBar(@NonNull Collection<? extends Player> recipients, @NonNull String message) {
         WrapperPlayServerActionBar packet = new WrapperPlayServerActionBar(toComponent(message));
         for (Player recipient : recipients) {
-            sendPacket(recipient, packet);
+            plugin.getContext().sendPacket(recipient, packet);
         }
     }
 
     // ── sendTitle ────────────────────────────────────────────────────────────
 
     @Override
-    public void sendTitle(@NonNull Player recipient, String title, String subtitle, BBAITitleTimes times) {
-        sendTitleSequence(recipient, title, subtitle, times == null ? BBAITitleTimes.DEFAULT : times);
+    public void sendTitle(@NonNull Player recipient, String title, String subtitle, int fadeIn, int stay, int fadeOut) {
+        sendTitleSequence(recipient, title, subtitle, fadeIn, stay, fadeOut);
     }
 
     @Override
-    public void sendTitle(@NonNull Collection<? extends Player> recipients, String title, String subtitle, BBAITitleTimes times) {
-        BBAITitleTimes effectiveTimes = times == null ? BBAITitleTimes.DEFAULT : times;
+    public void sendTitle(@NonNull Collection<? extends Player> recipients, String title, String subtitle, int fadeIn, int stay, int fadeOut) {
         for (Player recipient : recipients) {
-            sendTitleSequence(recipient, title, subtitle, effectiveTimes);
+            sendTitleSequence(recipient, title, subtitle, fadeIn, stay, fadeOut);
         }
     }
 
@@ -128,20 +124,20 @@ public class MessageService implements BBAIMessageService {
 
     @Override
     public void sendTab(@NonNull Player recipient, String header, String footer) {
-        sendPacket(recipient, new WrapperPlayServerPlayerListHeaderAndFooter(
-                toComponent(header), toComponent(footer)));
+        plugin.getContext().sendPacket(recipient, new WrapperPlayServerPlayerListHeaderAndFooter(
+                toComponent(header),
+                toComponent(footer)
+        ));
     }
 
     // ── sendPlayerListName ───────────────────────────────────────────────────
 
     @Override
     public void sendPlayerListName(@NonNull Player target, String playerListName, @NonNull Collection<? extends Player> viewers) {
-        Component displayName = playerListName == null ? null : toComponent(playerListName);
+        Component displayName = toComponent(playerListName);
         PacketWrapper<?> packet = createPlayerListNamePacket(target, displayName);
-        if (packet == null) return;
-        for (Player viewer : viewers) {
-            sendPacket(viewer, packet);
-        }
+        for (Player viewer : viewers)
+            plugin.getContext().sendPacket(viewer, packet);
     }
 
     // ── version-resolved factories ──────────────────────────────────────────
@@ -156,18 +152,24 @@ public class MessageService implements BBAIMessageService {
      */
     private ChatPacketFactory resolveChatFactory(ServerVersion version) {
         if (version.isNewerThanOrEquals(ServerVersion.V_1_19)) {
-            return (component, overlay) ->
-                    new WrapperPlayServerSystemChatMessage(overlay, component);
+            return (component, overlay) -> new WrapperPlayServerSystemChatMessage(
+                    overlay,
+                    component
+            );
         }
         if (version.isNewerThanOrEquals(ServerVersion.V_1_16)) {
             return (component, overlay) -> new WrapperPlayServerChatMessage(
-                    new ChatMessage_v1_16(component,
+                    new ChatMessage_v1_16(
+                            component,
                             overlay ? ChatTypes.GAME_INFO : ChatTypes.SYSTEM,
-                            new UUID(0L, 0L)));
+                            new UUID(0L, 0L)
+                    ));
         }
         return (component, overlay) -> new WrapperPlayServerChatMessage(
-                new ChatMessageLegacy(component,
-                        overlay ? ChatTypes.GAME_INFO : ChatTypes.SYSTEM));
+                new ChatMessageLegacy(
+                        component,
+                        overlay ? ChatTypes.GAME_INFO : ChatTypes.SYSTEM
+                ));
     }
 
     /**
@@ -179,31 +181,44 @@ public class MessageService implements BBAIMessageService {
      */
     private TitleSender resolveTitleSender(ServerVersion version) {
         if (version.isNewerThanOrEquals(ServerVersion.V_1_17)) {
-            return (player, title, subtitle, times) -> {
-                sendPacket(player, new WrapperPlayServerSetTitleTimes(
-                        times.getFadeIn(), times.getStay(), times.getFadeOut()));
-                if (title != null) {
-                    sendPacket(player, new WrapperPlayServerSetTitleText(title));
-                }
-                if (subtitle != null) {
-                    sendPacket(player, new WrapperPlayServerSetTitleSubtitle(subtitle));
-                }
+            return (player, title, subtitle, fadeIn, stay, fadeOut) -> {
+                plugin.getContext().sendPacket(player, new WrapperPlayServerSetTitleTimes(fadeIn, stay, fadeOut));
+                if (title != null)
+                    plugin.getContext().sendPacket(player, new WrapperPlayServerSetTitleText(title));
+                if (subtitle != null)
+                    plugin.getContext().sendPacket(player, new WrapperPlayServerSetTitleSubtitle(subtitle));
             };
         }
-        return (player, title, subtitle, times) -> {
-            sendPacket(player, new WrapperPlayServerTitle(
+        return (player, title, subtitle, fadeIn, stay, fadeOut) -> {
+            plugin.getContext().sendPacket(player, new WrapperPlayServerTitle(
                     WrapperPlayServerTitle.TitleAction.SET_TIMES_AND_DISPLAY,
-                    (Component) null, null, null,
-                    times.getFadeIn(), times.getStay(), times.getFadeOut()));
+                    (Component) null,
+                    null,
+                    null,
+                    fadeIn,
+                    stay,
+                    fadeOut
+            ));
             if (title != null) {
-                sendPacket(player, new WrapperPlayServerTitle(
+                plugin.getContext().sendPacket(player, new WrapperPlayServerTitle(
                         WrapperPlayServerTitle.TitleAction.SET_TITLE,
-                        title, null, null, 0, 0, 0));
+                        title,
+                        null,
+                        null,
+                        0,
+                        0,
+                        0));
             }
             if (subtitle != null) {
-                sendPacket(player, new WrapperPlayServerTitle(
+                plugin.getContext().sendPacket(player, new WrapperPlayServerTitle(
                         WrapperPlayServerTitle.TitleAction.SET_SUBTITLE,
-                        null, subtitle, null, 0, 0, 0));
+                        null,
+                        subtitle,
+                        null,
+                        0,
+                        0,
+                        0
+                ));
             }
         };
     }
@@ -218,21 +233,31 @@ public class MessageService implements BBAIMessageService {
     private PlayerListPacketFactory resolvePlayerListFactory(ServerVersion version) {
         if (version.isNewerThanOrEquals(ServerVersion.V_1_19_3)) {
             return (profile, gameMode, displayName) -> {
-                WrapperPlayServerPlayerInfoUpdate.PlayerInfo info =
-                        new WrapperPlayServerPlayerInfoUpdate.PlayerInfo(
-                                profile, true, 0, gameMode, displayName, null);
+                WrapperPlayServerPlayerInfoUpdate.PlayerInfo info = new WrapperPlayServerPlayerInfoUpdate.PlayerInfo(
+                        profile,
+                        true,
+                        0,
+                        gameMode,
+                        displayName,
+                        null
+                );
                 return new WrapperPlayServerPlayerInfoUpdate(
                         WrapperPlayServerPlayerInfoUpdate.Action.UPDATE_DISPLAY_NAME,
-                        Collections.singletonList(info));
+                        Collections.singletonList(info)
+                );
             };
         }
         return (profile, gameMode, displayName) -> {
-            WrapperPlayServerPlayerInfo.PlayerData data =
-                    new WrapperPlayServerPlayerInfo.PlayerData(
-                            displayName, profile, gameMode, 0);
+            WrapperPlayServerPlayerInfo.PlayerData data = new WrapperPlayServerPlayerInfo.PlayerData(
+                    displayName,
+                    profile,
+                    gameMode,
+                    0
+            );
             return new WrapperPlayServerPlayerInfo(
                     WrapperPlayServerPlayerInfo.Action.UPDATE_DISPLAY_NAME,
-                    Collections.singletonList(data));
+                    Collections.singletonList(data)
+            );
         };
     }
 
@@ -240,35 +265,34 @@ public class MessageService implements BBAIMessageService {
 
     /** Creates and sends a chat packet using the version-resolved factory. */
     private void sendChatPacket(Player player, Component component, boolean overlay) {
-        sendPacket(player, chatPacketFactory.create(component, overlay));
+        plugin.getContext().sendPacket(player, chatPacketFactory.create(component, overlay));
     }
 
     /**
      * Sends the full title sequence: timing packet first, then title and subtitle.
      * Converts raw text strings to Adventure components before delegation.
      */
-    private void sendTitleSequence(Player player, String title, String subtitle, BBAITitleTimes times) {
-        titleSender.send(player,
-                title == null ? null : toComponent(title),
-                subtitle == null ? null : toComponent(subtitle),
-                times);
+    private void sendTitleSequence(Player player, String title, String subtitle, int fadeIn, int stay, int fadeOut) {
+        titleSender.send(
+                player,
+                toComponent(title),
+                toComponent(subtitle),
+                fadeIn, stay, fadeOut
+        );
     }
 
     /**
      * Builds a player list name update packet for the target player.
-     * Resolves the target's PacketEvents {@link User} via their network channel.
+     * Resolves the target's PacketEvents {@link UserProfile} via {@link PluginContext#getUserProfile(Player)}.
      *
      * @return the constructed packet, or {@code null} if the player's channel is unavailable
      */
     private PacketWrapper<?> createPlayerListNamePacket(Player target, Component displayName) {
-        Object channel = PacketEvents.getAPI().getPlayerManager().getChannel(target.getUniqueId());
-        if (channel == null) return null;
-        User targetUser = PacketEvents.getAPI().getPlayerManager().getUser(channel);
-        if (targetUser == null) return null;
         return playerListPacketFactory.create(
-                targetUser.getProfile(),
+                plugin.getContext().getUserProfile(target),
                 toPacketEventsGameMode(target.getGameMode()),
-                displayName);
+                displayName
+        );
     }
 
     // ── component converters ─────────────────────────────────────────────────
@@ -289,13 +313,16 @@ public class MessageService implements BBAIMessageService {
         net.kyori.adventure.text.TextComponent.Builder builder = Component.text();
         for (BBAIChatMessage.Segment segment : message.getSegments()) {
             Component part = toComponent(segment.getText());
+
             if (segment.getClickAction() != null && segment.getClickValue() != null) {
                 ClickEvent click = toClickEvent(segment);
-                if (click != null) part = part.clickEvent(click);
+                if (click != null)
+                    part = part.clickEvent(click);
             }
-            if (segment.getHoverText() != null) {
+
+            if (segment.getHoverText() != null)
                 part = part.hoverEvent(HoverEvent.showText(toComponent(segment.getHoverText())));
-            }
+
             builder.append(part);
         }
         return builder.build();
@@ -317,7 +344,8 @@ public class MessageService implements BBAIMessageService {
 
     /** Converts a Bukkit {@link org.bukkit.GameMode} to the PacketEvents equivalent. */
     private GameMode toPacketEventsGameMode(org.bukkit.GameMode gameMode) {
-        if (gameMode == null) return GameMode.SURVIVAL;
+        if (gameMode == null)
+            return GameMode.SURVIVAL;
         switch (gameMode) {
             case CREATIVE:
                 return GameMode.CREATIVE;
@@ -327,26 +355,6 @@ public class MessageService implements BBAIMessageService {
                 return GameMode.SPECTATOR;
             default:
                 return GameMode.SURVIVAL;
-        }
-    }
-
-    // ── send helper ──────────────────────────────────────────────────────────
-
-    /**
-     * Sends a packet to a player via their PacketEvents network channel.
-     * Silently returns if the channel is unavailable (e.g. player disconnecting).
-     * Exceptions are caught and logged rather than propagated.
-     */
-    private void sendPacket(Player player, PacketWrapper<?> packet) {
-        try {
-            Object channel = PacketEvents.getAPI().getPlayerManager().getChannel(player.getUniqueId());
-            if (channel == null) return;
-            User user = PacketEvents.getAPI().getPlayerManager().getUser(channel);
-            if (user == null) return;
-            user.sendPacket(packet);
-        } catch (Exception e) {
-            plugin.getLogger().warning("Failed to send " + packet.getClass().getSimpleName()
-                    + " to " + player.getName() + ": " + e.getMessage());
         }
     }
 
@@ -368,7 +376,7 @@ public class MessageService implements BBAIMessageService {
      */
     @FunctionalInterface
     private interface TitleSender {
-        void send(Player player, Component title, Component subtitle, BBAITitleTimes times);
+        void send(Player player, Component title, Component subtitle, int fadeIn, int stay, int fadeOut);
     }
 
     /**

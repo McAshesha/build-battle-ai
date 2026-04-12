@@ -1,10 +1,6 @@
-package ru.ashesha.buildBattleAI.api;
+package ru.ashesha.buildBattleAI.core.api;
 
-import lombok.AccessLevel;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
+import lombok.*;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -12,14 +8,9 @@ import java.util.List;
 
 /**
  * Immutable rich chat message composed of one or more {@link Segment}s.
- * <p>
  * Each segment carries display text and optional interactive properties
  * (click action, hover tooltip). Messages are built via the fluent
  * {@link Builder} API and can be sent through {@link BBAIMessageService}.
- * <p>
- * Supports placeholder replacement via {@link #replace(String, String)},
- * which returns a new message instance with all occurrences substituted
- * across text, click values, and hover text.
  *
  * @see BBAIMessageService
  */
@@ -31,7 +22,7 @@ public class BBAIChatMessage {
     private final List<Segment> segments;
 
     private BBAIChatMessage(List<Segment> segments) {
-        this.segments = Collections.unmodifiableList(new ArrayList<Segment>(segments));
+        this.segments = new ArrayList<>(segments);
     }
 
     /**
@@ -51,22 +42,6 @@ public class BBAIChatMessage {
      */
     public static BBAIChatMessage of(@NonNull String text) {
         return builder().append(text).build();
-    }
-
-    /**
-     * Returns a new message with all occurrences of {@code target} replaced
-     * by {@code replacement} across every segment's text, click value, and hover text.
-     *
-     * @param target      the string to search for
-     * @param replacement the string to substitute in
-     * @return a new message with replacements applied
-     */
-    public BBAIChatMessage replace(@NonNull String target, @NonNull String replacement) {
-        List<Segment> replacedSegments = new ArrayList<Segment>(segments.size());
-        for (Segment segment : segments) {
-            replacedSegments.add(segment.replace(target, replacement));
-        }
-        return new BBAIChatMessage(replacedSegments);
     }
 
     /**
@@ -98,40 +73,16 @@ public class BBAIChatMessage {
         private final String clickValue;
         /** The tooltip text shown on hover, or {@code null} for no tooltip. */
         private final String hoverText;
-
-        /**
-         * Replaces occurrences of {@code target} in a nullable string value.
-         *
-         * @return the replaced string, or {@code null} if the input was {@code null}
-         */
-        private static String replaceValue(String value, String target, String replacement) {
-            if (value == null) {
-                return null;
-            }
-            return value.replace(target, replacement);
-        }
-
-        /**
-         * Returns a new segment with all occurrences of {@code target} replaced
-         * in text, click value, and hover text. The click action type is preserved.
-         */
-        private Segment replace(String target, String replacement) {
-            return new Segment(
-                    replaceValue(text, target, replacement),
-                    clickAction,
-                    replaceValue(clickValue, target, replacement),
-                    replaceValue(hoverText, target, replacement)
-            );
-        }
     }
 
     /**
      * Fluent builder for constructing {@link BBAIChatMessage} instances
      * by appending segments with optional interactive properties.
      */
+    @NoArgsConstructor(access = AccessLevel.PRIVATE)
     public static class Builder {
 
-        private final List<Segment> segments = new ArrayList<Segment>();
+        private final List<Segment> segments = new ArrayList<>();
 
         /**
          * Appends a plain-text segment with no interactive properties.

@@ -1,4 +1,4 @@
-package ru.ashesha.buildBattleAI.api;
+package ru.ashesha.buildBattleAI.game.api;
 
 /**
  * Service contract for managing game sessions.
@@ -7,12 +7,6 @@ package ru.ashesha.buildBattleAI.api;
  * topic assignment, building phase, AI judging, and results display.
  */
 public interface BBAIGameManager {
-
-    /**
-     * Initializes the game manager, loading game configuration
-     * and preparing for session creation.
-     */
-    void initialize();
 
     /**
      * Shuts down the game manager, ending all active sessions

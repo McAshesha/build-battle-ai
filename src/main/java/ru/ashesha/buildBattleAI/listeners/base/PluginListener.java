@@ -1,5 +1,9 @@
 package ru.ashesha.buildBattleAI.listeners.base;
 
+import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.event.PacketListener;
+import com.github.retrooper.packetevents.event.PacketListenerCommon;
+import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.bukkit.event.HandlerList;
@@ -7,29 +11,51 @@ import org.bukkit.event.Listener;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 
 /**
- * Base class for all Bukkit event listeners in the plugin.
- * Provides convenient {@link #register()} and {@link #unregister()} methods
- * that handle Bukkit's {@link org.bukkit.plugin.PluginManager} registration.
+ * Unified base class for Bukkit event listeners and PacketEvents packet listeners.
  * <p>
- * Subclasses annotate their handler methods with {@link org.bukkit.event.EventHandler}.
+ * Every subclass is registered with <b>both</b> event systems simultaneously:
+ * Bukkit's {@link org.bukkit.plugin.PluginManager} for {@code @EventHandler} methods,
+ * and PacketEvents for {@code onPacketReceive} / {@code onPacketSend} overrides.
+ * This allows a single listener to handle both Bukkit events and raw packets.
  */
 @RequiredArgsConstructor
-public abstract class PluginListener implements Listener {
+public abstract class PluginListener implements Listener, PacketListener {
 
     /** Reference to the plugin instance for accessing managers and server API. */
     @NonNull protected final BuildBattleAI plugin;
 
+    /** The priority at which this listener intercepts packets. */
+    private final PacketListenerPriority priority;
+
+    /** Handle to the registered PacketEvents listener, used for unregistration. */
+    private PacketListenerCommon registeredListener;
+
     /**
-     * Registers all {@code @EventHandler} methods in this listener with Bukkit.
+     * Creates a listener with the default {@link PacketListenerPriority#NORMAL} priority.
+     *
+     * @param plugin the plugin instance
      */
-    public final void register() {
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+    protected PluginListener(@NonNull BuildBattleAI plugin) {
+        this(plugin, PacketListenerPriority.NORMAL);
     }
 
     /**
-     * Unregisters all event handlers in this listener, stopping event delivery.
+     * Registers this listener with both Bukkit and PacketEvents event systems.
+     */
+    public final void register() {
+        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        registeredListener = PacketEvents.getAPI().getEventManager().registerListener(this, priority);
+    }
+
+    /**
+     * Unregisters this listener from both Bukkit and PacketEvents event systems.
+     * Safe to call even if not currently registered.
      */
     public final void unregister() {
         HandlerList.unregisterAll(this);
+        if (registeredListener != null) {
+            PacketEvents.getAPI().getEventManager().unregisterListener(registeredListener);
+            registeredListener = null;
+        }
     }
 }

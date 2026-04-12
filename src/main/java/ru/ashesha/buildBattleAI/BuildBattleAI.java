@@ -4,7 +4,7 @@ import com.github.retrooper.packetevents.PacketEvents;
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
 import lombok.Getter;
 import org.bukkit.plugin.java.JavaPlugin;
-import ru.ashesha.buildBattleAI.core.PluginBootstrap;
+import ru.ashesha.buildBattleAI.core.PluginContext;
 
 /**
  * Main plugin class for BuildBattleAI — a Minecraft Build Battle variant
@@ -20,8 +20,8 @@ import ru.ashesha.buildBattleAI.core.PluginBootstrap;
 @Getter
 public final class BuildBattleAI extends JavaPlugin {
 
-    /** Central bootstrap that owns all manager, command, and listener instances. */
-    private PluginBootstrap bootstrap;
+    /** Central context that owns all manager, command, and listener instances. */
+    private PluginContext context;
 
     /**
      * Called during server startup before {@link #onEnable()}.
@@ -31,17 +31,17 @@ public final class BuildBattleAI extends JavaPlugin {
     public void onLoad() {
         PacketEvents.setAPI(SpigotPacketEventsBuilder.build(this));
         PacketEvents.getAPI().load();
-        bootstrap = new PluginBootstrap(this);
+        context = new PluginContext(this);
     }
 
     /**
      * Called when the plugin is enabled. Initializes the PacketEvents event loop,
-     * creates the plugin bootstrap, and registers all commands and listeners.
+     * creates the plugin context, and registers all commands and listeners.
      */
     @Override
     public void onEnable() {
         PacketEvents.getAPI().init();
-        bootstrap.enable();
+        context.enable();
         getLogger().info("BuildBattleAI v" + getDescription().getVersion() + " has been enabled!");
     }
 
@@ -51,7 +51,7 @@ public final class BuildBattleAI extends JavaPlugin {
      */
     @Override
     public void onDisable() {
-        bootstrap.disable();
+        context.disable();
         PacketEvents.getAPI().terminate();
         getLogger().info("BuildBattleAI has been disabled.");
     }
