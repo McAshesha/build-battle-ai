@@ -681,7 +681,7 @@ public class CpuRenderer {
     /**
      * Convert raw RGB byte array to a BufferedImage for saving as PNG.
      */
-    public static BufferedImage toBufferedImage(@NonNull byte[] rgb) {
+    public static BufferedImage toBufferedImage(byte @NonNull [] rgb) {
         BufferedImage image = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
         int[] pixels = new int[WIDTH * HEIGHT];
         for (int i = 0; i < WIDTH * HEIGHT; i++) {

@@ -42,7 +42,7 @@ public class BlockRenderState {
      * Thread-safe cache keyed by raw block state strings.
      * Volatile so that atomic swap (for eviction) is visible to all render threads.
      */
-    private static volatile Map<String, BlockRenderState> CACHE = new ConcurrentHashMap<String, BlockRenderState>();
+    private static volatile Map<String, BlockRenderState> CACHE = new ConcurrentHashMap<>();
     /**
      * Horizontal direction the block faces (north/south/east/west).
      */
@@ -72,6 +72,12 @@ public class BlockRenderState {
      */
     int layers;
 
+
+    /**
+     * Rotation value for standing signs (0–15).
+     */
+    int rotation;
+
     /**
      * Retrieves or parses the block render state at the given world coordinates.
      * Returns {@link #DEFAULT} if no block state string is available.
@@ -82,11 +88,6 @@ public class BlockRenderState {
      * @param z     world Z coordinate
      * @return the parsed render state, never {@code null}
      */
-    /**
-     * Rotation value for standing signs (0–15).
-     */
-    int rotation;
-
     public static BlockRenderState of(SceneData scene, int x, int y, int z) {
         String blockState = scene.getBlockState(x, y, z);
         if (blockState == null || blockState.isEmpty())
@@ -95,7 +96,7 @@ public class BlockRenderState {
         if (cached != null)
             return cached;
         if (CACHE.size() > MAX_CACHE_SIZE)
-            CACHE = new ConcurrentHashMap<String, BlockRenderState>();
+            CACHE = new ConcurrentHashMap<>();
         BlockRenderState parsed = parse(blockState);
         CACHE.put(blockState, parsed);
         return parsed;
@@ -112,7 +113,7 @@ public class BlockRenderState {
      * Replaces the cache with a fresh empty map. Package-visible for testing.
      */
     static void clearCache() {
-        CACHE = new ConcurrentHashMap<String, BlockRenderState>();
+        CACHE = new ConcurrentHashMap<>();
     }
 
     /**

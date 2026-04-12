@@ -327,6 +327,7 @@ public class ChunkScene implements SceneData {
      * <p>
      * Thread-safe: JVM guarantees that class initialization is synchronized.
      */
+    @SuppressWarnings("JavaReflectionMemberAccess")
     private static class Version {
         /**
          * {@code true} on 1.8–1.12 servers (pre-flattening).

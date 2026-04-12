@@ -75,12 +75,12 @@ public class BBAICommand extends PluginCommand {
      */
     private void executeDemo(CommandSender sender, String[] args) {
         if (!(sender instanceof Player)) {
-            sender.sendMessage("\u00a7cDemo commands can only be used by a player.");
+            sender.sendMessage("§cDemo commands can only be used by a player.");
             return;
         }
 
         if (plugin.getContext().getMessageService() == null) {
-            sender.sendMessage("\u00a7cMessageService is not available.");
+            sender.sendMessage("§cMessageService is not available.");
             return;
         }
 
@@ -88,53 +88,40 @@ public class BBAICommand extends PluginCommand {
         String mode = args.length > 1 ? args[1].toLowerCase() : "all";
         BBAIMessageService messageService = plugin.getContext().getMessageService();
 
-        if ("all".equals(mode)) {
-            runChatDemo(player, messageService);
-            runRichDemo(player, messageService);
-            runActionBarDemo(player, messageService);
-            runTitleDemo(player, messageService);
-            runTabDemo(player, messageService);
-            runListNameDemo(player, messageService);
-            player.sendMessage("\u00a7aAll messaging demos were sent.");
-            return;
+        switch (mode) {
+            case "all":
+                runChatDemo(player, messageService);
+                runRichDemo(player, messageService);
+                runActionBarDemo(player, messageService);
+                runTitleDemo(player, messageService);
+                runTabDemo(player, messageService);
+                runListNameDemo(player, messageService);
+                player.sendMessage("§aAll messaging demos were sent.");
+                return;
+            case "chat":
+                runChatDemo(player, messageService);
+                return;
+            case "rich":
+                runRichDemo(player, messageService);
+                return;
+            case "bar":
+                runActionBarDemo(player, messageService);
+                return;
+            case "title":
+                runTitleDemo(player, messageService);
+                return;
+            case "tab":
+                runTabDemo(player, messageService);
+                return;
+            case "listname":
+                runListNameDemo(player, messageService);
+                return;
+            case "reset":
+                resetDemo(player, messageService);
+                return;
         }
 
-        if ("chat".equals(mode)) {
-            runChatDemo(player, messageService);
-            return;
-        }
-
-        if ("rich".equals(mode)) {
-            runRichDemo(player, messageService);
-            return;
-        }
-
-        if ("bar".equals(mode)) {
-            runActionBarDemo(player, messageService);
-            return;
-        }
-
-        if ("title".equals(mode)) {
-            runTitleDemo(player, messageService);
-            return;
-        }
-
-        if ("tab".equals(mode)) {
-            runTabDemo(player, messageService);
-            return;
-        }
-
-        if ("listname".equals(mode)) {
-            runListNameDemo(player, messageService);
-            return;
-        }
-
-        if ("reset".equals(mode)) {
-            resetDemo(player, messageService);
-            return;
-        }
-
-        player.sendMessage("\u00a7cUnknown demo mode. Use /bbai demo <all|chat|rich|bar|title|tab|listname|reset>");
+        player.sendMessage("§cUnknown demo mode. Use /bbai demo <all|chat|rich|bar|title|tab|listname|reset>");
     }
 
     /**
@@ -142,7 +129,7 @@ public class BBAICommand extends PluginCommand {
      */
     private void runChatDemo(Player player, BBAIMessageService messageService) {
         messageService.sendChat(player, "&6[Chat Demo] &fPlain PacketEvents chat message with &acolors&f.");
-        player.sendMessage("\u00a7aChat demo sent.");
+        player.sendMessage("§aChat demo sent.");
     }
 
     /**
@@ -157,7 +144,7 @@ public class BBAICommand extends PluginCommand {
                 .append(" &7| ")
                 .append("&d[OPEN URL]", ChatService.ClickAction.OPEN_URL, "https://github.com/retrooper/packetevents", "&7Open PacketEvents page");
         messageService.sendChat(player, message);
-        player.sendMessage("\u00a7aRich chat demo sent.");
+        player.sendMessage("§aRich chat demo sent.");
     }
 
     /**
@@ -165,7 +152,7 @@ public class BBAICommand extends PluginCommand {
      */
     private void runActionBarDemo(Player player, BBAIMessageService messageService) {
         messageService.sendActionBar(player, "&e[Bar Demo] &fPacketEvents action bar test");
-        player.sendMessage("\u00a7aAction bar demo sent.");
+        player.sendMessage("§aAction bar demo sent.");
     }
 
     /**
@@ -173,7 +160,7 @@ public class BBAICommand extends PluginCommand {
      */
     private void runTitleDemo(Player player, BBAIMessageService messageService) {
         messageService.sendTitle(player, "&6BuildBattleAI", "&fPacketEvents title/subtitle demo", 10, 50, 15);
-        player.sendMessage("\u00a7aTitle demo sent.");
+        player.sendMessage("§aTitle demo sent.");
     }
 
     /**
@@ -185,7 +172,7 @@ public class BBAICommand extends PluginCommand {
                 "&6BuildBattleAI Test Header\n&fPacketEvents tab demo",
                 "&7Player: &e" + player.getName() + "\n&aFooter line 2"
         );
-        player.sendMessage("\u00a7aTab demo sent.");
+        player.sendMessage("§aTab demo sent.");
     }
 
     /**
@@ -193,7 +180,7 @@ public class BBAICommand extends PluginCommand {
      */
     private void runListNameDemo(Player player, BBAIMessageService messageService) {
         messageService.sendPlayerListName(player, "&b[AI] &f" + player.getName(), player.getServer().getOnlinePlayers());
-        player.sendMessage("\u00a7aPlayer list name demo sent to all online viewers.");
+        player.sendMessage("§aPlayer list name demo sent to all online viewers.");
     }
 
     /**
@@ -202,6 +189,6 @@ public class BBAICommand extends PluginCommand {
     private void resetDemo(Player player, BBAIMessageService messageService) {
         messageService.sendTab(player, "", "");
         messageService.sendPlayerListName(player, null, player.getServer().getOnlinePlayers());
-        player.sendMessage("\u00a7aTab header/footer and player list name were reset.");
+        player.sendMessage("§aTab header/footer and player list name were reset.");
     }
 }

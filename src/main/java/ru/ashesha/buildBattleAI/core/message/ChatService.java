@@ -107,6 +107,7 @@ public class ChatService {
      *     <li>&lt;1.16 — uses {@code ChatMessageLegacy} (no sender UUID)</li>
      * </ul>
      */
+    @SuppressWarnings("deprecation")
     private ChatPacketFactory resolveChatFactory(ServerVersion version) {
         if (version.isNewerThanOrEquals(ServerVersion.V_1_19))
             return (component, overlay) -> new WrapperPlayServerSystemChatMessage(

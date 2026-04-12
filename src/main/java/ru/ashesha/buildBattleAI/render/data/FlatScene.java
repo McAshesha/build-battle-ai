@@ -42,7 +42,7 @@ public class FlatScene implements SceneData {
      * @param sizeY region size along Y axis
      * @param sizeZ region size along Z axis
      */
-    public FlatScene(@NonNull short[] data, int minX, int minY, int minZ, int sizeX, int sizeY, int sizeZ) {
+    public FlatScene(short @NonNull [] data, int minX, int minY, int minZ, int sizeX, int sizeY, int sizeZ) {
         this(data, null, null, minX, minY, minZ, sizeX, sizeY, sizeZ, SourceFormat.DIRECT, "direct");
     }
 
@@ -61,7 +61,7 @@ public class FlatScene implements SceneData {
      * @param sourceFormat    how the scene data was created
      * @param sourceName      human-readable label for the data source
      */
-    public FlatScene(@NonNull short[] data,
+    public FlatScene(short @NonNull [] data,
                      byte[] legacyBlockData,
                      String[] blockStates,
                      int minX, int minY, int minZ,

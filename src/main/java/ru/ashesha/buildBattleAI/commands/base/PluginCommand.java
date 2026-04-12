@@ -53,7 +53,7 @@ public abstract class PluginCommand implements TabExecutor {
      * to suppress Bukkit's default usage message.
      */
     @Override
-    public final boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+    public final boolean onCommand(@NonNull CommandSender sender,@NonNull  Command command,@NonNull  String label, String[] args) {
         execute(sender, args);
         return true;
     }
@@ -62,7 +62,7 @@ public abstract class PluginCommand implements TabExecutor {
      * Delegates to {@link #suggest(CommandSender, String[])}.
      */
     @Override
-    public final List<String> onTabComplete(CommandSender sender, Command command, String label, String[] args) {
+    public final List<String> onTabComplete(@NonNull CommandSender sender,@NonNull  Command command,@NonNull  String label, String[] args) {
         return suggest(sender, args);
     }
 

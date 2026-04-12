@@ -28,6 +28,7 @@ import java.util.Arrays;
  * <p>
  * All methods are thread-safe and can be called from any thread.
  */
+@SuppressWarnings("DataFlowIssue")
 @UtilityClass
 public class BlockPalette {
 

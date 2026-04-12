@@ -25,7 +25,7 @@ public class BlockShape {
     /**
      * Cache for shapes resolved from neighbor connectivity (fences, walls, panes).
      */
-    private static final Map<String, double[][]> CONNECTIVITY_SHAPE_CACHE = new ConcurrentHashMap<String, double[][]>();
+    private static final Map<String, double[][]> CONNECTIVITY_SHAPE_CACHE = new ConcurrentHashMap<>();
     // Fence: 4×16×4 center post
     private static final double[] FENCE_POST = {6 / 16.0, 0, 6 / 16.0, 10 / 16.0, 1, 10 / 16.0};
 
@@ -173,7 +173,7 @@ public class BlockShape {
      * Cache for shapes resolved from block state properties (slabs, stairs, trapdoors, etc.).
      * Keyed by {@code (ordinal << 32) | hashCode}. Volatile for atomic swap eviction.
      */
-    private static volatile Map<Long, double[][]> STATE_SHAPE_CACHE = new ConcurrentHashMap<Long, double[][]>();
+    private static volatile Map<Long, double[][]> STATE_SHAPE_CACHE = new ConcurrentHashMap<>();
 
     // Assigns shapes to materials based on name patterns.
     // The static initializer iterates all XMaterial values and maps each one to
@@ -386,7 +386,7 @@ public class BlockShape {
         double[][] resolved = buildStatefulShape(material, state);
         if (resolved != null) {
             if (STATE_SHAPE_CACHE.size() > MAX_STATE_SHAPE_CACHE_SIZE)
-                STATE_SHAPE_CACHE = new ConcurrentHashMap<Long, double[][]>();
+                STATE_SHAPE_CACHE = new ConcurrentHashMap<>();
             STATE_SHAPE_CACHE.put(key, resolved);
         }
         return resolved;
@@ -683,7 +683,7 @@ public class BlockShape {
      * Replaces the state shape cache with a fresh empty map. Package-visible for testing.
      */
     static void clearStateShapeCache() {
-        STATE_SHAPE_CACHE = new ConcurrentHashMap<Long, double[][]>();
+        STATE_SHAPE_CACHE = new ConcurrentHashMap<>();
     }
 
 }
