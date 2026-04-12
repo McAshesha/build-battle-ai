@@ -6,11 +6,7 @@ import lombok.NonNull;
 import lombok.experimental.Delegate;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.core.api.BBAIMessageService;
-import ru.ashesha.buildBattleAI.core.message.BarService;
-import ru.ashesha.buildBattleAI.core.message.ChatService;
-import ru.ashesha.buildBattleAI.core.message.NameService;
-import ru.ashesha.buildBattleAI.core.message.TabService;
-import ru.ashesha.buildBattleAI.core.message.TitleService;
+import ru.ashesha.buildBattleAI.core.message.*;
 
 /**
  * PacketEvents-based implementation of {@link BBAIMessageService}.
@@ -31,20 +27,35 @@ import ru.ashesha.buildBattleAI.core.message.TitleService;
  */
 class MessageService implements BBAIMessageService {
 
-    /** Sub-service for sending chat messages. */
-    @Delegate private final ChatService chatService;
+    /**
+     * Sub-service for sending chat messages.
+     */
+    @Delegate
+    private final ChatService chatService;
 
-    /** Sub-service for sending action bar messages. */
-    @Delegate private final BarService barService;
+    /**
+     * Sub-service for sending action bar messages.
+     */
+    @Delegate
+    private final BarService barService;
 
-    /** Sub-service for sending title/subtitle overlays. */
-    @Delegate private final TitleService titleService;
+    /**
+     * Sub-service for sending title/subtitle overlays.
+     */
+    @Delegate
+    private final TitleService titleService;
 
-    /** Sub-service for sending player list header/footer. */
-    @Delegate private final TabService tabService;
+    /**
+     * Sub-service for sending player list header/footer.
+     */
+    @Delegate
+    private final TabService tabService;
 
-    /** Sub-service for updating player list display names. */
-    @Delegate private final NameService nameService;
+    /**
+     * Sub-service for updating player list display names.
+     */
+    @Delegate
+    private final NameService nameService;
 
     /**
      * Creates the message service and initializes all sub-services.

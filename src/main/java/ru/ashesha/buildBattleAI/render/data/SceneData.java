@@ -14,22 +14,34 @@ import com.cryptomorin.xseries.XMaterial;
  */
 public interface SceneData {
 
-    /** Inclusive minimum world X coordinate of the scene region. */
+    /**
+     * Inclusive minimum world X coordinate of the scene region.
+     */
     int minX();
 
-    /** Inclusive minimum world Y coordinate of the scene region. */
+    /**
+     * Inclusive minimum world Y coordinate of the scene region.
+     */
     int minY();
 
-    /** Inclusive minimum world Z coordinate of the scene region. */
+    /**
+     * Inclusive minimum world Z coordinate of the scene region.
+     */
     int minZ();
 
-    /** Inclusive maximum world X coordinate of the scene region. */
+    /**
+     * Inclusive maximum world X coordinate of the scene region.
+     */
     int maxX();
 
-    /** Inclusive maximum world Y coordinate of the scene region. */
+    /**
+     * Inclusive maximum world Y coordinate of the scene region.
+     */
     int maxY();
 
-    /** Inclusive maximum world Z coordinate of the scene region. */
+    /**
+     * Inclusive maximum world Z coordinate of the scene region.
+     */
     int maxZ();
 
     /**

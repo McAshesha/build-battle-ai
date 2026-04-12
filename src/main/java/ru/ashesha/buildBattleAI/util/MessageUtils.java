@@ -13,7 +13,9 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 @UtilityClass
 public class MessageUtils {
 
-    /** Serializer for converting legacy {@code &}-prefixed color codes into Adventure components. */
+    /**
+     * Serializer for converting legacy {@code &}-prefixed color codes into Adventure components.
+     */
     public final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacyAmpersand();
 
     /**

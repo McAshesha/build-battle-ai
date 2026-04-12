@@ -339,11 +339,10 @@ class FlatSceneTest {
         }
 
         FlatScene scene = new FlatScene(data, 10, 20, 30, sizeX, sizeY, sizeZ);
-        for (int i = 0; i < testMats.length; i++) {
+        for (int i = 0; i < testMats.length; i++)
             assertEquals(testMats[i],
                     scene.getBlockType(coords[i][0] + 10, coords[i][1] + 20, coords[i][2] + 30),
                     "Block at (" + coords[i][0] + "," + coords[i][1] + "," + coords[i][2] + ")");
-        }
 
         // Out-of-bounds still returns AIR
         assertEquals(XMaterial.AIR, scene.getBlockType(9, 20, 30));

@@ -15,16 +15,24 @@ import lombok.experimental.UtilityClass;
 @UtilityClass
 public class LegacyBlockStates {
 
-    /** Stair facing values indexed by legacy data bits 0–1. */
+    /**
+     * Stair facing values indexed by legacy data bits 0–1.
+     */
     private static final String[] STAIR_FACING = {"east", "west", "south", "north"};
 
-    /** Trapdoor facing values indexed by legacy data bits 0–1. */
+    /**
+     * Trapdoor facing values indexed by legacy data bits 0–1.
+     */
     private static final String[] TRAPDOOR_FACING = {"south", "north", "east", "west"};
 
-    /** Door facing values indexed by legacy data bits 0–1 (lower-half only). */
+    /**
+     * Door facing values indexed by legacy data bits 0–1 (lower-half only).
+     */
     private static final String[] DOOR_FACING = {"east", "south", "west", "north"};
 
-    /** Fence gate facing values indexed by legacy data bits 0–1. */
+    /**
+     * Fence gate facing values indexed by legacy data bits 0–1.
+     */
     private static final String[] FENCE_GATE_FACING = {"south", "west", "north", "east"};
 
     /**
@@ -33,7 +41,9 @@ public class LegacyBlockStates {
      */
     private static final String[] WALL_MOUNTED_FACING = {null, null, "north", "south", "west", "east"};
 
-    /** Log/pillar axis values indexed by {@code (data >> 2) & 3}. */
+    /**
+     * Log/pillar axis values indexed by {@code (data >> 2) & 3}.
+     */
     private static final String[] AXIS_VALUES = {"y", "x", "z"};
 
     /**
@@ -43,51 +53,42 @@ public class LegacyBlockStates {
      * @param material the XMaterial (already resolved from legacy name + data)
      * @param data     the raw legacy data byte
      * @return a block state string like {@code "minecraft:oak_stairs[facing=north,half=bottom,shape=straight]"},
-     *         or {@code null} if the block has no render-relevant state
+     * or {@code null} if the block has no render-relevant state
      */
     public static String toBlockState(XMaterial material, byte data) {
         String name = material.name();
         int d = data & 0xFF;
 
-        if (name.endsWith("_STAIRS")) {
+        if (name.endsWith("_STAIRS"))
             return stairsState(name, d);
-        }
-        if (name.endsWith("_SLAB")) {
+        if (name.endsWith("_SLAB"))
             return slabState(name, d);
-        }
-        if (name.endsWith("_TRAPDOOR")) {
+        if (name.endsWith("_TRAPDOOR"))
             return trapdoorState(name, d);
-        }
-        if (name.endsWith("_DOOR")) {
+        if (name.endsWith("_DOOR"))
             return doorState(name, d);
-        }
-        if (name.endsWith("_FENCE_GATE")) {
+        if (name.endsWith("_FENCE_GATE"))
             return fenceGateState(name, d);
-        }
         // Standing signs (not wall signs)
-        if (name.endsWith("_SIGN") && !name.endsWith("_WALL_SIGN")) {
+        if (name.endsWith("_SIGN") && !name.endsWith("_WALL_SIGN"))
             return "minecraft:" + name.toLowerCase() + "[rotation=" + (d & 15) + "]";
-        }
         // Wall-mounted blocks: wall signs, ladders, wall torches
         if (name.endsWith("_WALL_SIGN") || name.equals("LADDER")
                 || name.equals("WALL_TORCH") || name.equals("SOUL_WALL_TORCH")
-                || name.equals("REDSTONE_WALL_TORCH")) {
+                || name.equals("REDSTONE_WALL_TORCH"))
             return wallMountedState(name, d);
-        }
         // Axis-aligned blocks: logs, wood, pillars, chains, end rods
         if (name.endsWith("_LOG") || name.endsWith("_WOOD")
                 || name.equals("BONE_BLOCK") || name.equals("HAY_BLOCK")
                 || name.equals("PURPUR_PILLAR") || name.equals("QUARTZ_PILLAR")
-                || name.equals("CHAIN") || name.equals("END_ROD")) {
+                || name.equals("CHAIN") || name.equals("END_ROD"))
             return axisState(name, d);
-        }
         if (name.equals("SNOW")) {
             int layers = (d & 7) + 1;
             return "minecraft:snow[layers=" + layers + "]";
         }
-        if (name.equals("VINE")) {
+        if (name.equals("VINE"))
             return vineState(d);
-        }
 
         return null;
     }
@@ -105,13 +106,17 @@ public class LegacyBlockStates {
                 + "[facing=" + facing + ",half=" + half + ",shape=straight]";
     }
 
-    /** Slabs: bit 3 = top position. Sub-type is already resolved via XMaterial. */
+    /**
+     * Slabs: bit 3 = top position. Sub-type is already resolved via XMaterial.
+     */
     private static String slabState(String name, int d) {
         String type = (d & 8) != 0 ? "top" : "bottom";
         return "minecraft:" + name.toLowerCase() + "[type=" + type + "]";
     }
 
-    /** Trapdoors: bits 0–1 = facing, bit 2 = open, bit 3 = top half. */
+    /**
+     * Trapdoors: bits 0–1 = facing, bit 2 = open, bit 3 = top half.
+     */
     private static String trapdoorState(String name, int d) {
         String facing = TRAPDOOR_FACING[d & 3];
         boolean open = (d & 4) != 0;
@@ -127,25 +132,28 @@ public class LegacyBlockStates {
      */
     private static String doorState(String name, int d) {
         String lower = name.toLowerCase();
-        if ((d & 8) != 0) {
-            // Upper half — facing is unknown without reading the lower block.
-            // Default to north; the renderer uses this only for shape, and doors
-            // are rendered as thin cross panels regardless of facing.
+        // Upper half — facing is unknown without reading the lower block.
+        // Default to north; the renderer uses this only for shape, and doors
+        // are rendered as thin cross panels regardless of facing.
+        if ((d & 8) != 0)
             return "minecraft:" + lower + "[half=upper,facing=north,open=false]";
-        }
         String facing = DOOR_FACING[d & 3];
         boolean open = (d & 4) != 0;
         return "minecraft:" + lower + "[facing=" + facing + ",half=lower,open=" + open + "]";
     }
 
-    /** Fence gates: bits 0–1 = facing, bit 2 = open. */
+    /**
+     * Fence gates: bits 0–1 = facing, bit 2 = open.
+     */
     private static String fenceGateState(String name, int d) {
         String facing = FENCE_GATE_FACING[d & 3];
         boolean open = (d & 4) != 0;
         return "minecraft:" + name.toLowerCase() + "[facing=" + facing + ",open=" + open + "]";
     }
 
-    /** Wall-mounted blocks: data 2–5 maps to cardinal facing. */
+    /**
+     * Wall-mounted blocks: data 2–5 maps to cardinal facing.
+     */
     private static String wallMountedState(String name, int d) {
         String facing = (d >= 2 && d <= 5) ? WALL_MOUNTED_FACING[d] : "north";
         return "minecraft:" + name.toLowerCase() + "[facing=" + facing + "]";
@@ -168,11 +176,16 @@ public class LegacyBlockStates {
      */
     private static String vineState(int d) {
         String facing;
-        if ((d & 4) != 0) facing = "north";
-        else if ((d & 1) != 0) facing = "south";
-        else if ((d & 2) != 0) facing = "west";
-        else if ((d & 8) != 0) facing = "east";
-        else facing = "north";
+        if ((d & 4) != 0)
+            facing = "north";
+        else if ((d & 1) != 0)
+            facing = "south";
+        else if ((d & 2) != 0)
+            facing = "west";
+        else if ((d & 8) != 0)
+            facing = "east";
+        else
+            facing = "north";
         return "minecraft:vine[facing=" + facing + "]";
     }
 

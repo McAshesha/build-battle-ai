@@ -86,7 +86,9 @@ class PluginCommandBaseTest {
         assertArrayEquals(new String[]{"arg1", "arg2"}, command.lastArgs);
     }
 
-    /** Minimal concrete subclass for testing the abstract PluginCommand. */
+    /**
+     * Minimal concrete subclass for testing the abstract PluginCommand.
+     */
     static class TestCommand extends PluginCommand {
 
         boolean executed;

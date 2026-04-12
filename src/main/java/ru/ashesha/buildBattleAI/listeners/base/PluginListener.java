@@ -21,13 +21,20 @@ import ru.ashesha.buildBattleAI.BuildBattleAI;
 @RequiredArgsConstructor
 public abstract class PluginListener implements Listener, PacketListener {
 
-    /** Reference to the plugin instance for accessing managers and server API. */
-    @NonNull protected final BuildBattleAI plugin;
+    /**
+     * Reference to the plugin instance for accessing managers and server API.
+     */
+    @NonNull
+    protected final BuildBattleAI plugin;
 
-    /** The priority at which this listener intercepts packets. */
+    /**
+     * The priority at which this listener intercepts packets.
+     */
     private final PacketListenerPriority priority;
 
-    /** Handle to the registered PacketEvents listener, used for unregistration. */
+    /**
+     * Handle to the registered PacketEvents listener, used for unregistration.
+     */
     private PacketListenerCommon registeredListener;
 
     /**

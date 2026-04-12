@@ -19,11 +19,17 @@ import java.util.List;
 @RequiredArgsConstructor
 public abstract class PluginCommand implements TabExecutor {
 
-    /** Reference to the plugin instance for accessing managers and server API. */
-    @NonNull protected final BuildBattleAI plugin;
+    /**
+     * Reference to the plugin instance for accessing managers and server API.
+     */
+    @NonNull
+    protected final BuildBattleAI plugin;
 
-    /** The command name as declared in plugin.yml. */
-    @NonNull private final String name;
+    /**
+     * The command name as declared in plugin.yml.
+     */
+    @NonNull
+    private final String name;
 
     /**
      * Executes the command logic.
@@ -52,7 +58,9 @@ public abstract class PluginCommand implements TabExecutor {
         return true;
     }
 
-    /** Delegates to {@link #suggest(CommandSender, String[])}. */
+    /**
+     * Delegates to {@link #suggest(CommandSender, String[])}.
+     */
     @Override
     public final List<String> onTabComplete(CommandSender sender, Command command, String label, String[] args) {
         return suggest(sender, args);

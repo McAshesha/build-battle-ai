@@ -32,11 +32,15 @@ import ru.ashesha.buildBattleAI.render.CpuRenderer;
 @RequiredArgsConstructor
 public class PluginContext {
 
-    @NonNull private final BuildBattleAI plugin;
+    @NonNull
+    private final BuildBattleAI plugin;
 
-    @Getter private ArenaManager arenaManager;
-    @Getter private GameManager gameManager;
-    @Getter private BBAIMessageService messageService;
+    @Getter
+    private ArenaManager arenaManager;
+    @Getter
+    private GameManager gameManager;
+    @Getter
+    private BBAIMessageService messageService;
 
     /**
      * Initializes all plugin subsystems, registers commands and event listeners.

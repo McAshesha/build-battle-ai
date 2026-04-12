@@ -20,7 +20,9 @@ import ru.ashesha.buildBattleAI.core.PluginContext;
 @Getter
 public final class BuildBattleAI extends JavaPlugin {
 
-    /** Central context that owns all manager, command, and listener instances. */
+    /**
+     * Central context that owns all manager, command, and listener instances.
+     */
     private PluginContext context;
 
     /**

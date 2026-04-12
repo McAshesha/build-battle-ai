@@ -21,6 +21,21 @@ class CpuRendererTest {
 
     // ===== Constants =====
 
+    private static FlatScene emptyScene() {
+        int size = 10;
+        short[] data = airArray(size * size * size);
+        return new FlatScene(data, 0, 0, 0, size, size, size);
+    }
+
+    private static boolean hasNonBackgroundPixels(byte[] pixels) {
+        for (int i = 0; i < pixels.length; i += 3)
+            if ((pixels[i] & 0xFF) != 0xC8 || (pixels[i + 1] & 0xFF) != 0xD8 || (pixels[i + 2] & 0xFF) != 0xE8)
+                return true;
+        return false;
+    }
+
+    // ===== render() output format =====
+
     @Test
     void outputDimensions() {
         assertEquals(224, CpuRenderer.WIDTH);
@@ -32,14 +47,14 @@ class CpuRendererTest {
         assertEquals(70.0, CpuRenderer.FOV, 1e-9);
     }
 
-    // ===== render() output format =====
-
     @Test
     void renderReturnsCorrectArraySize() {
         FlatScene scene = emptyScene();
         byte[] pixels = CpuRenderer.render(scene, 0, 0, 0, 0, 0);
         assertEquals(224 * 224 * 3, pixels.length);
     }
+
+    // ===== Rendering blocks =====
 
     @Test
     void renderEmptySceneProducesBackgroundColor() {
@@ -74,8 +89,6 @@ class CpuRendererTest {
         }
     }
 
-    // ===== Rendering blocks =====
-
     @Test
     void renderSolidBlockProducesNonBackgroundPixels() {
         // Create a 16x16x16 scene filled with stone, camera inside looking at it
@@ -83,25 +96,21 @@ class CpuRendererTest {
         short[] data = new short[size * size * size];
         Arrays.fill(data, (short) XMaterial.STONE.ordinal());
         // Clear a 3x3x3 area in the center for the camera
-        for (int x = 7; x <= 9; x++) {
-            for (int y = 7; y <= 9; y++) {
-                for (int z = 7; z <= 9; z++) {
+        for (int x = 7; x <= 9; x++)
+            for (int y = 7; y <= 9; y++)
+                for (int z = 7; z <= 9; z++)
                     data[x * size * size + y * size + z] = (short) XMaterial.AIR.ordinal();
-                }
-            }
-        }
 
         FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
         byte[] pixels = CpuRenderer.render(scene, 8.5, 8.5, 8.5, 0, 0);
 
         // At least some pixels should differ from background
         boolean hasNonBackground = false;
-        for (int i = 0; i < pixels.length; i += 3) {
+        for (int i = 0; i < pixels.length; i += 3)
             if ((pixels[i] & 0xFF) != 0xC8 || (pixels[i + 1] & 0xFF) != 0xD8 || (pixels[i + 2] & 0xFF) != 0xE8) {
                 hasNonBackground = true;
                 break;
             }
-        }
         assertTrue(hasNonBackground, "Rendering a stone room should produce non-background pixels");
     }
 
@@ -128,19 +137,18 @@ class CpuRendererTest {
         assertNotEquals(0xD8, g, "Center pixel G should not be background");
     }
 
+    // ===== Translucent blocks =====
+
     @Test
     void renderDifferentYawDirections() {
         // Fill a 10x10x10 box with stone, hollow center
         int size = 10;
         short[] data = new short[size * size * size];
         Arrays.fill(data, (short) XMaterial.STONE.ordinal());
-        for (int x = 3; x <= 6; x++) {
-            for (int y = 3; y <= 6; y++) {
-                for (int z = 3; z <= 6; z++) {
+        for (int x = 3; x <= 6; x++)
+            for (int y = 3; y <= 6; y++)
+                for (int z = 3; z <= 6; z++)
                     data[x * size * size + y * size + z] = (short) XMaterial.AIR.ordinal();
-                }
-            }
-        }
 
         FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
 
@@ -157,17 +165,17 @@ class CpuRendererTest {
         assertTrue(hasNonBackgroundPixels(east), "East view should see walls");
     }
 
+    // ===== toBufferedImage() =====
+
     @Test
     void renderPitchLookingDown() {
         // Place stone floor below camera
         int size = 10;
         short[] data = airArray(size * size * size);
         // Fill y=0 layer with stone
-        for (int x = 0; x < size; x++) {
-            for (int z = 0; z < size; z++) {
-                data[x * size * size + 0 * size + z] = (short) XMaterial.STONE.ordinal();
-            }
-        }
+        for (int x = 0; x < size; x++)
+            for (int z = 0; z < size; z++)
+                data[x * size * size + 0 + z] = (short) XMaterial.STONE.ordinal();
 
         FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
         // Camera at y=5 looking straight down (pitch=90)
@@ -175,8 +183,6 @@ class CpuRendererTest {
 
         assertTrue(hasNonBackgroundPixels(pixels), "Looking down at floor should see stone");
     }
-
-    // ===== Translucent blocks =====
 
     @Test
     void renderTranslucentBlockBlends() {
@@ -204,8 +210,6 @@ class CpuRendererTest {
         assertTrue(differs, "Glass should affect the rendered color");
     }
 
-    // ===== toBufferedImage() =====
-
     @Test
     void toBufferedImageDimensions() {
         byte[] rgb = new byte[224 * 224 * 3];
@@ -214,6 +218,8 @@ class CpuRendererTest {
         assertEquals(224, image.getHeight());
         assertEquals(BufferedImage.TYPE_INT_RGB, image.getType());
     }
+
+    // ===== Emissive rendering =====
 
     @Test
     void toBufferedImagePreservesColors() {
@@ -239,6 +245,8 @@ class CpuRendererTest {
         assertEquals(0x0000FF, lastColor);
     }
 
+    // ===== Camera outside scene =====
+
     @Test
     void toBufferedImageMidPixelColor() {
         byte[] rgb = new byte[224 * 224 * 3];
@@ -254,8 +262,6 @@ class CpuRendererTest {
         assertEquals(64, (color >> 8) & 0xFF);
         assertEquals(32, color & 0xFF);
     }
-
-    // ===== Emissive rendering =====
 
     @Test
     void emissiveBlocksRenderBrighter() {
@@ -285,7 +291,7 @@ class CpuRendererTest {
         assertTrue(differs, "Glowstone and stone should render differently");
     }
 
-    // ===== Camera outside scene =====
+    // ===== Sub-block shapes =====
 
     @Test
     void cameraOutsideSceneLookingIn() {
@@ -301,6 +307,8 @@ class CpuRendererTest {
         assertTrue(hasNonBackgroundPixels(pixels), "Should see stone cube from outside");
     }
 
+    // ===== Parallel rendering consistency =====
+
     @Test
     void cameraFarFromSceneSeesBackground() {
         // Scene is a single block at origin
@@ -311,16 +319,14 @@ class CpuRendererTest {
 
         // Most/all pixels should be background
         int nonBg = 0;
-        for (int i = 0; i < pixels.length; i += 3) {
-            if ((pixels[i] & 0xFF) != 0xC8 || (pixels[i + 1] & 0xFF) != 0xD8 || (pixels[i + 2] & 0xFF) != 0xE8) {
+        for (int i = 0; i < pixels.length; i += 3)
+            if ((pixels[i] & 0xFF) != 0xC8 || (pixels[i + 1] & 0xFF) != 0xD8 || (pixels[i + 2] & 0xFF) != 0xE8)
                 nonBg++;
-            }
-        }
         // Should be almost all background (block is tiny at this distance)
         assertTrue(nonBg < 100, "Far camera should mostly see background, but saw " + nonBg + " non-bg pixels");
     }
 
-    // ===== Sub-block shapes =====
+    // ===== Height map acceleration =====
 
     @Test
     void renderSlabProducesPartialBlockPixels() {
@@ -336,20 +342,15 @@ class CpuRendererTest {
         assertTrue(hasNonBackgroundPixels(pixels), "Should see the slab");
     }
 
-    // ===== Parallel rendering consistency =====
-
     @Test
     void renderIsDeterministic() {
         int size = 8;
         short[] data = new short[size * size * size];
         Arrays.fill(data, (short) XMaterial.STONE.ordinal());
-        for (int x = 3; x <= 4; x++) {
-            for (int y = 3; y <= 4; y++) {
-                for (int z = 3; z <= 4; z++) {
+        for (int x = 3; x <= 4; x++)
+            for (int y = 3; y <= 4; y++)
+                for (int z = 3; z <= 4; z++)
                     data[x * size * size + y * size + z] = (short) XMaterial.AIR.ordinal();
-                }
-            }
-        }
 
         FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
 
@@ -358,8 +359,6 @@ class CpuRendererTest {
 
         assertArrayEquals(render1, render2, "Two renders with same parameters should be identical");
     }
-
-    // ===== Height map acceleration =====
 
     @Test
     void buildHeightMapSingleBlock() {
@@ -377,10 +376,12 @@ class CpuRendererTest {
         assertEquals(3, heightMap[colIdx + 1], "maxY for column (2,1) should be 3");
 
         // An empty column should have minY > maxY
-        int emptyColIdx = (0 * 5 + 0) * 2;
+        int emptyColIdx = 0;
         assertTrue(heightMap[emptyColIdx] > heightMap[emptyColIdx + 1],
                 "Empty column should have minY > maxY");
     }
+
+    // ===== Bulk toBufferedImage =====
 
     @Test
     void buildHeightMapMultipleBlocksInColumn() {
@@ -398,6 +399,8 @@ class CpuRendererTest {
         assertEquals(7, heightMap[colIdx + 1], "maxY should be 7");
     }
 
+    // ===== Dedicated pool determinism =====
+
     @Test
     void renderWithHeightMapProducesSameResult() {
         // Verify the height map optimization doesn't change render output.
@@ -414,7 +417,7 @@ class CpuRendererTest {
         assertTrue(hasNonBackgroundPixels(render1), "Should see the stone block");
     }
 
-    // ===== Bulk toBufferedImage =====
+    // ===== Ambient Occlusion on sub-block shapes =====
 
     @Test
     void toBufferedImageBulkMatchesAllPixels() {
@@ -437,8 +440,6 @@ class CpuRendererTest {
         }
     }
 
-    // ===== Dedicated pool determinism =====
-
     @Test
     void renderDedicatedPoolProducesDeterministicOutput() {
         // Render a complex scene twice to confirm the dedicated ForkJoinPool
@@ -446,13 +447,10 @@ class CpuRendererTest {
         int size = 16;
         short[] data = new short[size * size * size];
         Arrays.fill(data, (short) XMaterial.STONE.ordinal());
-        for (int x = 5; x <= 10; x++) {
-            for (int y = 5; y <= 10; y++) {
-                for (int z = 5; z <= 10; z++) {
+        for (int x = 5; x <= 10; x++)
+            for (int y = 5; y <= 10; y++)
+                for (int z = 5; z <= 10; z++)
                     data[x * size * size + y * size + z] = AIR;
-                }
-            }
-        }
         data[5 * size * size + 5 * size + 11] = (short) XMaterial.GLOWSTONE.ordinal();
         data[6 * size * size + 5 * size + 11] = (short) XMaterial.OAK_PLANKS.ordinal();
 
@@ -462,8 +460,6 @@ class CpuRendererTest {
 
         assertArrayEquals(render1, render2, "Dedicated pool renders should be pixel-identical");
     }
-
-    // ===== Ambient Occlusion on sub-block shapes =====
 
     @Test
     void aoOnSlabDarkensPixelsNearOpaqueNeighbor() {
@@ -476,14 +472,14 @@ class CpuRendererTest {
         // Clear one block for the camera at (2, 2, 2)
         stoneData[2 * size * size + 2 * size + 2] = AIR;
         // Place slab directly below the camera at (2, 1, 2)
-        stoneData[2 * size * size + 1 * size + 2] = (short) XMaterial.OAK_SLAB.ordinal();
+        stoneData[2 * size * size + size + 2] = (short) XMaterial.OAK_SLAB.ordinal();
 
         FlatScene enclosed = new FlatScene(stoneData, 0, 0, 0, size, size, size);
         byte[] enclosedRender = CpuRenderer.render(enclosed, 2.5, 2.5, 2.5, 0, 90);
 
         // Isolated slab: same slab, no surrounding stone, no AO
         short[] airData = airArray(size * size * size);
-        airData[2 * size * size + 1 * size + 2] = (short) XMaterial.OAK_SLAB.ordinal();
+        airData[2 * size * size + size + 2] = (short) XMaterial.OAK_SLAB.ordinal();
 
         FlatScene isolated = new FlatScene(airData, 0, 0, 0, size, size, size);
         byte[] isolatedRender = CpuRenderer.render(isolated, 2.5, 2.5, 2.5, 0, 90);
@@ -497,7 +493,8 @@ class CpuRendererTest {
             // Only compare non-background pixels visible in both renders
             boolean isBgEnclosed = lumEnclosed == (0xC8 + 0xD8 + 0xE8);
             boolean isBgIsolated = lumIsolated == (0xC8 + 0xD8 + 0xE8);
-            if (isBgEnclosed || isBgIsolated) continue;
+            if (isBgEnclosed || isBgIsolated)
+                continue;
 
             if (lumEnclosed < lumIsolated) {
                 hasDarkerPixel = true;
@@ -514,13 +511,13 @@ class CpuRendererTest {
         short[] stoneData = new short[size * size * size];
         Arrays.fill(stoneData, (short) XMaterial.STONE.ordinal());
         stoneData[2 * size * size + 2 * size + 2] = AIR;
-        stoneData[2 * size * size + 1 * size + 2] = (short) XMaterial.OAK_STAIRS.ordinal();
+        stoneData[2 * size * size + size + 2] = (short) XMaterial.OAK_STAIRS.ordinal();
 
         FlatScene enclosed = new FlatScene(stoneData, 0, 0, 0, size, size, size);
         byte[] enclosedRender = CpuRenderer.render(enclosed, 2.5, 2.5, 2.5, 0, 90);
 
         short[] airData = airArray(size * size * size);
-        airData[2 * size * size + 1 * size + 2] = (short) XMaterial.OAK_STAIRS.ordinal();
+        airData[2 * size * size + size + 2] = (short) XMaterial.OAK_STAIRS.ordinal();
 
         FlatScene isolated = new FlatScene(airData, 0, 0, 0, size, size, size);
         byte[] isolatedRender = CpuRenderer.render(isolated, 2.5, 2.5, 2.5, 0, 90);
@@ -532,7 +529,8 @@ class CpuRendererTest {
 
             boolean isBgEnclosed = lumEnclosed == (0xC8 + 0xD8 + 0xE8);
             boolean isBgIsolated = lumIsolated == (0xC8 + 0xD8 + 0xE8);
-            if (isBgEnclosed || isBgIsolated) continue;
+            if (isBgEnclosed || isBgIsolated)
+                continue;
 
             if (lumEnclosed < lumIsolated) {
                 hasDarkerPixel = true;
@@ -542,6 +540,8 @@ class CpuRendererTest {
         assertTrue(hasDarkerPixel, "Stair pixels should be darkened by AO when surrounded by opaque blocks");
     }
 
+    // ===== Helpers =====
+
     @Test
     void fullBlockAoUnchangedBySubBlockAoExtension() {
         // Render a scene with only full blocks (stone room) — output must be identical
@@ -549,13 +549,10 @@ class CpuRendererTest {
         int size = 8;
         short[] data = new short[size * size * size];
         Arrays.fill(data, (short) XMaterial.STONE.ordinal());
-        for (int x = 3; x <= 4; x++) {
-            for (int y = 3; y <= 4; y++) {
-                for (int z = 3; z <= 4; z++) {
+        for (int x = 3; x <= 4; x++)
+            for (int y = 3; y <= 4; y++)
+                for (int z = 3; z <= 4; z++)
                     data[x * size * size + y * size + z] = AIR;
-                }
-            }
-        }
 
         FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
         byte[] render1 = CpuRenderer.render(scene, 3.5, 3.5, 3.5, 45, 10);
@@ -606,30 +603,12 @@ class CpuRendererTest {
         // behind also gets AO, the composited color can differ. So we just verify glass is still rendered
         // and the translucent block exclusion didn't regress.
         boolean glassVisible = false;
-        for (int i = 0; i < withoutNeighbor.length; i += 3) {
+        for (int i = 0; i < withoutNeighbor.length; i += 3)
             if ((withoutNeighbor[i] & 0xFF) != 0xC8 || (withoutNeighbor[i + 1] & 0xFF) != 0xD8
                     || (withoutNeighbor[i + 2] & 0xFF) != 0xE8) {
                 glassVisible = true;
                 break;
             }
-        }
         assertTrue(glassVisible, "Translucent glass should still render (not excluded by AO logic)");
-    }
-
-    // ===== Helpers =====
-
-    private static FlatScene emptyScene() {
-        int size = 10;
-        short[] data = airArray(size * size * size);
-        return new FlatScene(data, 0, 0, 0, size, size, size);
-    }
-
-    private static boolean hasNonBackgroundPixels(byte[] pixels) {
-        for (int i = 0; i < pixels.length; i += 3) {
-            if ((pixels[i] & 0xFF) != 0xC8 || (pixels[i + 1] & 0xFF) != 0xD8 || (pixels[i + 2] & 0xFF) != 0xE8) {
-                return true;
-            }
-        }
-        return false;
     }
 }

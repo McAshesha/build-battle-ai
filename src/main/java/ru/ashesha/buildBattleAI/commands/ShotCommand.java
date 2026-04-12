@@ -30,7 +30,9 @@ import java.util.List;
  */
 public class ShotCommand extends PluginCommand {
 
-    /** Half-size of the cubic capture region around the camera, in blocks. */
+    /**
+     * Half-size of the cubic capture region around the camera, in blocks.
+     */
     private static final int REGION_RADIUS = 64;
 
     public ShotCommand(BuildBattleAI plugin) {
@@ -116,7 +118,8 @@ public class ShotCommand extends PluginCommand {
 
     @Override
     public List<String> suggest(CommandSender sender, String[] args) {
-        if (args.length == 1) return Collections.singletonList("screenshot");
+        if (args.length == 1)
+            return Collections.singletonList("screenshot");
         return Collections.emptyList();
     }
 }

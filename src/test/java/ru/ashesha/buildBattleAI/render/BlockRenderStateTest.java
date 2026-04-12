@@ -9,12 +9,62 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class BlockRenderStateTest {
 
+    /**
+     * Creates a minimal SceneData backed by a single block whose block state
+     * string is the provided value.
+     */
+    private static SceneData singleBlockScene(final String blockState) {
+        return new SceneData() {
+            @Override
+            public int minX() {
+                return 0;
+            }
+
+            @Override
+            public int minY() {
+                return 0;
+            }
+
+            @Override
+            public int minZ() {
+                return 0;
+            }
+
+            @Override
+            public int maxX() {
+                return 0;
+            }
+
+            @Override
+            public int maxY() {
+                return 0;
+            }
+
+            @Override
+            public int maxZ() {
+                return 0;
+            }
+
+            @Override
+            public XMaterial getBlockType(int wx, int wy, int wz) {
+                return XMaterial.STONE;
+            }
+
+            @Override
+            public String getBlockState(int wx, int wy, int wz) {
+                return blockState;
+            }
+        };
+    }
+
+    // ===== Default state =====
+
     @BeforeEach
     void clearCaches() {
         BlockRenderState.clearCache();
     }
 
-    // ===== Default state =====
+    // ===== Parsing block states =====
 
     @Test
     void defaultStateValues() {
@@ -28,8 +78,6 @@ class BlockRenderStateTest {
         assertEquals(1, def.layers());
         assertEquals(0, def.rotation());
     }
-
-    // ===== Parsing block states =====
 
     @Test
     void parseFacing() {
@@ -91,6 +139,8 @@ class BlockRenderStateTest {
         assertEquals(12, state.rotation());
     }
 
+    // ===== Edge cases =====
+
     @Test
     void parseStairsFull() {
         SceneData scene = singleBlockScene("minecraft:oak_stairs[facing=east,half=top,shape=inner_left]");
@@ -99,8 +149,6 @@ class BlockRenderStateTest {
         assertEquals("top", state.half());
         assertEquals("inner_left", state.shape());
     }
-
-    // ===== Edge cases =====
 
     @Test
     void nullBlockStateReturnsDefault() {
@@ -154,6 +202,8 @@ class BlockRenderStateTest {
         assertEquals("west", state.facing());
     }
 
+    // ===== Caching =====
+
     @Test
     void multipleProperties() {
         SceneData scene = singleBlockScene("minecraft:stairs[facing=east,half=top,shape=outer_right,waterlogged=false]");
@@ -163,7 +213,7 @@ class BlockRenderStateTest {
         assertEquals("outer_right", state.shape());
     }
 
-    // ===== Caching =====
+    // ===== Value equality =====
 
     @Test
     void sameBlockStateReturnsCachedInstance() {
@@ -174,7 +224,7 @@ class BlockRenderStateTest {
         assertSame(first, second);
     }
 
-    // ===== Value equality =====
+    // ===== Cache eviction =====
 
     @Test
     void statesWithSameValuesAreEqual() {
@@ -184,8 +234,6 @@ class BlockRenderStateTest {
         BlockRenderState s2 = BlockRenderState.of(scene2, 0, 0, 0);
         assertEquals(s1, s2);
     }
-
-    // ===== Cache eviction =====
 
     @Test
     void cacheStaysBoundedAfterManyUniqueInserts() {
@@ -201,6 +249,8 @@ class BlockRenderStateTest {
                 "Cache size should be bounded, was: " + BlockRenderState.cacheSize());
     }
 
+    // ===== Helper =====
+
     @Test
     void correctnessPreservedAfterEviction() {
         // Fill past the limit to trigger a clear
@@ -214,24 +264,5 @@ class BlockRenderStateTest {
         assertEquals("south", state.facing());
         assertEquals("top", state.half());
         assertEquals("inner_left", state.shape());
-    }
-
-    // ===== Helper =====
-
-    /**
-     * Creates a minimal SceneData backed by a single block whose block state
-     * string is the provided value.
-     */
-    private static SceneData singleBlockScene(final String blockState) {
-        return new SceneData() {
-            @Override public int minX() { return 0; }
-            @Override public int minY() { return 0; }
-            @Override public int minZ() { return 0; }
-            @Override public int maxX() { return 0; }
-            @Override public int maxY() { return 0; }
-            @Override public int maxZ() { return 0; }
-            @Override public XMaterial getBlockType(int wx, int wy, int wz) { return XMaterial.STONE; }
-            @Override public String getBlockState(int wx, int wy, int wz) { return blockState; }
-        };
     }
 }

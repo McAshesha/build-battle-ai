@@ -15,7 +15,8 @@ import java.util.Collection;
 @RequiredArgsConstructor
 public class TabService {
 
-    @NonNull private final BuildBattleAI plugin;
+    @NonNull
+    private final BuildBattleAI plugin;
 
     /**
      * Sets the player list (tab) header and footer for a single player.
@@ -43,8 +44,7 @@ public class TabService {
                 MessageUtils.toComponent(header),
                 MessageUtils.toComponent(footer)
         );
-        for (Player recipient : recipients) {
+        for (Player recipient : recipients)
             plugin.getContext().sendPacket(recipient, packet);
-        }
     }
 }

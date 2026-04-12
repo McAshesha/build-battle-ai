@@ -28,20 +28,32 @@ import java.util.concurrent.RecursiveAction;
 @UtilityClass
 public class CpuRenderer {
 
-    /** Output image width in pixels (matches typical ML classifier input size). */
+    /**
+     * Output image width in pixels (matches typical ML classifier input size).
+     */
     public static final int WIDTH = 224;
-    /** Output image height in pixels (matches typical ML classifier input size). */
+    /**
+     * Output image height in pixels (matches typical ML classifier input size).
+     */
     public static final int HEIGHT = 224;
-    /** Vertical field of view in degrees (matches Minecraft's default FOV). */
+    /**
+     * Vertical field of view in degrees (matches Minecraft's default FOV).
+     */
     public static final double FOV = 70.0;
 
-    /** Default background (sky) color as packed 24-bit RGB. */
+    /**
+     * Default background (sky) color as packed 24-bit RGB.
+     */
     private static final int BG_COLOR = 0xC8D8E8;
-    /** Pre-extracted background color channels for fast blending in the ray loop. */
+    /**
+     * Pre-extracted background color channels for fast blending in the ray loop.
+     */
     private static final double BG_R = (BG_COLOR >> 16) & 0xFF;
     private static final double BG_G = (BG_COLOR >> 8) & 0xFF;
     private static final double BG_B = BG_COLOR & 0xFF;
-    /** Small epsilon to nudge the ray entry point forward, preventing self-intersection at voxel boundaries. */
+    /**
+     * Small epsilon to nudge the ray entry point forward, preventing self-intersection at voxel boundaries.
+     */
     private static final double NUDGE = 1e-4;
 
     /**
@@ -175,9 +187,8 @@ public class CpuRenderer {
             }
             tMin = Math.max(tMin, t1);
             tMax = Math.min(tMax, t2);
-        } else {
-            if (ox < aabbMinX || ox >= aabbMaxX) return BG_COLOR;
-        }
+        } else if (ox < aabbMinX || ox >= aabbMaxX)
+            return BG_COLOR;
 
         if (dy != 0) {
             double invD = 1.0 / dy;
@@ -190,9 +201,8 @@ public class CpuRenderer {
             }
             tMin = Math.max(tMin, t1);
             tMax = Math.min(tMax, t2);
-        } else {
-            if (oy < aabbMinY || oy >= aabbMaxY) return BG_COLOR;
-        }
+        } else if (oy < aabbMinY || oy >= aabbMaxY)
+            return BG_COLOR;
 
         if (dz != 0) {
             double invD = 1.0 / dz;
@@ -205,15 +215,16 @@ public class CpuRenderer {
             }
             tMin = Math.max(tMin, t1);
             tMax = Math.min(tMax, t2);
-        } else {
-            if (oz < aabbMinZ || oz >= aabbMaxZ) return BG_COLOR;
-        }
+        } else if (oz < aabbMinZ || oz >= aabbMaxZ)
+            return BG_COLOR;
 
-        if (tMin >= tMax || tMax <= 0) return BG_COLOR;
+        if (tMin >= tMax || tMax <= 0)
+            return BG_COLOR;
 
         // Entry point into the AABB (nudge slightly forward to avoid boundary issues)
         double tStart = Math.max(tMin, 0.0) + NUDGE;
-        if (tStart >= tMax) return BG_COLOR;
+        if (tStart >= tMax)
+            return BG_COLOR;
 
         double startX = ox + dx * tStart;
         double startY = oy + dy * tStart;
@@ -225,12 +236,18 @@ public class CpuRenderer {
         int vz = (int) Math.floor(startZ);
 
         // Clamp to region bounds (safety for floating point edge cases)
-        if (vx < regionMinX) vx = regionMinX;
-        if (vx > regionMaxX) vx = regionMaxX;
-        if (vy < regionMinY) vy = regionMinY;
-        if (vy > regionMaxY) vy = regionMaxY;
-        if (vz < regionMinZ) vz = regionMinZ;
-        if (vz > regionMaxZ) vz = regionMaxZ;
+        if (vx < regionMinX)
+            vx = regionMinX;
+        if (vx > regionMaxX)
+            vx = regionMaxX;
+        if (vy < regionMinY)
+            vy = regionMinY;
+        if (vy > regionMaxY)
+            vy = regionMaxY;
+        if (vz < regionMinZ)
+            vz = regionMinZ;
+        if (vz > regionMaxZ)
+            vz = regionMaxZ;
 
         // DDA setup
         int stepX = dx > 0 ? 1 : (dx < 0 ? -1 : 0);
@@ -242,29 +259,26 @@ public class CpuRenderer {
         double tDeltaZ = dz != 0 ? Math.abs(1.0 / dz) : Double.MAX_VALUE;
 
         double tMaxX, tMaxY, tMaxZ;
-        if (dx > 0) {
+        if (dx > 0)
             tMaxX = (vx + 1.0 - startX) / dx;
-        } else if (dx < 0) {
+        else if (dx < 0)
             tMaxX = (vx - startX) / dx;
-        } else {
+        else
             tMaxX = Double.MAX_VALUE;
-        }
 
-        if (dy > 0) {
+        if (dy > 0)
             tMaxY = (vy + 1.0 - startY) / dy;
-        } else if (dy < 0) {
+        else if (dy < 0)
             tMaxY = (vy - startY) / dy;
-        } else {
+        else
             tMaxY = Double.MAX_VALUE;
-        }
 
-        if (dz > 0) {
+        if (dz > 0)
             tMaxZ = (vz + 1.0 - startZ) / dz;
-        } else if (dz < 0) {
+        else if (dz < 0)
             tMaxZ = (vz - startZ) / dz;
-        } else {
+        else
             tMaxZ = Double.MAX_VALUE;
-        }
 
         // Track which face was crossed to reach current voxel (for shading)
         // 0=X face, 1=Y face, 2=Z face
@@ -289,9 +303,8 @@ public class CpuRenderer {
                 if (color != -1) {
                     double[][] shape = BlockShape.getShape(scene, vx, vy, vz, blockType);
                     int hitFace = face;
-                    if (shape != null) {
+                    if (shape != null)
                         hitFace = testSubBlockHit(ox, oy, oz, dx, dy, dz, vx, vy, vz, shape);
-                    }
                     if (hitFace >= 0) {
                         int alpha = BlockPalette.getAlpha(blockType);
 
@@ -300,29 +313,26 @@ public class CpuRenderer {
                         if (alpha < 255 && shape == null && shouldSkipTranslucentBlend(scene, blockType, vx, vy, vz,
                                 hitFace, stepX, stepY, stepZ,
                                 regionMinX, regionMinY, regionMinZ,
-                                regionMaxX, regionMaxY, regionMaxZ)) {
+                                regionMaxX, regionMaxY, regionMaxZ))
                             continue;
-                        }
 
                         // Compute brightness (emissive bypass / face shading + AO)
                         double brightness;
-                        if (BlockPalette.isEmissive(blockType)) {
+                        if (BlockPalette.isEmissive(blockType))
                             brightness = 1.0;
-                        } else {
-                            if (hitFace == 0) {
+                        else {
+                            if (hitFace == 0)
                                 brightness = BRIGHTNESS_X;
-                            } else if (hitFace == 1) {
+                            else if (hitFace == 1)
                                 brightness = dy < 0 ? BRIGHTNESS_Y_TOP : BRIGHTNESS_Y_BOTTOM;
-                            } else {
+                            else
                                 brightness = BRIGHTNESS_Z;
-                            }
                             // AO for all opaque blocks (full blocks and sub-block shapes like slabs/stairs)
-                            if (alpha >= 255) {
+                            if (alpha >= 255)
                                 brightness *= computeAO(scene, ox, oy, oz, dx, dy, dz,
                                         vx, vy, vz, hitFace, stepX, stepY, stepZ,
                                         regionMinX, regionMinY, regionMinZ,
                                         regionMaxX, regionMaxY, regionMaxZ);
-                            }
                         }
 
                         // Shade the color
@@ -345,14 +355,15 @@ public class CpuRenderer {
                             accG += remaining * a * sg;
                             accB += remaining * a * sb;
                             remaining *= (1.0 - a);
-                            if (remaining < MIN_REMAINING) break;
+                            if (remaining < MIN_REMAINING)
+                                break;
                         }
                     }
                 }
             }
 
             // Advance to next voxel boundary
-            if (tMaxX < tMaxY) {
+            if (tMaxX < tMaxY)
                 if (tMaxX < tMaxZ) {
                     vx += stepX;
                     tMaxX += tDeltaX;
@@ -362,24 +373,21 @@ public class CpuRenderer {
                     tMaxZ += tDeltaZ;
                     face = 2;
                 }
+            else if (tMaxY < tMaxZ) {
+                vy += stepY;
+                tMaxY += tDeltaY;
+                face = 1;
             } else {
-                if (tMaxY < tMaxZ) {
-                    vy += stepY;
-                    tMaxY += tDeltaY;
-                    face = 1;
-                } else {
-                    vz += stepZ;
-                    tMaxZ += tDeltaZ;
-                    face = 2;
-                }
+                vz += stepZ;
+                tMaxZ += tDeltaZ;
+                face = 2;
             }
 
             // Check if we've left the region
             if (vx < regionMinX || vx > regionMaxX ||
                     vy < regionMinY || vy > regionMaxY ||
-                    vz < regionMinZ || vz > regionMaxZ) {
+                    vz < regionMinZ || vz > regionMaxZ)
                 break;
-            }
         }
 
         // Blend remaining opacity with background
@@ -465,17 +473,15 @@ public class CpuRenderer {
         int prevY = vy;
         int prevZ = vz;
 
-        if (hitFace == 0) {
+        if (hitFace == 0)
             prevX -= stepX;
-        } else if (hitFace == 1) {
+        else if (hitFace == 1)
             prevY -= stepY;
-        } else {
+        else
             prevZ -= stepZ;
-        }
 
-        if (prevX < minX || prevX > maxX || prevY < minY || prevY > maxY || prevZ < minZ || prevZ > maxZ) {
+        if (prevX < minX || prevX > maxX || prevY < minY || prevY > maxY || prevZ < minZ || prevZ > maxZ)
             return false;
-        }
 
         XMaterial previous = scene.getBlockType(prevX, prevY, prevZ);
         return BlockPalette.canMergeTranslucent(previous, blockType);
@@ -544,23 +550,32 @@ public class CpuRenderer {
         }
 
         int count = 0;
-        if (isSolidForAO(scene, n1x, n1y, n1z, rMinX, rMinY, rMinZ, rMaxX, rMaxY, rMaxZ)) count++;
-        if (isSolidForAO(scene, n2x, n2y, n2z, rMinX, rMinY, rMinZ, rMaxX, rMaxY, rMaxZ)) count++;
-        if (isSolidForAO(scene, n3x, n3y, n3z, rMinX, rMinY, rMinZ, rMaxX, rMaxY, rMaxZ)) count++;
+        if (isSolidForAO(scene, n1x, n1y, n1z, rMinX, rMinY, rMinZ, rMaxX, rMaxY, rMaxZ))
+            count++;
+        if (isSolidForAO(scene, n2x, n2y, n2z, rMinX, rMinY, rMinZ, rMaxX, rMaxY, rMaxZ))
+            count++;
+        if (isSolidForAO(scene, n3x, n3y, n3z, rMinX, rMinY, rMinZ, rMaxX, rMaxY, rMaxZ))
+            count++;
         return AO_TABLE[count];
     }
 
-    /** Clamps a value to the [0, 1] range. */
+    /**
+     * Clamps a value to the [0, 1] range.
+     */
     private static double clamp01(double value) {
         return Math.max(0.0, Math.min(1.0, value));
     }
 
-    /** Hermite smoothstep interpolation for smooth AO transitions between face quadrants. */
+    /**
+     * Hermite smoothstep interpolation for smooth AO transitions between face quadrants.
+     */
     private static double smoothstep(double value) {
         return value * value * (3.0 - 2.0 * value);
     }
 
-    /** Linearly interpolates between {@code a} and {@code b} by factor {@code t}. */
+    /**
+     * Linearly interpolates between {@code a} and {@code b} by factor {@code t}.
+     */
     private static double lerp(double a, double b, double t) {
         return a + (b - a) * t;
     }
@@ -572,7 +587,8 @@ public class CpuRenderer {
     private static boolean isSolidForAO(SceneData scene, int x, int y, int z,
                                         int minX, int minY, int minZ,
                                         int maxX, int maxY, int maxZ) {
-        if (x < minX || x > maxX || y < minY || y > maxY || z < minZ || z > maxZ) return false;
+        if (x < minX || x > maxX || y < minY || y > maxY || z < minZ || z > maxZ)
+            return false;
         XMaterial mat = scene.getBlockType(x, y, z);
         return BlockPalette.getColor(mat) != -1 && BlockPalette.getAlpha(mat) >= 255;
     }
@@ -611,9 +627,8 @@ public class CpuRenderer {
                     entryFace = 0;
                 }
                 tMax = Math.min(tMax, t2);
-            } else {
-                if (ox < bMinX || ox >= bMaxX) continue;
-            }
+            } else if (ox < bMinX || ox >= bMaxX)
+                continue;
 
             // Y slabs
             if (dy != 0) {
@@ -630,9 +645,8 @@ public class CpuRenderer {
                     entryFace = 1;
                 }
                 tMax = Math.min(tMax, t2);
-            } else {
-                if (oy < bMinY || oy >= bMaxY) continue;
-            }
+            } else if (oy < bMinY || oy >= bMaxY)
+                continue;
 
             // Z slabs
             if (dz != 0) {
@@ -649,11 +663,11 @@ public class CpuRenderer {
                     entryFace = 2;
                 }
                 tMax = Math.min(tMax, t2);
-            } else {
-                if (oz < bMinZ || oz >= bMaxZ) continue;
-            }
+            } else if (oz < bMinZ || oz >= bMaxZ)
+                continue;
 
-            if (tMin >= tMax || tMin < 0) continue;
+            if (tMin >= tMax || tMin < 0)
+                continue;
 
             if (tMin < closestT) {
                 closestT = tMin;
@@ -700,18 +714,19 @@ public class CpuRenderer {
             heightMap[i * 2] = scene.maxY() + 1;
             heightMap[i * 2 + 1] = scene.minY() - 1;
         }
-        for (int x = scene.minX(); x <= scene.maxX(); x++) {
+        for (int x = scene.minX(); x <= scene.maxX(); x++)
             for (int z = scene.minZ(); z <= scene.maxZ(); z++) {
                 int colIdx = ((x - scene.minX()) * sizeZ + (z - scene.minZ())) * 2;
                 for (int y = scene.minY(); y <= scene.maxY(); y++) {
                     XMaterial mat = scene.getBlockType(x, y, z);
                     if (BlockPalette.getColor(mat) != -1) {
-                        if (y < heightMap[colIdx]) heightMap[colIdx] = y;
-                        if (y > heightMap[colIdx + 1]) heightMap[colIdx + 1] = y;
+                        if (y < heightMap[colIdx])
+                            heightMap[colIdx] = y;
+                        if (y > heightMap[colIdx + 1])
+                            heightMap[colIdx + 1] = y;
                     }
                 }
             }
-        }
         return heightMap;
     }
 
@@ -762,7 +777,9 @@ public class CpuRenderer {
             );
         }
 
-        /** Traces one ray per pixel for scanlines [{@code startRow}, {@code endRow}). */
+        /**
+         * Traces one ray per pixel for scanlines [{@code startRow}, {@code endRow}).
+         */
         private void renderRows() {
             for (int py = startRow; py < endRow; py++) {
                 double ndcY = (1.0 - 2.0 * (py + 0.5) / HEIGHT) * ctx.halfTan;

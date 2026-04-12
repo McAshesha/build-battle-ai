@@ -15,7 +15,8 @@ import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
 @RequiredArgsConstructor
 public class GameManager implements BBAIGameManager {
 
-    @NonNull private final BuildBattleAI plugin;
+    @NonNull
+    private final BuildBattleAI plugin;
 
     @Override
     public void shutdown() {

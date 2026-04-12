@@ -31,43 +31,57 @@ import java.util.Arrays;
 @UtilityClass
 public class BlockPalette {
 
-    /** Sentinel value indicating the block is fully transparent and should not be rendered. */
-    private static final int TRANSPARENT = -1;
-
-    /** Sentinel value used during initialization for materials not yet assigned a color. */
-    private static final int NOT_MAPPED = -2;
-
-    /** Base RGB color for each material, indexed by ordinal. -1 = transparent. */
-    private static final int[] COLORS = new int[XMaterial.values().length];
-
-    /** Opacity for each material (0–255), indexed by ordinal. Default = 255 (opaque). */
-    private static final int[] ALPHAS = new int[XMaterial.values().length];
-
-    /** Whether each material emits light and bypasses face shading. */
-    private static final boolean[] EMISSIVE = new boolean[XMaterial.values().length];
-
-    /** Bit flag: block has an orientation axis (logs, pillars, chains, stems, hyphae). */
+    /**
+     * Bit flag: block has an orientation axis (logs, pillars, chains, stems, hyphae).
+     */
     static final int FLAG_AXIS_BLOCK = 1;
-
-    /** Bit flag: block has a distinct front face (furnace, observer, dispenser, carved pumpkin, etc.). */
+    /**
+     * Bit flag: block has a distinct front face (furnace, observer, dispenser, carved pumpkin, etc.).
+     */
     static final int FLAG_FACING_FRONT = 1 << 1;
-
-    /** Bit flag: glass pane or iron bars (connects to neighbors via pane connectivity). */
+    /**
+     * Bit flag: glass pane or iron bars (connects to neighbors via pane connectivity).
+     */
     static final int FLAG_PANE = 1 << 2;
-
-    /** Bit flag: fence post, not gates (connects to neighbors via fence connectivity). */
+    /**
+     * Bit flag: fence post, not gates (connects to neighbors via fence connectivity).
+     */
     static final int FLAG_FENCE = 1 << 3;
-
-    /** Bit flag: wall block (connects to neighbors via wall connectivity). */
+    /**
+     * Bit flag: wall block (connects to neighbors via wall connectivity).
+     */
     static final int FLAG_WALL = 1 << 4;
-
-    /** Bit flag: block whose shape depends on block state (slabs, stairs, trapdoors, doors, gates, signs, snow, chains, end rods, ladders, vines, wall torches). */
+    /**
+     * Bit flag: block whose shape depends on block state (slabs, stairs, trapdoors, doors, gates, signs, snow, chains, end rods, ladders, vines, wall torches).
+     */
     static final int FLAG_NEEDS_STATE = 1 << 5;
-
-    /** Pre-computed per-material flag bits, indexed by {@link XMaterial#ordinal()}. Eliminates runtime string checks in the render hot path. */
+    /**
+     * Pre-computed per-material flag bits, indexed by {@link XMaterial#ordinal()}. Eliminates runtime string checks in the render hot path.
+     */
     static final int[] BLOCK_FLAGS = new int[XMaterial.values().length];
-
-    /** Prefix strings for Minecraft's 16 dye colors, used for name-based color inference. */
+    /**
+     * Sentinel value indicating the block is fully transparent and should not be rendered.
+     */
+    private static final int TRANSPARENT = -1;
+    /**
+     * Sentinel value used during initialization for materials not yet assigned a color.
+     */
+    private static final int NOT_MAPPED = -2;
+    /**
+     * Base RGB color for each material, indexed by ordinal. -1 = transparent.
+     */
+    private static final int[] COLORS = new int[XMaterial.values().length];
+    /**
+     * Opacity for each material (0–255), indexed by ordinal. Default = 255 (opaque).
+     */
+    private static final int[] ALPHAS = new int[XMaterial.values().length];
+    /**
+     * Whether each material emits light and bypasses face shading.
+     */
+    private static final boolean[] EMISSIVE = new boolean[XMaterial.values().length];
+    /**
+     * Prefix strings for Minecraft's 16 dye colors, used for name-based color inference.
+     */
     private static final String[] DYE_PREFIXES = {
             "LIGHT_BLUE_", "LIGHT_GRAY_",
             "MAGENTA_", "ORANGE_", "YELLOW_", "PURPLE_",
@@ -75,7 +89,9 @@ public class BlockPalette {
             "LIME_", "PINK_", "GRAY_", "CYAN_", "BLUE_", "RED_"
     };
 
-    /** Corresponding RGB colors for each dye prefix. */
+    /**
+     * Corresponding RGB colors for each dye prefix.
+     */
     private static final int[] DYE_COLORS = {
             0x3AB3DA, 0x9D9D97,
             0xC74EBD, 0xF9801D, 0xFED83D, 0x8932B8,
@@ -100,9 +116,8 @@ public class BlockPalette {
                     || name.equals("SUGAR_CANE") || name.equals("LILY_PAD")
                     || name.equals("FIRE") || name.equals("SOUL_FIRE")
                     || name.equals("COBWEB") || name.equals("STRUCTURE_VOID")
-                    || name.equals("BARRIER") || name.equals("LIGHT")) {
+                    || name.equals("BARRIER") || name.equals("LIGHT"))
                 put(mat, TRANSPARENT);
-            }
         }
 
         // Stone family
@@ -497,24 +512,24 @@ public class BlockPalette {
         for (XMaterial mat : XMaterial.values()) {
             String name = mat.name();
             if (name.endsWith("_SIGN") || name.endsWith("_WALL_SIGN")
-                    || name.endsWith("_HANGING_SIGN") || name.endsWith("_WALL_HANGING_SIGN")) {
+                    || name.endsWith("_HANGING_SIGN") || name.endsWith("_WALL_HANGING_SIGN"))
                 put(mat, inferWoodFamilyColor(name, 0xA88654));
-            } else if (name.equals("TORCH") || name.equals("WALL_TORCH")) {
+            else if (name.equals("TORCH") || name.equals("WALL_TORCH"))
                 put(mat, 0xB89242);
-            } else if (name.equals("SOUL_TORCH") || name.equals("SOUL_WALL_TORCH")) {
+            else if (name.equals("SOUL_TORCH") || name.equals("SOUL_WALL_TORCH"))
                 put(mat, 0x5C98B6);
-            } else if (name.equals("REDSTONE_TORCH") || name.equals("REDSTONE_WALL_TORCH")) {
+            else if (name.equals("REDSTONE_TORCH") || name.equals("REDSTONE_WALL_TORCH"))
                 put(mat, 0xC64A2B);
-            } else if (name.equals("LADDER")) {
+            else if (name.equals("LADDER"))
                 put(mat, 0x9C7A44);
-            } else if (name.endsWith("_BUTTON")) {
+            else if (name.endsWith("_BUTTON"))
                 put(mat, inferBaseColor(name) != null ? applyNameVariant(inferBaseColor(name), name) : 0x7D7D7D);
-            } else if (name.endsWith("_PRESSURE_PLATE")) {
+            else if (name.endsWith("_PRESSURE_PLATE"))
                 put(mat, inferBaseColor(name) != null ? applyNameVariant(inferBaseColor(name), name) : 0x8A8A8A);
-            } else if (name.equals("RAIL") || name.equals("POWERED_RAIL")
-                    || name.equals("DETECTOR_RAIL") || name.equals("ACTIVATOR_RAIL")) {
+            else if (name.equals("RAIL") || name.equals("POWERED_RAIL")
+                    || name.equals("DETECTOR_RAIL") || name.equals("ACTIVATOR_RAIL"))
                 put(mat, name.equals("POWERED_RAIL") ? 0xC89E42 : 0x7A6A58);
-            } else if (name.endsWith("_SAPLING") || name.endsWith("_FLOWER")
+            else if (name.endsWith("_SAPLING") || name.endsWith("_FLOWER")
                     || name.equals("DANDELION") || name.equals("POPPY")
                     || name.equals("BLUE_ORCHID") || name.equals("ALLIUM")
                     || name.equals("AZURE_BLUET") || name.equals("OXEYE_DAISY")
@@ -524,11 +539,10 @@ public class BlockPalette {
                     || name.equals("ROSE_BUSH") || name.equals("PEONY")
                     || name.equals("SHORT_GRASS") || name.equals("TALL_GRASS")
                     || name.equals("FERN") || name.equals("LARGE_FERN")
-                    || name.equals("DEAD_BUSH") || name.endsWith("_TULIP")) {
+                    || name.equals("DEAD_BUSH") || name.endsWith("_TULIP"))
                 put(mat, inferPlantColor(name));
-            } else if (name.equals("VINE")) {
+            else if (name.equals("VINE"))
                 put(mat, 0x4C7A34);
-            }
         }
 
         // Ice / Snow
@@ -557,11 +571,9 @@ public class BlockPalette {
         put(XMaterial.DEAD_HORN_CORAL_BLOCK, 0x7E7567);
 
         // Fill remaining via name-based inference
-        for (XMaterial mat : XMaterial.values()) {
-            if (COLORS[mat.ordinal()] == NOT_MAPPED) {
+        for (XMaterial mat : XMaterial.values())
+            if (COLORS[mat.ordinal()] == NOT_MAPPED)
                 COLORS[mat.ordinal()] = inferFromName(mat.name());
-            }
-        }
 
         // === Alpha values (translucency) ===
         putAlpha(XMaterial.GLASS, 100);
@@ -572,11 +584,11 @@ public class BlockPalette {
 
         for (XMaterial mat : XMaterial.values()) {
             String name = mat.name();
-            if (name.endsWith("_STAINED_GLASS") || name.endsWith("_STAINED_GLASS_PANE")) {
+            if (name.endsWith("_STAINED_GLASS") || name.endsWith("_STAINED_GLASS_PANE"))
                 ALPHAS[mat.ordinal()] = 120;
-            } else if (name.endsWith("_LEAVES")) {
+            else if (name.endsWith("_LEAVES"))
                 ALPHAS[mat.ordinal()] = 220;
-            } else if (name.equals("VINE") || name.endsWith("_SAPLING")
+            else if (name.equals("VINE") || name.endsWith("_SAPLING")
                     || name.endsWith("_FLOWER") || name.equals("DANDELION")
                     || name.equals("POPPY") || name.equals("BLUE_ORCHID")
                     || name.equals("ALLIUM") || name.equals("AZURE_BLUET")
@@ -587,9 +599,8 @@ public class BlockPalette {
                     || name.equals("PEONY") || name.equals("SHORT_GRASS")
                     || name.equals("TALL_GRASS") || name.equals("FERN")
                     || name.equals("LARGE_FERN") || name.equals("DEAD_BUSH")
-                    || name.endsWith("_TULIP")) {
+                    || name.endsWith("_TULIP"))
                 ALPHAS[mat.ordinal()] = 210;
-            }
         }
 
         // === Emissive blocks (always full brightness, no face shading) ===
@@ -607,21 +618,26 @@ public class BlockPalette {
 
         for (XMaterial mat : XMaterial.values()) {
             String name = mat.name();
-            if (name.endsWith("_FROGLIGHT")) {
+            if (name.endsWith("_FROGLIGHT"))
                 EMISSIVE[mat.ordinal()] = true;
-            }
         }
 
         // Populate per-material flag bits from name-based helpers (executed once at class load)
         for (XMaterial mat : XMaterial.values()) {
             String name = mat.name();
             int flags = 0;
-            if (isAxisBlock(name)) flags |= FLAG_AXIS_BLOCK;
-            if (isFacingFrontBlock(name)) flags |= FLAG_FACING_FRONT;
-            if (isPaneBlock(name)) flags |= FLAG_PANE;
-            if (isFenceBlock(name)) flags |= FLAG_FENCE;
-            if (isWallBlock(name)) flags |= FLAG_WALL;
-            if (isNeedsStateBlock(name)) flags |= FLAG_NEEDS_STATE;
+            if (isAxisBlock(name))
+                flags |= FLAG_AXIS_BLOCK;
+            if (isFacingFrontBlock(name))
+                flags |= FLAG_FACING_FRONT;
+            if (isPaneBlock(name))
+                flags |= FLAG_PANE;
+            if (isFenceBlock(name))
+                flags |= FLAG_FENCE;
+            if (isWallBlock(name))
+                flags |= FLAG_WALL;
+            if (isNeedsStateBlock(name))
+                flags |= FLAG_NEEDS_STATE;
             BLOCK_FLAGS[mat.ordinal()] = flags;
         }
     }
@@ -655,37 +671,31 @@ public class BlockPalette {
                                XMaterial material, int hitFace,
                                double dx, double dy, double dz) {
         int color = getColor(material);
-        if (color == TRANSPARENT) {
+        if (color == TRANSPARENT)
             return color;
-        }
 
         if (material == XMaterial.GRASS_BLOCK) {
-            if (hitFace == 1) {
+            if (hitFace == 1)
                 return dy < 0 ? 0x7CBD6B : 0x866043;
-            }
             return 0x7D8A58;
         }
         if (material == XMaterial.MYCELIUM) {
-            if (hitFace == 1) {
+            if (hitFace == 1)
                 return dy < 0 ? 0x81758A : 0x6B4F3E;
-            }
             return 0x776A73;
         }
         if (material == XMaterial.PODZOL) {
-            if (hitFace == 1) {
+            if (hitFace == 1)
                 return dy < 0 ? 0x6B5B28 : 0x866043;
-            }
             return 0x70552E;
         }
 
         int flags = BLOCK_FLAGS[material.ordinal()];
-        if ((flags & (FLAG_AXIS_BLOCK | FLAG_FACING_FRONT)) == 0) {
+        if ((flags & (FLAG_AXIS_BLOCK | FLAG_FACING_FRONT)) == 0)
             return color;
-        }
         BlockRenderState state = BlockRenderState.of(scene, x, y, z);
-        if ((flags & FLAG_AXIS_BLOCK) != 0) {
+        if ((flags & FLAG_AXIS_BLOCK) != 0)
             return colorForAxisBlock(color, state.axis(), hitFace);
-        }
         return colorForFacingBlock(color, frontColor(material, color), state.facing(), hitFace, dx, dy, dz);
     }
 
@@ -718,38 +728,42 @@ public class BlockPalette {
      * @return {@code true} if the boundary should be skipped
      */
     public static boolean canMergeTranslucent(XMaterial first, XMaterial second) {
-        if (first == second) {
+        if (first == second)
             return isMergeableTranslucent(first);
-        }
-        if (!isMergeableTranslucent(first) || !isMergeableTranslucent(second)) {
+        if (!isMergeableTranslucent(first) || !isMergeableTranslucent(second))
             return false;
-        }
         return getTranslucentMergeFamily(first).equals(getTranslucentMergeFamily(second));
     }
 
-    /** Registers a base color for a material during static initialization. */
+    /**
+     * Registers a base color for a material during static initialization.
+     */
     private static void put(XMaterial xMaterial, int color) {
         COLORS[xMaterial.ordinal()] = color;
     }
 
-    /** Registers a custom alpha (opacity) for a material. */
+    /**
+     * Registers a custom alpha (opacity) for a material.
+     */
     private static void putAlpha(XMaterial xMaterial, int alpha) {
         ALPHAS[xMaterial.ordinal()] = alpha;
     }
 
-    /** Marks a material as emissive (always rendered at full brightness). */
+    /**
+     * Marks a material as emissive (always rendered at full brightness).
+     */
     private static void putEmissive(XMaterial xMaterial) {
         EMISSIVE[xMaterial.ordinal()] = true;
     }
 
-    /** Checks if a material supports boundary merging (volumetric translucency). */
+    /**
+     * Checks if a material supports boundary merging (volumetric translucency).
+     */
     private static boolean isMergeableTranslucent(XMaterial material) {
-        if (getColor(material) == TRANSPARENT) {
+        if (getColor(material) == TRANSPARENT)
             return false;
-        }
-        if (getAlpha(material) >= 255) {
+        if (getAlpha(material) >= 255)
             return false;
-        }
         String name = material.name();
         return name.equals("WATER")
                 || name.equals("GLASS")
@@ -764,21 +778,16 @@ public class BlockPalette {
      */
     private static String getTranslucentMergeFamily(XMaterial material) {
         String name = material.name();
-        if (name.equals("WATER")) {
+        if (name.equals("WATER"))
             return "WATER";
-        }
-        if (name.equals("GLASS")) {
+        if (name.equals("GLASS"))
             return "GLASS";
-        }
-        if (name.endsWith("_STAINED_GLASS")) {
+        if (name.endsWith("_STAINED_GLASS"))
             return name;
-        }
-        if (name.equals("ICE")) {
+        if (name.equals("ICE"))
             return "ICE";
-        }
-        if (name.equals("FROSTED_ICE")) {
+        if (name.equals("FROSTED_ICE"))
             return "FROSTED_ICE";
-        }
         return name;
     }
 
@@ -788,9 +797,8 @@ public class BlockPalette {
      */
     private static int inferFromName(String name) {
         Integer baseColor = inferBaseColor(name);
-        if (baseColor != null) {
+        if (baseColor != null)
             return applyNameVariant(baseColor, name);
-        }
 
         return hashedFallbackColor(name);
     }
@@ -803,116 +811,202 @@ public class BlockPalette {
      */
     private static Integer inferBaseColor(String name) {
         // Dye-colored block families
-        for (int i = 0; i < DYE_PREFIXES.length; i++) {
-            if (name.startsWith(DYE_PREFIXES[i])) {
+        for (int i = 0; i < DYE_PREFIXES.length; i++)
+            if (name.startsWith(DYE_PREFIXES[i]))
                 return DYE_COLORS[i];
-            }
-        }
 
         // Wood type inference (check more specific names first)
-        if (name.contains("DARK_OAK")) return 0x422B12;
-        if (name.contains("PALE_OAK")) return 0xD8D2C8;
-        if (name.contains("CHERRY")) return 0xE7C3B5;
-        if (name.contains("MANGROVE")) return 0x773535;
-        if (name.contains("BAMBOO")) return 0xC8B348;
-        if (name.contains("CRIMSON")) return 0x653046;
-        if (name.contains("WARPED")) return 0x2B6D5B;
-        if (name.contains("OAK")) return 0xA88654;
-        if (name.contains("SPRUCE")) return 0x734B2E;
-        if (name.contains("BIRCH")) return 0xC8B77A;
-        if (name.contains("JUNGLE")) return 0xA0724B;
-        if (name.contains("ACACIA")) return 0xA85A2C;
+        if (name.contains("DARK_OAK"))
+            return 0x422B12;
+        if (name.contains("PALE_OAK"))
+            return 0xD8D2C8;
+        if (name.contains("CHERRY"))
+            return 0xE7C3B5;
+        if (name.contains("MANGROVE"))
+            return 0x773535;
+        if (name.contains("BAMBOO"))
+            return 0xC8B348;
+        if (name.contains("CRIMSON"))
+            return 0x653046;
+        if (name.contains("WARPED"))
+            return 0x2B6D5B;
+        if (name.contains("OAK"))
+            return 0xA88654;
+        if (name.contains("SPRUCE"))
+            return 0x734B2E;
+        if (name.contains("BIRCH"))
+            return 0xC8B77A;
+        if (name.contains("JUNGLE"))
+            return 0xA0724B;
+        if (name.contains("ACACIA"))
+            return 0xA85A2C;
 
         // Stone variants
-        if (name.contains("DEEPSLATE")) return 0x505050;
-        if (name.contains("TUFF")) return 0x6C6C5E;
-        if (name.contains("CALCITE")) return 0xDDDCC8;
-        if (name.contains("BASALT")) return 0x4E4E52;
-        if (name.contains("OBSIDIAN")) return 0x140C20;
-        if (name.contains("BLACKSTONE")) return 0x2C272E;
-        if (name.contains("NETHERRACK")) return 0x6B2E2E;
-        if (name.contains("END_STONE")) return 0xDBDE9F;
-        if (name.contains("PURPUR")) return 0xA977A9;
-        if (name.contains("COBBLESTONE") || name.contains("COBBLED")) return 0x6B6B6B;
-        if (name.contains("ANDESITE")) return 0x888888;
-        if (name.contains("DIORITE")) return 0xBCBCBC;
-        if (name.contains("GRANITE")) return 0x9A6C50;
-        if (name.contains("TERRACOTTA")) return 0x985E43;
-        if (name.contains("MUD_BRICK")) return 0x897158;
-        if (name.contains("MUD")) return 0x5E4C42;
-        if (name.contains("CLAY")) return 0x9EA5B1;
-        if (name.contains("GRAVEL")) return 0x838080;
-        if (name.contains("DRIPSTONE")) return 0x866B5C;
-        if (name.contains("STONE")) return 0x7D7D7D;
+        if (name.contains("DEEPSLATE"))
+            return 0x505050;
+        if (name.contains("TUFF"))
+            return 0x6C6C5E;
+        if (name.contains("CALCITE"))
+            return 0xDDDCC8;
+        if (name.contains("BASALT"))
+            return 0x4E4E52;
+        if (name.contains("OBSIDIAN"))
+            return 0x140C20;
+        if (name.contains("BLACKSTONE"))
+            return 0x2C272E;
+        if (name.contains("NETHERRACK"))
+            return 0x6B2E2E;
+        if (name.contains("END_STONE"))
+            return 0xDBDE9F;
+        if (name.contains("PURPUR"))
+            return 0xA977A9;
+        if (name.contains("COBBLESTONE") || name.contains("COBBLED"))
+            return 0x6B6B6B;
+        if (name.contains("ANDESITE"))
+            return 0x888888;
+        if (name.contains("DIORITE"))
+            return 0xBCBCBC;
+        if (name.contains("GRANITE"))
+            return 0x9A6C50;
+        if (name.contains("TERRACOTTA"))
+            return 0x985E43;
+        if (name.contains("MUD_BRICK"))
+            return 0x897158;
+        if (name.contains("MUD"))
+            return 0x5E4C42;
+        if (name.contains("CLAY"))
+            return 0x9EA5B1;
+        if (name.contains("GRAVEL"))
+            return 0x838080;
+        if (name.contains("DRIPSTONE"))
+            return 0x866B5C;
+        if (name.contains("STONE"))
+            return 0x7D7D7D;
 
         // Copper blocks with varying oxidation stages
         if (name.contains("COPPER")) {
-            if (name.contains("OXIDIZED")) return 0x52A384;
-            if (name.contains("WEATHERED")) return 0x6C9862;
-            if (name.contains("EXPOSED")) return 0xA08258;
+            if (name.contains("OXIDIZED"))
+                return 0x52A384;
+            if (name.contains("WEATHERED"))
+                return 0x6C9862;
+            if (name.contains("EXPOSED"))
+                return 0xA08258;
             return 0xC06840;
         }
 
         // Other material keywords
-        if (name.contains("IRON")) return 0xDCDCDC;
-        if (name.contains("NETHERITE")) return 0x434040;
-        if (name.contains("GOLD")) return 0xF8D44E;
-        if (name.contains("DIAMOND")) return 0x62EDD8;
-        if (name.contains("EMERALD")) return 0x41C13E;
-        if (name.contains("LAPIS")) return 0x2456A8;
-        if (name.contains("REDSTONE")) return 0xAB1207;
-        if (name.contains("COAL")) return 0x303030;
-        if (name.contains("QUARTZ")) return 0xECE7DE;
-        if (name.contains("PRISMARINE")) return 0x63A58E;
-        if (name.contains("NETHER_BRICK")) return 0x2D1520;
-        if (name.contains("BRICK")) return 0x966456;
-        if (name.contains("SANDSTONE")) return 0xD8CB8A;
-        if (name.contains("RED_SAND")) return 0xBE6621;
-        if (name.contains("SAND")) return 0xDBCFA3;
-        if (name.contains("GLASS")) return 0xC8E8F0;
-        if (name.contains("ICE")) return 0x91B3F3;
-        if (name.contains("SNOW")) return 0xF9FFFE;
-        if (name.contains("WATER")) return 0x2825F5;
-        if (name.contains("LAVA")) return 0xD05E10;
+        if (name.contains("IRON"))
+            return 0xDCDCDC;
+        if (name.contains("NETHERITE"))
+            return 0x434040;
+        if (name.contains("GOLD"))
+            return 0xF8D44E;
+        if (name.contains("DIAMOND"))
+            return 0x62EDD8;
+        if (name.contains("EMERALD"))
+            return 0x41C13E;
+        if (name.contains("LAPIS"))
+            return 0x2456A8;
+        if (name.contains("REDSTONE"))
+            return 0xAB1207;
+        if (name.contains("COAL"))
+            return 0x303030;
+        if (name.contains("QUARTZ"))
+            return 0xECE7DE;
+        if (name.contains("PRISMARINE"))
+            return 0x63A58E;
+        if (name.contains("NETHER_BRICK"))
+            return 0x2D1520;
+        if (name.contains("BRICK"))
+            return 0x966456;
+        if (name.contains("SANDSTONE"))
+            return 0xD8CB8A;
+        if (name.contains("RED_SAND"))
+            return 0xBE6621;
+        if (name.contains("SAND"))
+            return 0xDBCFA3;
+        if (name.contains("GLASS"))
+            return 0xC8E8F0;
+        if (name.contains("ICE"))
+            return 0x91B3F3;
+        if (name.contains("SNOW"))
+            return 0xF9FFFE;
+        if (name.contains("WATER"))
+            return 0x2825F5;
+        if (name.contains("LAVA"))
+            return 0xD05E10;
 
         // Coral variants with species-specific colors
         if (name.contains("CORAL")) {
-            if (name.contains("DEAD")) return 0x7E7567;
-            if (name.contains("TUBE")) return 0x3455D5;
-            if (name.contains("BRAIN")) return 0xD1789A;
-            if (name.contains("BUBBLE")) return 0xA61D89;
-            if (name.contains("FIRE")) return 0xD82A20;
-            if (name.contains("HORN")) return 0xD9C634;
+            if (name.contains("DEAD"))
+                return 0x7E7567;
+            if (name.contains("TUBE"))
+                return 0x3455D5;
+            if (name.contains("BRAIN"))
+                return 0xD1789A;
+            if (name.contains("BUBBLE"))
+                return 0xA61D89;
+            if (name.contains("FIRE"))
+                return 0xD82A20;
+            if (name.contains("HORN"))
+                return 0xD9C634;
             return 0xD8626C;
         }
 
-        if (name.contains("AMETHYST")) return 0x8664C5;
-        if (name.contains("SCULK")) return 0x0E1E24;
-        if (name.contains("MOSS")) return 0x4D6B28;
-        if (name.contains("GRASS")) return 0x6BAA36;
-        if (name.contains("LEAVES")) return 0x4A7A32;
-        if (name.contains("VINE")) return 0x4C7A34;
-        if (name.contains("AZALEA")) return 0x6B8A38;
-        if (name.contains("CACTUS")) return 0x5B7C3E;
-        if (name.contains("MELON")) return 0x6B9830;
-        if (name.contains("PUMPKIN")) return 0xC9820D;
-        if (name.contains("HONEY")) return 0xE59B28;
-        if (name.contains("SLIME")) return 0x6CC46A;
-        if (name.contains("BONE")) return 0xD1CCAC;
-        if (name.contains("BOOKSHELF")) return 0x735E3E;
-        if (name.contains("CHEST")) return 0x6B4D30;
-        if (name.contains("FURNACE")) return 0x7A7A7A;
-        if (name.contains("LANTERN")) return 0x8A6A3E;
-        if (name.contains("CANDLE")) return 0xD5C9A4;
-        if (name.contains("WOOL")) return 0xB8B1A8;
-        if (name.contains("CONCRETE_POWDER")) return 0xB0AAA0;
-        if (name.contains("CONCRETE")) return 0x9C958B;
-        if (name.contains("CERAMIC")) return 0xA8846C;
-        if (name.contains("MUSHROOM")) return 0xA07060;
-        if (name.contains("FROGLIGHT")) return 0xC8B58C;
-        if (name.contains("SEA_PICKLE")) return 0x76A52E;
-        if (name.contains("SPONGE")) return 0xC2BC4A;
-        if (name.contains("HAY")) return 0xB5960C;
+        if (name.contains("AMETHYST"))
+            return 0x8664C5;
+        if (name.contains("SCULK"))
+            return 0x0E1E24;
+        if (name.contains("MOSS"))
+            return 0x4D6B28;
+        if (name.contains("GRASS"))
+            return 0x6BAA36;
+        if (name.contains("LEAVES"))
+            return 0x4A7A32;
+        if (name.contains("VINE"))
+            return 0x4C7A34;
+        if (name.contains("AZALEA"))
+            return 0x6B8A38;
+        if (name.contains("CACTUS"))
+            return 0x5B7C3E;
+        if (name.contains("MELON"))
+            return 0x6B9830;
+        if (name.contains("PUMPKIN"))
+            return 0xC9820D;
+        if (name.contains("HONEY"))
+            return 0xE59B28;
+        if (name.contains("SLIME"))
+            return 0x6CC46A;
+        if (name.contains("BONE"))
+            return 0xD1CCAC;
+        if (name.contains("BOOKSHELF"))
+            return 0x735E3E;
+        if (name.contains("CHEST"))
+            return 0x6B4D30;
+        if (name.contains("FURNACE"))
+            return 0x7A7A7A;
+        if (name.contains("LANTERN"))
+            return 0x8A6A3E;
+        if (name.contains("CANDLE"))
+            return 0xD5C9A4;
+        if (name.contains("WOOL"))
+            return 0xB8B1A8;
+        if (name.contains("CONCRETE_POWDER"))
+            return 0xB0AAA0;
+        if (name.contains("CONCRETE"))
+            return 0x9C958B;
+        if (name.contains("CERAMIC"))
+            return 0xA8846C;
+        if (name.contains("MUSHROOM"))
+            return 0xA07060;
+        if (name.contains("FROGLIGHT"))
+            return 0xC8B58C;
+        if (name.contains("SEA_PICKLE"))
+            return 0x76A52E;
+        if (name.contains("SPONGE"))
+            return 0xC2BC4A;
+        if (name.contains("HAY"))
+            return 0xB5960C;
 
         return null;
     }
@@ -925,73 +1019,51 @@ public class BlockPalette {
     private static int applyNameVariant(int color, String name) {
         double brightness = 1.0;
 
-        if (name.contains("POLISHED") || name.contains("SMOOTH") || name.contains("CUT")) {
+        if (name.contains("POLISHED") || name.contains("SMOOTH") || name.contains("CUT"))
             brightness *= 1.06;
-        }
-        if (name.contains("CHISELED") || name.contains("CARVED")) {
+        if (name.contains("CHISELED") || name.contains("CARVED"))
             brightness *= 0.98;
-        }
-        if (name.contains("CRACKED")) {
+        if (name.contains("CRACKED"))
             brightness *= 0.9;
-        }
-        if (name.contains("MOSSY")) {
+        if (name.contains("MOSSY"))
             color = blend(color, 0x4D6B28, 0.22);
-        }
-        if (name.contains("WAXED")) {
+        if (name.contains("WAXED"))
             brightness *= 1.03;
-        }
-        if (name.contains("STRIPPED")) {
+        if (name.contains("STRIPPED"))
             brightness *= 1.08;
-        }
-        if (name.contains("OXIDIZED")) {
+        if (name.contains("OXIDIZED"))
             brightness *= 0.96;
-        }
-        if (name.contains("WEATHERED")) {
+        if (name.contains("WEATHERED"))
             brightness *= 0.98;
-        }
-        if (name.contains("EXPOSED")) {
+        if (name.contains("EXPOSED"))
             brightness *= 1.01;
-        }
         if (name.endsWith("_PLANKS") || name.endsWith("_LOG") || name.endsWith("_WOOD")
-                || name.endsWith("_STEM") || name.endsWith("_HYPHAE")) {
+                || name.endsWith("_STEM") || name.endsWith("_HYPHAE"))
             brightness *= 1.01;
-        }
-        if (name.endsWith("_STAIRS")) {
+        if (name.endsWith("_STAIRS"))
             brightness *= 0.97;
-        }
-        if (name.endsWith("_SLAB")) {
+        if (name.endsWith("_SLAB"))
             brightness *= 1.03;
-        }
-        if (name.endsWith("_WALL")) {
+        if (name.endsWith("_WALL"))
             brightness *= 0.95;
-        }
-        if (name.endsWith("_FENCE") || name.endsWith("_FENCE_GATE")) {
+        if (name.endsWith("_FENCE") || name.endsWith("_FENCE_GATE"))
             brightness *= 0.94;
-        }
-        if (name.endsWith("_DOOR") || name.endsWith("_TRAPDOOR")) {
+        if (name.endsWith("_DOOR") || name.endsWith("_TRAPDOOR"))
             brightness *= 0.92;
-        }
-        if (name.endsWith("_BUTTON") || name.endsWith("_PRESSURE_PLATE")) {
+        if (name.endsWith("_BUTTON") || name.endsWith("_PRESSURE_PLATE"))
             brightness *= 1.05;
-        }
-        if (name.endsWith("_PILLAR")) {
+        if (name.endsWith("_PILLAR"))
             brightness *= 1.04;
-        }
-        if (name.endsWith("_BRICKS")) {
+        if (name.endsWith("_BRICKS"))
             brightness *= 0.96;
-        }
-        if (name.endsWith("_TILES")) {
+        if (name.endsWith("_TILES"))
             brightness *= 0.93;
-        }
-        if (name.endsWith("_ORE")) {
+        if (name.endsWith("_ORE"))
             brightness *= 0.91;
-        }
-        if (name.endsWith("_BLOCK")) {
+        if (name.endsWith("_BLOCK"))
             brightness *= 1.02;
-        }
-        if (name.contains("RAW_")) {
+        if (name.contains("RAW_"))
             brightness *= 0.94;
-        }
 
         color = scaleBrightness(color, brightness);
 
@@ -1035,7 +1107,9 @@ public class BlockPalette {
         );
     }
 
-    /** Linearly blends two colors. {@code ratio} = 0.0 returns {@code first}, 1.0 returns {@code second}. */
+    /**
+     * Linearly blends two colors. {@code ratio} = 0.0 returns {@code first}, 1.0 returns {@code second}.
+     */
     private static int blend(int first, int second, double ratio) {
         double inv = 1.0 - ratio;
         return rgb(
@@ -1045,7 +1119,9 @@ public class BlockPalette {
         );
     }
 
-    /** Scales all RGB channels of a color by a brightness factor, clamping to [0, 255]. */
+    /**
+     * Scales all RGB channels of a color by a brightness factor, clamping to [0, 255].
+     */
     private static int scaleBrightness(int color, double factor) {
         return rgb(
                 clampChannel((int) Math.round(((color >> 16) & 0xFF) * factor)),
@@ -1054,12 +1130,16 @@ public class BlockPalette {
         );
     }
 
-    /** Packs three 8-bit channels into a single 24-bit RGB integer. */
+    /**
+     * Packs three 8-bit channels into a single 24-bit RGB integer.
+     */
     private static int rgb(int red, int green, int blue) {
         return (red << 16) | (green << 8) | blue;
     }
 
-    /** Returns whether the block has an orientation axis (logs, pillars, chains, etc.). */
+    /**
+     * Returns whether the block has an orientation axis (logs, pillars, chains, etc.).
+     */
     private static boolean isAxisBlock(String name) {
         return name.endsWith("_LOG")
                 || name.endsWith("_WOOD")
@@ -1071,7 +1151,9 @@ public class BlockPalette {
                 || name.equals("CHAIN");
     }
 
-    /** Returns whether the block has a distinct front face (furnace, observer, etc.). */
+    /**
+     * Returns whether the block has a distinct front face (furnace, observer, etc.).
+     */
     private static boolean isFacingFrontBlock(String name) {
         return name.equals("FURNACE")
                 || name.equals("BLAST_FURNACE")
@@ -1083,22 +1165,30 @@ public class BlockPalette {
                 || name.equals("JACK_O_LANTERN");
     }
 
-    /** Returns whether the block is a glass pane or iron bars. Used in static initializer for flag computation. */
+    /**
+     * Returns whether the block is a glass pane or iron bars. Used in static initializer for flag computation.
+     */
     private static boolean isPaneBlock(String name) {
         return name.endsWith("_PANE") || name.equals("IRON_BARS");
     }
 
-    /** Returns whether the block is a fence (not a gate). Used in static initializer for flag computation. */
+    /**
+     * Returns whether the block is a fence (not a gate). Used in static initializer for flag computation.
+     */
     private static boolean isFenceBlock(String name) {
         return name.endsWith("_FENCE") && !name.contains("GATE");
     }
 
-    /** Returns whether the block is a wall. Used in static initializer for flag computation. */
+    /**
+     * Returns whether the block is a wall. Used in static initializer for flag computation.
+     */
     private static boolean isWallBlock(String name) {
         return name.endsWith("_WALL");
     }
 
-    /** Returns whether the block's shape depends on block state properties. Used in static initializer for flag computation. */
+    /**
+     * Returns whether the block's shape depends on block state properties. Used in static initializer for flag computation.
+     */
     private static boolean isNeedsStateBlock(String name) {
         return name.endsWith("_SLAB")
                 || name.endsWith("_STAIRS")
@@ -1126,75 +1216,89 @@ public class BlockPalette {
         boolean endFace = ("x".equals(axis) && hitFace == 0)
                 || ("y".equals(axis) && hitFace == 1)
                 || ("z".equals(axis) && hitFace == 2);
-        if (!endFace) {
+        if (!endFace)
             return sideColor;
-        }
         return blend(scaleBrightness(sideColor, 1.18), 0xD2B48C, 0.24);
     }
 
-    /** Returns the front face color if the ray hit the block's facing side, otherwise the side color. */
+    /**
+     * Returns the front face color if the ray hit the block's facing side, otherwise the side color.
+     */
     private static int colorForFacingBlock(int sideColor, int frontColor, String facing,
                                            int hitFace, double dx, double dy, double dz) {
-        if (facing.equals(faceName(hitFace, dx, dy, dz))) {
+        if (facing.equals(faceName(hitFace, dx, dy, dz)))
             return frontColor;
-        }
         return sideColor;
     }
 
-    /** Converts a hit face index and ray direction into a Minecraft facing name (north/south/east/west/up/down). */
+    /**
+     * Converts a hit face index and ray direction into a Minecraft facing name (north/south/east/west/up/down).
+     */
     private static String faceName(int hitFace, double dx, double dy, double dz) {
-        if (hitFace == 0) {
+        if (hitFace == 0)
             return dx > 0 ? "west" : "east";
-        }
-        if (hitFace == 1) {
+        if (hitFace == 1)
             return dy > 0 ? "down" : "up";
-        }
         return dz > 0 ? "north" : "south";
     }
 
-    /** Returns the distinct front face color for specific blocks (furnace, observer, etc.). */
+    /**
+     * Returns the distinct front face color for specific blocks (furnace, observer, etc.).
+     */
     private static int frontColor(XMaterial material, int fallback) {
-        if (material == XMaterial.FURNACE || material == XMaterial.BLAST_FURNACE || material == XMaterial.SMOKER) {
+        if (material == XMaterial.FURNACE || material == XMaterial.BLAST_FURNACE || material == XMaterial.SMOKER)
             return 0x3B332C;
-        }
-        if (material == XMaterial.OBSERVER) {
+        if (material == XMaterial.OBSERVER)
             return 0xB24A3A;
-        }
-        if (material == XMaterial.DROPPER || material == XMaterial.DISPENSER) {
+        if (material == XMaterial.DROPPER || material == XMaterial.DISPENSER)
             return 0x3C3C3C;
-        }
-        if (material == XMaterial.CARVED_PUMPKIN || material == XMaterial.JACK_O_LANTERN) {
+        if (material == XMaterial.CARVED_PUMPKIN || material == XMaterial.JACK_O_LANTERN)
             return 0x5A2E08;
-        }
         return scaleBrightness(fallback, 0.84);
     }
 
-    /** Returns a characteristic color for flowers, saplings, and other vegetation by name. */
+    /**
+     * Returns a characteristic color for flowers, saplings, and other vegetation by name.
+     */
     private static int inferPlantColor(String name) {
-        if (name.contains("WITHER_ROSE")) return 0x402428;
-        if (name.contains("ROSE") || name.contains("POPPY") || name.contains("TULIP")) return 0xC84B42;
-        if (name.contains("DANDELION") || name.contains("SUNFLOWER")) return 0xD6B62E;
-        if (name.contains("ALLIUM") || name.contains("LILAC")) return 0xA678C8;
-        if (name.contains("BLUE") || name.contains("ORCHID") || name.contains("CORNFLOWER")) return 0x4D74D9;
-        if (name.contains("AZURE")) return 0xB9D6E8;
-        if (name.contains("LILY_OF_THE_VALLEY")) return 0xDDE8D6;
-        if (name.contains("PEONY")) return 0xC96C88;
-        if (name.contains("TORCHFLOWER")) return 0xD26A2E;
-        if (name.contains("DEAD_BUSH")) return 0x8A6A3A;
-        if (name.contains("FERN") || name.contains("GRASS") || name.contains("SAPLING")) return 0x5E8C34;
+        if (name.contains("WITHER_ROSE"))
+            return 0x402428;
+        if (name.contains("ROSE") || name.contains("POPPY") || name.contains("TULIP"))
+            return 0xC84B42;
+        if (name.contains("DANDELION") || name.contains("SUNFLOWER"))
+            return 0xD6B62E;
+        if (name.contains("ALLIUM") || name.contains("LILAC"))
+            return 0xA678C8;
+        if (name.contains("BLUE") || name.contains("ORCHID") || name.contains("CORNFLOWER"))
+            return 0x4D74D9;
+        if (name.contains("AZURE"))
+            return 0xB9D6E8;
+        if (name.contains("LILY_OF_THE_VALLEY"))
+            return 0xDDE8D6;
+        if (name.contains("PEONY"))
+            return 0xC96C88;
+        if (name.contains("TORCHFLOWER"))
+            return 0xD26A2E;
+        if (name.contains("DEAD_BUSH"))
+            return 0x8A6A3A;
+        if (name.contains("FERN") || name.contains("GRASS") || name.contains("SAPLING"))
+            return 0x5E8C34;
         return 0x6BAA36;
     }
 
-    /** Infers a color for sign blocks based on their wood family, with variant adjustments. */
+    /**
+     * Infers a color for sign blocks based on their wood family, with variant adjustments.
+     */
     private static int inferWoodFamilyColor(String name, int fallback) {
         Integer base = inferBaseColor(name);
-        if (base == null) {
+        if (base == null)
             return fallback;
-        }
         return applyNameVariant(base, name);
     }
 
-    /** Clamps a single color channel value to the valid [0, 255] range. */
+    /**
+     * Clamps a single color channel value to the valid [0, 255] range.
+     */
     private static int clampChannel(int value) {
         return Math.max(0, Math.min(255, value));
     }

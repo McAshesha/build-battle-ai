@@ -8,9 +8,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
+import ru.ashesha.buildBattleAI.core.PluginContext;
 import ru.ashesha.buildBattleAI.core.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.core.message.ChatService;
-import ru.ashesha.buildBattleAI.core.PluginContext;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -18,7 +18,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 class BBAICommandTest {
@@ -43,7 +44,7 @@ class BBAICommandTest {
         CommandSender sender = mock(CommandSender.class);
         PluginDescriptionFile desc = mock(PluginDescriptionFile.class);
         when(desc.getVersion()).thenReturn("1.0-SNAPSHOT");
-        when(desc.getAuthors()).thenReturn(Arrays.asList("McAshesha"));
+        when(desc.getAuthors()).thenReturn(Collections.singletonList("McAshesha"));
         when(plugin.getDescription()).thenReturn(desc);
 
         command.onCommand(sender, null, "bbai", new String[0]);
@@ -235,7 +236,7 @@ class BBAICommandTest {
     void onCommandAlwaysReturnsTrue() {
         PluginDescriptionFile desc = mock(PluginDescriptionFile.class);
         when(desc.getVersion()).thenReturn("1.0");
-        when(desc.getAuthors()).thenReturn(Collections.<String>emptyList());
+        when(desc.getAuthors()).thenReturn(Collections.emptyList());
         when(plugin.getDescription()).thenReturn(desc);
 
         assertTrue(command.onCommand(mock(CommandSender.class), null, "bbai", new String[0]));

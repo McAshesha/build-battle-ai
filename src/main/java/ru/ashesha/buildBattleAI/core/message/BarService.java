@@ -6,8 +6,8 @@ import com.github.retrooper.packetevents.protocol.chat.message.ChatMessageLegacy
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerActionBar;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerChatMessage;
-import net.kyori.adventure.text.Component;
 import lombok.NonNull;
+import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.util.MessageUtils;
@@ -28,7 +28,9 @@ public class BarService {
 
     private final BuildBattleAI plugin;
 
-    /** Version-resolved factory for creating action bar packets. */
+    /**
+     * Version-resolved factory for creating action bar packets.
+     */
     private final BarPacketFactory barPacketFactory;
 
     /**
@@ -60,9 +62,8 @@ public class BarService {
      */
     public void sendActionBar(@NonNull Collection<? extends Player> recipients, @NonNull String message) {
         PacketWrapper<?> packet = barPacketFactory.create(MessageUtils.toComponent(message));
-        for (Player recipient : recipients) {
+        for (Player recipient : recipients)
             plugin.getContext().sendPacket(recipient, packet);
-        }
     }
 
     // ── version-resolved factory ────────────────────────────────────────────
@@ -75,10 +76,10 @@ public class BarService {
      *         {@code GAME_INFO} position (action bar via chat packet)</li>
      * </ul>
      */
+    @SuppressWarnings("deprecation")
     private BarPacketFactory resolveBarFactory(ServerVersion version) {
-        if (version.isNewerThanOrEquals(ServerVersion.V_1_11)) {
+        if (version.isNewerThanOrEquals(ServerVersion.V_1_11))
             return WrapperPlayServerActionBar::new;
-        }
         // 1.8–1.10: no dedicated action bar packet; use chat with GAME_INFO position
         return component -> new WrapperPlayServerChatMessage(
                 new ChatMessageLegacy(component, ChatTypes.GAME_INFO));

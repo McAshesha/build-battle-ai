@@ -12,12 +12,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class BlockShapeTest {
 
-    @BeforeEach
-    void clearCaches() {
-        BlockShape.clearStateShapeCache();
-        BlockRenderState.clearCache();
-    }
-
     private static final short AIR = (short) XMaterial.AIR.ordinal();
 
     private static short[] airArray(int size) {
@@ -26,7 +20,57 @@ class BlockShapeTest {
         return data;
     }
 
+    private static SceneData sceneWithState(final XMaterial material, final String blockState) {
+        return new SceneData() {
+            @Override
+            public int minX() {
+                return 0;
+            }
+
+            @Override
+            public int minY() {
+                return 0;
+            }
+
+            @Override
+            public int minZ() {
+                return 0;
+            }
+
+            @Override
+            public int maxX() {
+                return 0;
+            }
+
+            @Override
+            public int maxY() {
+                return 0;
+            }
+
+            @Override
+            public int maxZ() {
+                return 0;
+            }
+
+            @Override
+            public XMaterial getBlockType(int wx, int wy, int wz) {
+                return (wx == 0 && wy == 0 && wz == 0) ? material : XMaterial.AIR;
+            }
+
+            @Override
+            public String getBlockState(int wx, int wy, int wz) {
+                return (wx == 0 && wy == 0 && wz == 0) ? blockState : null;
+            }
+        };
+    }
+
     // ===== Full blocks return null =====
+
+    @BeforeEach
+    void clearCaches() {
+        BlockShape.clearStateShapeCache();
+        BlockRenderState.clearCache();
+    }
 
     @Test
     void stoneIsFullBlock() {
@@ -48,12 +92,12 @@ class BlockShapeTest {
         assertNull(BlockShape.getShape(XMaterial.OAK_PLANKS));
     }
 
+    // ===== Slabs =====
+
     @Test
     void obsidianIsFullBlock() {
         assertNull(BlockShape.getShape(XMaterial.OBSIDIAN));
     }
-
-    // ===== Slabs =====
 
     @Test
     void oakSlabHasShape() {
@@ -69,12 +113,12 @@ class BlockShapeTest {
         assertNotNull(BlockShape.getShape(XMaterial.STONE_SLAB));
     }
 
+    // ===== Stairs =====
+
     @Test
     void cobblestonSlabHasShape() {
         assertNotNull(BlockShape.getShape(XMaterial.COBBLESTONE_SLAB));
     }
-
-    // ===== Stairs =====
 
     @Test
     void oakStairsHasShape() {
@@ -85,12 +129,12 @@ class BlockShapeTest {
         assertEquals(12 / 16.0, shape[0][4], 1e-9);
     }
 
+    // ===== Fences =====
+
     @Test
     void stoneStairsHasShape() {
         assertNotNull(BlockShape.getShape(XMaterial.STONE_STAIRS));
     }
-
-    // ===== Fences =====
 
     @Test
     void oakFenceHasShape() {
@@ -102,12 +146,14 @@ class BlockShapeTest {
         assertEquals(10 / 16.0, shape[0][3], 1e-9);
     }
 
+    // ===== Walls =====
+
     @Test
     void netherBrickFenceHasShape() {
         assertNotNull(BlockShape.getShape(XMaterial.NETHER_BRICK_FENCE));
     }
 
-    // ===== Walls =====
+    // ===== Panes and bars =====
 
     @Test
     void cobblestoneWallHasShape() {
@@ -119,14 +165,14 @@ class BlockShapeTest {
         assertEquals(12 / 16.0, shape[0][3], 1e-9);
     }
 
-    // ===== Panes and bars =====
-
     @Test
     void glassPaneHasShape() {
         double[][] shape = BlockShape.getShape(XMaterial.GLASS_PANE);
         assertNotNull(shape);
         assertEquals(2, shape.length); // Two cross panels
     }
+
+    // ===== Trapdoors =====
 
     @Test
     void ironBarsHasShape() {
@@ -135,7 +181,7 @@ class BlockShapeTest {
         assertEquals(2, shape.length);
     }
 
-    // ===== Trapdoors =====
+    // ===== Doors =====
 
     @Test
     void oakTrapdoorHasShape() {
@@ -146,7 +192,7 @@ class BlockShapeTest {
         assertEquals(3 / 16.0, shape[0][4], 1e-9);
     }
 
-    // ===== Doors =====
+    // ===== Fence gates =====
 
     @Test
     void oakDoorHasShape() {
@@ -155,15 +201,13 @@ class BlockShapeTest {
         assertEquals(2, shape.length); // Cross shape
     }
 
-    // ===== Fence gates =====
+    // ===== Carpets =====
 
     @Test
     void oakFenceGateHasShape() {
         double[][] shape = BlockShape.getShape(XMaterial.OAK_FENCE_GATE);
         assertNotNull(shape);
     }
-
-    // ===== Carpets =====
 
     @Test
     void whiteCarpetHasShape() {
@@ -173,12 +217,12 @@ class BlockShapeTest {
         assertEquals(1 / 16.0, shape[0][4], 1e-9); // Very thin
     }
 
+    // ===== Torches =====
+
     @Test
     void redCarpetHasShape() {
         assertNotNull(BlockShape.getShape(XMaterial.RED_CARPET));
     }
-
-    // ===== Torches =====
 
     @Test
     void torchHasShape() {
@@ -193,24 +237,24 @@ class BlockShapeTest {
         assertNotNull(BlockShape.getShape(XMaterial.SOUL_TORCH));
     }
 
+    // ===== Thin posts =====
+
     @Test
     void redstoneTorchHasShape() {
         assertNotNull(BlockShape.getShape(XMaterial.REDSTONE_TORCH));
     }
-
-    // ===== Thin posts =====
 
     @Test
     void endRodHasShape() {
         assertNotNull(BlockShape.getShape(XMaterial.END_ROD));
     }
 
+    // ===== Flora =====
+
     @Test
     void lightningRodHasShape() {
         assertNotNull(BlockShape.getShape(XMaterial.LIGHTNING_ROD));
     }
-
-    // ===== Flora =====
 
     @Test
     void dandelionHasShape() {
@@ -239,12 +283,14 @@ class BlockShapeTest {
         assertNotNull(BlockShape.getShape(XMaterial.DEAD_BUSH));
     }
 
+    // ===== Pressure plates =====
+
     @Test
     void oakSaplingHasShape() {
         assertNotNull(BlockShape.getShape(XMaterial.OAK_SAPLING));
     }
 
-    // ===== Pressure plates =====
+    // ===== Buttons =====
 
     @Test
     void stonePressurePlateHasShape() {
@@ -254,7 +300,7 @@ class BlockShapeTest {
         assertEquals(2 / 16.0, shape[0][4], 1e-9);
     }
 
-    // ===== Buttons =====
+    // ===== Rails =====
 
     @Test
     void stoneButtonHasShape() {
@@ -263,19 +309,17 @@ class BlockShapeTest {
         assertEquals(1, shape.length);
     }
 
-    // ===== Rails =====
-
     @Test
     void railHasShape() {
         assertNotNull(BlockShape.getShape(XMaterial.RAIL));
     }
 
+    // ===== Special blocks =====
+
     @Test
     void poweredRailHasShape() {
         assertNotNull(BlockShape.getShape(XMaterial.POWERED_RAIL));
     }
-
-    // ===== Special blocks =====
 
     @Test
     void chestHasShape() {
@@ -383,18 +427,21 @@ class BlockShapeTest {
         assertNotNull(BlockShape.getShape(XMaterial.COMPOSTER));
     }
 
+    // ===== Shape box validity =====
+
     @Test
     void cauldronHasShape() {
         assertNotNull(BlockShape.getShape(XMaterial.CAULDRON));
     }
 
-    // ===== Shape box validity =====
+    // ===== Context-sensitive getShape(scene,...) =====
 
     @Test
     void allShapeBoxesHaveValidCoordinates() {
         for (XMaterial mat : XMaterial.values()) {
             double[][] shape = BlockShape.getShape(mat);
-            if (shape == null) continue;
+            if (shape == null)
+                continue;
             for (int i = 0; i < shape.length; i++) {
                 double[] box = shape[i];
                 assertEquals(6, box.length, mat.name() + " box " + i + " should have 6 elements");
@@ -410,8 +457,6 @@ class BlockShapeTest {
             }
         }
     }
-
-    // ===== Context-sensitive getShape(scene,...) =====
 
     @Test
     void slabTopHalfShapeViaHalfProperty() {
@@ -513,6 +558,8 @@ class BlockShapeTest {
         assertEquals(13 / 16.0, shape[0][2], 1e-9);
     }
 
+    // ===== Fence connectivity =====
+
     @Test
     void snowLayersScaleHeight() {
         for (int layers = 1; layers <= 8; layers++) {
@@ -525,8 +572,6 @@ class BlockShapeTest {
                     "Snow with " + layers + " layers should have height " + expectedHeight);
         }
     }
-
-    // ===== Fence connectivity =====
 
     @Test
     void isolatedFenceIsJustPost() {
@@ -555,6 +600,8 @@ class BlockShapeTest {
         assertEquals(2, shape.length);
     }
 
+    // ===== Wall connectivity =====
+
     @Test
     void fenceConnectsToOpaqueFullBlock() {
         short[] data = airArray(27); // 3x3x3
@@ -568,8 +615,6 @@ class BlockShapeTest {
         assertEquals(2, shape.length); // Post + north arm
     }
 
-    // ===== Wall connectivity =====
-
     @Test
     void isolatedWallIsPost() {
         short[] data = airArray(27);
@@ -580,6 +625,8 @@ class BlockShapeTest {
         assertNotNull(shape);
         assertEquals(1, shape.length);
     }
+
+    // ===== Glass pane connectivity =====
 
     @Test
     void wallStraightLineNorthSouthOptimized() {
@@ -595,7 +642,7 @@ class BlockShapeTest {
         assertEquals(1, shape.length);
     }
 
-    // ===== Glass pane connectivity =====
+    // ===== Long-key STATE_SHAPE_CACHE correctness =====
 
     @Test
     void isolatedGlassPaneShowsCross() {
@@ -608,8 +655,6 @@ class BlockShapeTest {
         // Isolated pane shows full cross (crossWhenIsolated=true)
         assertEquals(3, shape.length); // center + 2 arms
     }
-
-    // ===== Long-key STATE_SHAPE_CACHE correctness =====
 
     @Test
     void oakStairsNorthBottomShapeWithLongKey() {
@@ -654,6 +699,8 @@ class BlockShapeTest {
         assertSame(first, second, "Cache hit should return the same array instance");
     }
 
+    // ===== State shape cache eviction =====
+
     @Test
     void fullBlockSkipsStatefulShapeLookup() {
         // Stone has no FLAG_NEEDS_STATE, so getStatefulShape should be skipped entirely
@@ -661,8 +708,6 @@ class BlockShapeTest {
         double[][] shape = BlockShape.getShape(scene, 0, 0, 0, XMaterial.STONE);
         assertNull(shape, "Full blocks should return null even with block state present");
     }
-
-    // ===== State shape cache eviction =====
 
     @Test
     void stateShapeCacheStaysBounded() {
@@ -676,6 +721,8 @@ class BlockShapeTest {
         assertTrue(BlockShape.stateShapeCacheSize() <= BlockShape.MAX_STATE_SHAPE_CACHE_SIZE + 1,
                 "State shape cache should be bounded, was: " + BlockShape.stateShapeCacheSize());
     }
+
+    // ===== Helper =====
 
     @Test
     void stateShapeCorrectnessAfterEviction() {
@@ -691,24 +738,5 @@ class BlockShapeTest {
         assertNotNull(shape);
         assertEquals(1, shape.length);
         assertArrayEquals(new double[]{0, 0.5, 0, 1, 1, 1}, shape[0], 1e-9);
-    }
-
-    // ===== Helper =====
-
-    private static SceneData sceneWithState(final XMaterial material, final String blockState) {
-        return new SceneData() {
-            @Override public int minX() { return 0; }
-            @Override public int minY() { return 0; }
-            @Override public int minZ() { return 0; }
-            @Override public int maxX() { return 0; }
-            @Override public int maxY() { return 0; }
-            @Override public int maxZ() { return 0; }
-            @Override public XMaterial getBlockType(int wx, int wy, int wz) {
-                return (wx == 0 && wy == 0 && wz == 0) ? material : XMaterial.AIR;
-            }
-            @Override public String getBlockState(int wx, int wy, int wz) {
-                return (wx == 0 && wy == 0 && wz == 0) ? blockState : null;
-            }
-        };
     }
 }

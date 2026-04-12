@@ -6,8 +6,8 @@ import com.github.retrooper.packetevents.protocol.player.UserProfile;
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerInfo;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerInfoUpdate;
-import net.kyori.adventure.text.Component;
 import lombok.NonNull;
+import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.util.MessageUtils;
@@ -27,7 +27,9 @@ public class NameService {
 
     private final BuildBattleAI plugin;
 
-    /** Version-resolved factory for creating player list (tab) update packets. */
+    /**
+     * Version-resolved factory for creating player list (tab) update packets.
+     */
     private final PlayerListPacketFactory playerListPacketFactory;
 
     /**
@@ -81,7 +83,7 @@ public class NameService {
      * </ul>
      */
     private PlayerListPacketFactory resolvePlayerListFactory(ServerVersion version) {
-        if (version.isNewerThanOrEquals(ServerVersion.V_1_19_3)) {
+        if (version.isNewerThanOrEquals(ServerVersion.V_1_19_3))
             return (profile, gameMode, displayName) -> {
                 WrapperPlayServerPlayerInfoUpdate.PlayerInfo info = new WrapperPlayServerPlayerInfoUpdate.PlayerInfo(
                         profile,
@@ -96,7 +98,6 @@ public class NameService {
                         Collections.singletonList(info)
                 );
             };
-        }
         return (profile, gameMode, displayName) -> {
             WrapperPlayServerPlayerInfo.PlayerData data = new WrapperPlayServerPlayerInfo.PlayerData(
                     displayName,
@@ -128,7 +129,9 @@ public class NameService {
         );
     }
 
-    /** Converts a Bukkit {@link org.bukkit.GameMode} to the PacketEvents equivalent. */
+    /**
+     * Converts a Bukkit {@link org.bukkit.GameMode} to the PacketEvents equivalent.
+     */
     private GameMode toPacketEventsGameMode(org.bukkit.GameMode gameMode) {
         if (gameMode == null)
             return GameMode.SURVIVAL;

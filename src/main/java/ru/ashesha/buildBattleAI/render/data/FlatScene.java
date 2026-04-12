@@ -25,7 +25,9 @@ public class FlatScene implements SceneData {
     private final String[] blockStates;
     private final int minX, minY, minZ, maxX, maxY, maxZ;
     private final int sizeX, sizeY, sizeZ;
-    /** Pre-computed {@code sizeY * sizeZ} to avoid repeated multiplication in {@link #indexOf(int, int, int)}. */
+    /**
+     * Pre-computed {@code sizeY * sizeZ} to avoid repeated multiplication in {@link #indexOf(int, int, int)}.
+     */
     private final int sizeYZ;
     private final SourceFormat sourceFormat;
     private final String sourceName;
@@ -99,8 +101,8 @@ public class FlatScene implements SceneData {
         boolean hasLegacy = snapshot.hasLegacyBlockData();
         byte[] legacyBlockData = hasLegacy ? new byte[data.length] : null;
 
-        for (int x = 0; x < sizeX; x++) {
-            for (int y = 0; y < sizeY; y++) {
+        for (int x = 0; x < sizeX; x++)
+            for (int y = 0; y < sizeY; y++)
                 for (int z = 0; z < sizeZ; z++) {
                     int index = x * sizeY * sizeZ + y * sizeZ + z;
                     int worldX = x + minX;
@@ -108,12 +110,9 @@ public class FlatScene implements SceneData {
                     int worldZ = z + minZ;
                     data[index] = (short) snapshot.getBlockType(worldX, worldY, worldZ).ordinal();
                     blockStates[index] = snapshot.getBlockState(worldX, worldY, worldZ);
-                    if (legacyBlockData != null) {
+                    if (legacyBlockData != null)
                         legacyBlockData[index] = snapshot.getLegacyBlockData(worldX, worldY, worldZ);
-                    }
                 }
-            }
-        }
 
         return new FlatScene(data, legacyBlockData, blockStates, minX, minY, minZ,
                 sizeX, sizeY, sizeZ, SourceFormat.RUNTIME, "runtime");
@@ -122,19 +121,22 @@ public class FlatScene implements SceneData {
     @Override
     public XMaterial getBlockType(int wx, int wy, int wz) {
         int index = indexOf(wx, wy, wz);
-        if (index < 0) return XMaterial.AIR;
+        if (index < 0)
+            return XMaterial.AIR;
         return MATERIAL_VALUES[data[index] & 0xFFFF];
     }
 
     public byte getLegacyBlockData(int wx, int wy, int wz) {
         int index = indexOf(wx, wy, wz);
-        if (index < 0 || legacyBlockData == null) return 0;
+        if (index < 0 || legacyBlockData == null)
+            return 0;
         return legacyBlockData[index];
     }
 
     public String getBlockState(int wx, int wy, int wz) {
         int index = indexOf(wx, wy, wz);
-        if (index < 0 || blockStates == null) return null;
+        if (index < 0 || blockStates == null)
+            return null;
         return blockStates[index];
     }
 
@@ -149,9 +151,8 @@ public class FlatScene implements SceneData {
      */
     public BlockDataSnapshot getBlockDataSnapshot(int wx, int wy, int wz) {
         int index = indexOf(wx, wy, wz);
-        if (index < 0) {
+        if (index < 0)
             return new BlockDataSnapshot(XMaterial.AIR, (byte) 0, null);
-        }
         return new BlockDataSnapshot(
                 // Mask with 0xFFFF to prevent sign-extension of short → int producing a negative index
                 MATERIAL_VALUES[data[index] & 0xFFFF],
@@ -160,12 +161,16 @@ public class FlatScene implements SceneData {
         );
     }
 
-    /** Returns whether this scene contains legacy block data. */
+    /**
+     * Returns whether this scene contains legacy block data.
+     */
     public boolean hasLegacyBlockData() {
         return legacyBlockData != null;
     }
 
-    /** Returns whether this scene contains block state strings. */
+    /**
+     * Returns whether this scene contains block state strings.
+     */
     public boolean hasBlockStates() {
         return blockStates != null;
     }
@@ -179,9 +184,8 @@ public class FlatScene implements SceneData {
         int lx = wx - minX;
         int ly = wy - minY;
         int lz = wz - minZ;
-        if (lx < 0 || lx >= sizeX || ly < 0 || ly >= sizeY || lz < 0 || lz >= sizeZ) {
+        if (lx < 0 || lx >= sizeX || ly < 0 || ly >= sizeY || lz < 0 || lz >= sizeZ)
             return -1;
-        }
         return lx * sizeYZ + ly * sizeZ + lz;
     }
 
@@ -189,9 +193,13 @@ public class FlatScene implements SceneData {
      * Indicates how the flat scene data was created.
      */
     public enum SourceFormat {
-        /** Created at runtime from a {@link ChunkScene} snapshot. */
+        /**
+         * Created at runtime from a {@link ChunkScene} snapshot.
+         */
         RUNTIME,
-        /** Created directly by supplying a pre-built data array. */
+        /**
+         * Created directly by supplying a pre-built data array.
+         */
         DIRECT
     }
 

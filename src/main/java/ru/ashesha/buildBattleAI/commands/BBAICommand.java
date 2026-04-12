@@ -5,9 +5,9 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginDescriptionFile;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
+import ru.ashesha.buildBattleAI.commands.base.PluginCommand;
 import ru.ashesha.buildBattleAI.core.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.core.message.ChatService;
-import ru.ashesha.buildBattleAI.commands.base.PluginCommand;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -137,13 +137,17 @@ public class BBAICommand extends PluginCommand {
         player.sendMessage("\u00a7cUnknown demo mode. Use /bbai demo <all|chat|rich|bar|title|tab|listname|reset>");
     }
 
-    /** Sends a plain chat message via PacketEvents. */
+    /**
+     * Sends a plain chat message via PacketEvents.
+     */
     private void runChatDemo(Player player, BBAIMessageService messageService) {
         messageService.sendChat(player, "&6[Chat Demo] &fPlain PacketEvents chat message with &acolors&f.");
         player.sendMessage("\u00a7aChat demo sent.");
     }
 
-    /** Sends a rich chat message with clickable segments and hover tooltips. */
+    /**
+     * Sends a rich chat message with clickable segments and hover tooltips.
+     */
     private void runRichDemo(Player player, BBAIMessageService messageService) {
         ChatService.ChatMessage message = new ChatService.ChatMessage()
                 .append("&6[Rich Demo] &f")
@@ -156,19 +160,25 @@ public class BBAICommand extends PluginCommand {
         player.sendMessage("\u00a7aRich chat demo sent.");
     }
 
-    /** Displays a message on the action bar above the hotbar. */
+    /**
+     * Displays a message on the action bar above the hotbar.
+     */
     private void runActionBarDemo(Player player, BBAIMessageService messageService) {
         messageService.sendActionBar(player, "&e[Bar Demo] &fPacketEvents action bar test");
         player.sendMessage("\u00a7aAction bar demo sent.");
     }
 
-    /** Displays a title and subtitle overlay on the player's screen. */
+    /**
+     * Displays a title and subtitle overlay on the player's screen.
+     */
     private void runTitleDemo(Player player, BBAIMessageService messageService) {
         messageService.sendTitle(player, "&6BuildBattleAI", "&fPacketEvents title/subtitle demo", 10, 50, 15);
         player.sendMessage("\u00a7aTitle demo sent.");
     }
 
-    /** Sets custom header and footer in the player list (tab) overlay. */
+    /**
+     * Sets custom header and footer in the player list (tab) overlay.
+     */
     private void runTabDemo(Player player, BBAIMessageService messageService) {
         messageService.sendTab(
                 player,
@@ -178,13 +188,17 @@ public class BBAICommand extends PluginCommand {
         player.sendMessage("\u00a7aTab demo sent.");
     }
 
-    /** Changes the player's display name in the tab list for all online viewers. */
+    /**
+     * Changes the player's display name in the tab list for all online viewers.
+     */
     private void runListNameDemo(Player player, BBAIMessageService messageService) {
         messageService.sendPlayerListName(player, "&b[AI] &f" + player.getName(), player.getServer().getOnlinePlayers());
         player.sendMessage("\u00a7aPlayer list name demo sent to all online viewers.");
     }
 
-    /** Resets tab header/footer and player list name to defaults. */
+    /**
+     * Resets tab header/footer and player list name to defaults.
+     */
     private void resetDemo(Player player, BBAIMessageService messageService) {
         messageService.sendTab(player, "", "");
         messageService.sendPlayerListName(player, null, player.getServer().getOnlinePlayers());

@@ -10,6 +10,45 @@ class BlockPaletteTest {
 
     // ===== getColor() =====
 
+    private static SceneData simpleScene(final XMaterial material) {
+        return new SceneData() {
+            @Override
+            public int minX() {
+                return 0;
+            }
+
+            @Override
+            public int minY() {
+                return 0;
+            }
+
+            @Override
+            public int minZ() {
+                return 0;
+            }
+
+            @Override
+            public int maxX() {
+                return 0;
+            }
+
+            @Override
+            public int maxY() {
+                return 0;
+            }
+
+            @Override
+            public int maxZ() {
+                return 0;
+            }
+
+            @Override
+            public XMaterial getBlockType(int wx, int wy, int wz) {
+                return (wx == 0 && wy == 0 && wz == 0) ? material : XMaterial.AIR;
+            }
+        };
+    }
+
     @Test
     void airIsTransparent() {
         assertEquals(-1, BlockPalette.getColor(XMaterial.AIR));
@@ -88,6 +127,8 @@ class BlockPaletteTest {
         assertEquals(-1, BlockPalette.getColor(XMaterial.BARRIER));
     }
 
+    // ===== getAlpha() =====
+
     @Test
     void allMaterialsHaveColor() {
         // After initialization, no material should have NOT_MAPPED (-2)
@@ -96,8 +137,6 @@ class BlockPaletteTest {
             assertNotEquals(-2, color, "Material " + mat.name() + " has NOT_MAPPED color");
         }
     }
-
-    // ===== getAlpha() =====
 
     @Test
     void stoneIsFullyOpaque() {
@@ -138,14 +177,14 @@ class BlockPaletteTest {
         assertEquals(220, alpha);
     }
 
+    // ===== isEmissive() =====
+
     @Test
     void solidBlocksDefaultToOpaque() {
         assertEquals(255, BlockPalette.getAlpha(XMaterial.COBBLESTONE));
         assertEquals(255, BlockPalette.getAlpha(XMaterial.IRON_BLOCK));
         assertEquals(255, BlockPalette.getAlpha(XMaterial.OBSIDIAN));
     }
-
-    // ===== isEmissive() =====
 
     @Test
     void glowstoneIsEmissive() {
@@ -212,12 +251,12 @@ class BlockPaletteTest {
         assertFalse(BlockPalette.isEmissive(XMaterial.OAK_PLANKS));
     }
 
+    // ===== canMergeTranslucent() =====
+
     @Test
     void airIsNotEmissive() {
         assertFalse(BlockPalette.isEmissive(XMaterial.AIR));
     }
-
-    // ===== canMergeTranslucent() =====
 
     @Test
     void waterMergesWithWater() {
@@ -264,26 +303,25 @@ class BlockPaletteTest {
         assertTrue(BlockPalette.canMergeTranslucent(XMaterial.FROSTED_ICE, XMaterial.FROSTED_ICE));
     }
 
+    // ===== hashedFallbackColor safety (Bug fix: & 0x7FFFFFFF mask) =====
+
     @Test
     void frostedIceDoesNotMergeWithRegularIce() {
         assertFalse(BlockPalette.canMergeTranslucent(XMaterial.FROSTED_ICE, XMaterial.ICE));
     }
 
-    // ===== hashedFallbackColor safety (Bug fix: & 0x7FFFFFFF mask) =====
+    // ===== Context-sensitive getColor() =====
 
     @Test
     void getColorNeverThrowsForAnyMaterial() {
         // Exercises the hashed-fallback path for unmapped materials. Before the fix,
         // a name whose hashCode() == Integer.MIN_VALUE caused a negative array index.
-        for (XMaterial mat : XMaterial.values()) {
+        for (XMaterial mat : XMaterial.values())
             assertDoesNotThrow(
                     () -> BlockPalette.getColor(mat),
                     "getColor threw for " + mat.name()
             );
-        }
     }
-
-    // ===== Context-sensitive getColor() =====
 
     @Test
     void grassBlockTopFaceIsGreen() {
@@ -309,6 +347,8 @@ class BlockPaletteTest {
         assertEquals(0x7D8A58, color);
     }
 
+    // ===== Dye color inference =====
+
     @Test
     void grassBlockSideFaceZ() {
         SceneData scene = simpleScene(XMaterial.GRASS_BLOCK);
@@ -317,7 +357,7 @@ class BlockPaletteTest {
         assertEquals(0x7D8A58, color);
     }
 
-    // ===== Dye color inference =====
+    // ===== Color validity =====
 
     @Test
     void dyeColoredBlocksInferred() {
@@ -325,8 +365,8 @@ class BlockPaletteTest {
         String[] prefixes = {"RED_", "BLUE_", "GREEN_", "YELLOW_", "BLACK_", "WHITE_", "ORANGE_",
                 "MAGENTA_", "LIGHT_BLUE_", "LIME_", "PINK_", "GRAY_", "LIGHT_GRAY_",
                 "CYAN_", "PURPLE_", "BROWN_"};
-        for (String prefix : prefixes) {
-            // Test wool specifically
+        // Test wool specifically
+        for (String prefix : prefixes)
             try {
                 XMaterial wool = XMaterial.valueOf(prefix + "WOOL");
                 int color = BlockPalette.getColor(wool);
@@ -335,16 +375,14 @@ class BlockPaletteTest {
             } catch (IllegalArgumentException e) {
                 // Material doesn't exist, skip
             }
-        }
     }
-
-    // ===== Color validity =====
 
     @Test
     void colorChannelsInValidRange() {
         for (XMaterial mat : XMaterial.values()) {
             int color = BlockPalette.getColor(mat);
-            if (color == -1 || color == -2) continue;
+            if (color == -1 || color == -2)
+                continue;
             int r = (color >> 16) & 0xFF;
             int g = (color >> 8) & 0xFF;
             int b = color & 0xFF;
@@ -354,6 +392,8 @@ class BlockPaletteTest {
         }
     }
 
+    // ===== Specific material families =====
+
     @Test
     void alphaValuesInValidRange() {
         for (XMaterial mat : XMaterial.values()) {
@@ -361,8 +401,6 @@ class BlockPaletteTest {
             assertTrue(alpha >= 0 && alpha <= 255, "Alpha out of range for " + mat.name() + ": " + alpha);
         }
     }
-
-    // ===== Specific material families =====
 
     @Test
     void woodFamiliesHaveDistinctColors() {
@@ -403,6 +441,8 @@ class BlockPaletteTest {
         assertNotEquals(-1, BlockPalette.getColor(XMaterial.WARPED_PLANKS));
     }
 
+    // ===== BLOCK_FLAGS consistency =====
+
     @Test
     void coralBlocksHaveColors() {
         assertNotEquals(-1, BlockPalette.getColor(XMaterial.TUBE_CORAL_BLOCK));
@@ -411,8 +451,6 @@ class BlockPaletteTest {
         assertNotEquals(-1, BlockPalette.getColor(XMaterial.FIRE_CORAL_BLOCK));
         assertNotEquals(-1, BlockPalette.getColor(XMaterial.HORN_CORAL_BLOCK));
     }
-
-    // ===== BLOCK_FLAGS consistency =====
 
     @Test
     void blockFlagsAxisBlockConsistent() {
@@ -554,26 +592,12 @@ class BlockPaletteTest {
         assertTrue((BlockPalette.BLOCK_FLAGS[XMaterial.OAK_TRAPDOOR.ordinal()] & BlockPalette.FLAG_NEEDS_STATE) != 0);
     }
 
+    // ===== Helper =====
+
     @Test
     void fenceGateHasNeedsStateButNotFenceFlag() {
         int flags = BlockPalette.BLOCK_FLAGS[XMaterial.OAK_FENCE_GATE.ordinal()];
         assertTrue((flags & BlockPalette.FLAG_NEEDS_STATE) != 0, "Fence gate should have FLAG_NEEDS_STATE");
         assertEquals(0, flags & BlockPalette.FLAG_FENCE, "Fence gate should NOT have FLAG_FENCE");
-    }
-
-    // ===== Helper =====
-
-    private static SceneData simpleScene(final XMaterial material) {
-        return new SceneData() {
-            @Override public int minX() { return 0; }
-            @Override public int minY() { return 0; }
-            @Override public int minZ() { return 0; }
-            @Override public int maxX() { return 0; }
-            @Override public int maxY() { return 0; }
-            @Override public int maxZ() { return 0; }
-            @Override public XMaterial getBlockType(int wx, int wy, int wz) {
-                return (wx == 0 && wy == 0 && wz == 0) ? material : XMaterial.AIR;
-            }
-        };
     }
 }

@@ -8,7 +8,7 @@ commands:
   bbai:
     description: Show BuildBattleAI plugin status
     usage: /bbai [demo <all|chat|rich|bar|title|tab|listname|reset>]
-    aliases: [buildbattleai]
+    aliases: [ buildbattleai ]
   shot:
     description: Render a screenshot of the build area
     usage: /shot <fileName>

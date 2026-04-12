@@ -5,8 +5,8 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSe
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSetTitleText;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSetTitleTimes;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTitle;
-import net.kyori.adventure.text.Component;
 import lombok.NonNull;
+import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.util.MessageUtils;
@@ -25,7 +25,9 @@ public class TitleService {
 
     private final BuildBattleAI plugin;
 
-    /** Version-resolved sender for title/subtitle packets. */
+    /**
+     * Version-resolved sender for title/subtitle packets.
+     */
     private final TitleSender titleSender;
 
     /**
@@ -66,9 +68,8 @@ public class TitleService {
      * @param fadeOut    fade-out duration in ticks
      */
     public void sendTitle(@NonNull Collection<? extends Player> recipients, String title, String subtitle, int fadeIn, int stay, int fadeOut) {
-        for (Player recipient : recipients) {
+        for (Player recipient : recipients)
             sendTitleSequence(recipient, title, subtitle, fadeIn, stay, fadeOut);
-        }
     }
 
     // ── version-resolved factory ────────────────────────────────────────────
@@ -81,7 +82,7 @@ public class TitleService {
      * </ul>
      */
     private TitleSender resolveTitleSender(ServerVersion version) {
-        if (version.isNewerThanOrEquals(ServerVersion.V_1_17)) {
+        if (version.isNewerThanOrEquals(ServerVersion.V_1_17))
             return (player, title, subtitle, fadeIn, stay, fadeOut) -> {
                 plugin.getContext().sendPacket(player, new WrapperPlayServerSetTitleTimes(fadeIn, stay, fadeOut));
                 if (title != null)
@@ -89,7 +90,6 @@ public class TitleService {
                 if (subtitle != null)
                     plugin.getContext().sendPacket(player, new WrapperPlayServerSetTitleSubtitle(subtitle));
             };
-        }
         return (player, title, subtitle, fadeIn, stay, fadeOut) -> {
             plugin.getContext().sendPacket(player, new WrapperPlayServerTitle(
                     WrapperPlayServerTitle.TitleAction.SET_TIMES_AND_DISPLAY,
@@ -100,7 +100,7 @@ public class TitleService {
                     stay,
                     fadeOut
             ));
-            if (title != null) {
+            if (title != null)
                 plugin.getContext().sendPacket(player, new WrapperPlayServerTitle(
                         WrapperPlayServerTitle.TitleAction.SET_TITLE,
                         title,
@@ -109,8 +109,7 @@ public class TitleService {
                         0,
                         0,
                         0));
-            }
-            if (subtitle != null) {
+            if (subtitle != null)
                 plugin.getContext().sendPacket(player, new WrapperPlayServerTitle(
                         WrapperPlayServerTitle.TitleAction.SET_SUBTITLE,
                         null,
@@ -120,7 +119,6 @@ public class TitleService {
                         0,
                         0
                 ));
-            }
         };
     }
 

@@ -18,7 +18,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Accessors(fluent = true)
 public class BlockRenderState {
 
-    /** Default state used when no block state string is available. */
+    /**
+     * Default state used when no block state string is available.
+     */
     public static final BlockRenderState DEFAULT = new BlockRenderState(
             "north",
             "y",
@@ -29,29 +31,46 @@ public class BlockRenderState {
             1,
             0
     );
-
+    /**
+     * Maximum cache size before eviction. Generous for steady-state working sets
+     * (a typical build scene uses a few hundred unique block states) but prevents
+     * unbounded growth on long-running servers. Clearing is safe — entries are purely
+     * a performance optimization and will be recomputed on next access.
+     */
+    static final int MAX_CACHE_SIZE = 1024;
     /**
      * Thread-safe cache keyed by raw block state strings.
      * Volatile so that atomic swap (for eviction) is visible to all render threads.
      */
     private static volatile Map<String, BlockRenderState> CACHE = new ConcurrentHashMap<String, BlockRenderState>();
-
-    /** Horizontal direction the block faces (north/south/east/west). */
+    /**
+     * Horizontal direction the block faces (north/south/east/west).
+     */
     String facing;
-    /** Orientation axis for logs, pillars, and chains (x/y/z). */
+    /**
+     * Orientation axis for logs, pillars, and chains (x/y/z).
+     */
     String axis;
-    /** Slab type: "bottom", "top", or "double". */
+    /**
+     * Slab type: "bottom", "top", or "double".
+     */
     String type;
-    /** Vertical half for stairs and trapdoors: "bottom" or "top". */
+    /**
+     * Vertical half for stairs and trapdoors: "bottom" or "top".
+     */
     String half;
-    /** Stair shape variant: "straight", "inner_left", etc. */
+    /**
+     * Stair shape variant: "straight", "inner_left", etc.
+     */
     String shape;
-    /** Whether trapdoors and fence gates are in the open position. */
+    /**
+     * Whether trapdoors and fence gates are in the open position.
+     */
     boolean open;
-    /** Number of snow layers (1–8). */
+    /**
+     * Number of snow layers (1–8).
+     */
     int layers;
-    /** Rotation value for standing signs (0–15). */
-    int rotation;
 
     /**
      * Retrieves or parses the block render state at the given world coordinates.
@@ -64,41 +83,41 @@ public class BlockRenderState {
      * @return the parsed render state, never {@code null}
      */
     /**
-     * Maximum cache size before eviction. Generous for steady-state working sets
-     * (a typical build scene uses a few hundred unique block states) but prevents
-     * unbounded growth on long-running servers. Clearing is safe — entries are purely
-     * a performance optimization and will be recomputed on next access.
+     * Rotation value for standing signs (0–15).
      */
-    static final int MAX_CACHE_SIZE = 1024;
+    int rotation;
 
     public static BlockRenderState of(SceneData scene, int x, int y, int z) {
         String blockState = scene.getBlockState(x, y, z);
-        if (blockState == null || blockState.isEmpty()) {
+        if (blockState == null || blockState.isEmpty())
             return DEFAULT;
-        }
         BlockRenderState cached = CACHE.get(blockState);
-        if (cached != null) {
+        if (cached != null)
             return cached;
-        }
-        if (CACHE.size() > MAX_CACHE_SIZE) {
+        if (CACHE.size() > MAX_CACHE_SIZE)
             CACHE = new ConcurrentHashMap<String, BlockRenderState>();
-        }
         BlockRenderState parsed = parse(blockState);
         CACHE.put(blockState, parsed);
         return parsed;
     }
 
-    /** Returns the current number of cached entries. Package-visible for testing. */
+    /**
+     * Returns the current number of cached entries. Package-visible for testing.
+     */
     static int cacheSize() {
         return CACHE.size();
     }
 
-    /** Replaces the cache with a fresh empty map. Package-visible for testing. */
+    /**
+     * Replaces the cache with a fresh empty map. Package-visible for testing.
+     */
     static void clearCache() {
         CACHE = new ConcurrentHashMap<String, BlockRenderState>();
     }
 
-    /** Parses all render-relevant properties from a raw block state string. */
+    /**
+     * Parses all render-relevant properties from a raw block state string.
+     */
     private static BlockRenderState parse(String blockState) {
         String facing = property(blockState, "facing", "north");
         String axis = property(blockState, "axis", "y");
@@ -118,28 +137,26 @@ public class BlockRenderState {
      */
     private static String property(String blockState, String key, String fallback) {
         int stateStart = blockState.indexOf('[');
-        if (stateStart < 0) {
+        if (stateStart < 0)
             return fallback;
-        }
 
         String needle = key + "=";
         int valueStart = blockState.indexOf(needle, stateStart);
-        if (valueStart < 0) {
+        if (valueStart < 0)
             return fallback;
-        }
         valueStart += needle.length();
 
         int valueEnd = blockState.indexOf(',', valueStart);
-        if (valueEnd < 0) {
+        if (valueEnd < 0)
             valueEnd = blockState.indexOf(']', valueStart);
-        }
-        if (valueEnd < 0 || valueEnd <= valueStart) {
+        if (valueEnd < 0 || valueEnd <= valueStart)
             return fallback;
-        }
         return blockState.substring(valueStart, valueEnd);
     }
 
-    /** Parses an integer value, returning the fallback on parse failure. */
+    /**
+     * Parses an integer value, returning the fallback on parse failure.
+     */
     private static int parseInt(String value, int fallback) {
         try {
             return Integer.parseInt(value);
