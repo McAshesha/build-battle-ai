@@ -7,6 +7,8 @@ import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.util.MessageUtils;
 
+import java.util.Collection;
+
 /**
  * Sub-service responsible for sending player list (tab) header and footer via packets.
  */
@@ -27,5 +29,22 @@ public class TabService {
                 MessageUtils.toComponent(header),
                 MessageUtils.toComponent(footer)
         ));
+    }
+
+    /**
+     * Sets the player list (tab) header and footer for multiple players.
+     *
+     * @param recipients the target players
+     * @param header     the header text (supports {@code &} color codes and {@code \n})
+     * @param footer     the footer text (supports {@code &} color codes and {@code \n})
+     */
+    public void sendTab(@NonNull Collection<? extends Player> recipients, String header, String footer) {
+        WrapperPlayServerPlayerListHeaderAndFooter packet = new WrapperPlayServerPlayerListHeaderAndFooter(
+                MessageUtils.toComponent(header),
+                MessageUtils.toComponent(footer)
+        );
+        for (Player recipient : recipients) {
+            plugin.getContext().sendPacket(recipient, packet);
+        }
     }
 }

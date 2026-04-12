@@ -101,6 +101,25 @@ public interface BBAIMessageService {
     void sendTab(@NonNull Player recipient, String header, String footer);
 
     /**
+     * Sets the player list (tab) header and footer for multiple players.
+     *
+     * @param recipients the target players
+     * @param header     the header text (supports {@code &} color codes and {@code \n})
+     * @param footer     the footer text (supports {@code &} color codes and {@code \n})
+     */
+    void sendTab(@NonNull Collection<? extends Player> recipients, String header, String footer);
+
+    /**
+     * Updates a player's display name in the player list (tab) for a single viewer.
+     *
+     * @param target         the player whose list name to change
+     * @param playerListName the new display name (supports {@code &} color codes),
+     *                       or {@code null} to reset to the default name
+     * @param viewer         the player who will see the updated name
+     */
+    void sendPlayerListName(@NonNull Player target, String playerListName, @NonNull Player viewer);
+
+    /**
      * Updates a player's display name in the player list (tab) for the specified viewers.
      *
      * @param target         the player whose list name to change

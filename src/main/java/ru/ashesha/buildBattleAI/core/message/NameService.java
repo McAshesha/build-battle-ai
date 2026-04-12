@@ -44,6 +44,19 @@ public class NameService {
     // ── public API ──────────────────────────────────────────────────────────
 
     /**
+     * Updates a player's display name in the player list (tab) for a single viewer.
+     *
+     * @param target         the player whose list name to change
+     * @param playerListName the new display name (supports {@code &} color codes),
+     *                       or {@code null} to reset to the default name
+     * @param viewer         the player who will see the updated name
+     */
+    public void sendPlayerListName(@NonNull Player target, String playerListName, @NonNull Player viewer) {
+        Component displayName = MessageUtils.toComponent(playerListName);
+        plugin.getContext().sendPacket(viewer, createPlayerListNamePacket(target, displayName));
+    }
+
+    /**
      * Updates a player's display name in the player list (tab) for the specified viewers.
      *
      * @param target         the player whose list name to change
