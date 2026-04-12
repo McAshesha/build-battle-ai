@@ -2,10 +2,7 @@ package ru.ashesha.buildBattleAI.commands.base;
 
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabCompleter;
+import org.bukkit.command.*;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 
 import java.util.List;
@@ -20,7 +17,7 @@ import java.util.List;
  * Commands must also be declared in {@code plugin.yml} for Bukkit registration to succeed.
  */
 @RequiredArgsConstructor
-public abstract class PluginCommand implements CommandExecutor, TabCompleter {
+public abstract class PluginCommand implements TabExecutor {
 
     /** Reference to the plugin instance for accessing managers and server API. */
     @NonNull protected final BuildBattleAI plugin;
