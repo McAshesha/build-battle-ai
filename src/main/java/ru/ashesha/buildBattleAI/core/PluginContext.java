@@ -12,6 +12,8 @@ import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.ArenaManager;
 import ru.ashesha.buildBattleAI.core.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.game.GameManager;
+import ru.ashesha.buildBattleAI.commands.TestNPCCommand;
+import ru.ashesha.buildBattleAI.core.api.BBAINPCService;
 import ru.ashesha.buildBattleAI.render.CpuRenderer;
 
 /**
@@ -22,6 +24,7 @@ import ru.ashesha.buildBattleAI.render.CpuRenderer;
  *     <li>Arena manager — loads arena definitions</li>
  *     <li>Game manager — prepares game session handling</li>
  *     <li>Message service — resolves version-dependent packet factories</li>
+ *     <li>NPC service — resolves version-dependent NPC packet factories</li>
  *     <li>Commands and listeners — registered last, after all services are ready</li>
  * </ol>
  * Shutdown occurs in reverse dependency order (game manager before arena manager).
@@ -38,6 +41,8 @@ public class PluginContext {
     private GameManager gameManager;
     @Getter
     private BBAIMessageService messageService;
+    @Getter
+    private BBAINPCService npcService;
 
     /**
      * Initializes all plugin subsystems, registers commands and event listeners.
@@ -49,8 +54,10 @@ public class PluginContext {
         gameManager = new GameManager(plugin);
 
         messageService = new MessageService(plugin);
+        npcService = new NPCService(plugin);
 
-        // TODO: register commands and listeners here
+        // Register commands
+        new TestNPCCommand(plugin).register();
     }
 
     /**
@@ -58,6 +65,7 @@ public class PluginContext {
      * Called from {@link BuildBattleAI#onDisable()}.
      */
     public void disable() {
+        npcService.shutdown();
         gameManager.shutdown();
         arenaManager.shutdown();
         CpuRenderer.shutdown();

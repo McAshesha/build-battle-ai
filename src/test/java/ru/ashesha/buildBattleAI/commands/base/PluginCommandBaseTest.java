@@ -1,5 +1,6 @@
 package ru.ashesha.buildBattleAI.commands.base;
 
+import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,19 +63,19 @@ class PluginCommandBaseTest {
 
     @Test
     void onCommandDelegatesToExecuteAndReturnsTrue() {
-        boolean result = command.onCommand(mock(CommandSender.class), null, "test", new String[]{"a", "b"});
+        boolean result = command.onCommand(mock(CommandSender.class), mock(Command.class), "test", new String[]{"a", "b"});
         assertTrue(result);
         assertTrue(command.executed);
     }
 
     @Test
     void onCommandAlwaysReturnsTrueRegardlessOfExecution() {
-        assertTrue(command.onCommand(mock(CommandSender.class), null, "test", new String[0]));
+        assertTrue(command.onCommand(mock(CommandSender.class), mock(Command.class), "test", new String[0]));
     }
 
     @Test
     void onTabCompleteDelegatesToSuggest() {
-        List<String> result = command.onTabComplete(mock(CommandSender.class), null, "test", new String[]{"x"});
+        List<String> result = command.onTabComplete(mock(CommandSender.class), mock(Command.class), "test", new String[]{"x"});
         assertTrue(result.isEmpty());
         assertTrue(command.suggested);
     }
@@ -82,7 +83,7 @@ class PluginCommandBaseTest {
     @Test
     void executeReceivesCorrectArgs() {
         CommandSender sender = mock(CommandSender.class);
-        command.onCommand(sender, null, "test", new String[]{"arg1", "arg2"});
+        command.onCommand(sender, mock(Command.class), "test", new String[]{"arg1", "arg2"});
         assertArrayEquals(new String[]{"arg1", "arg2"}, command.lastArgs);
     }
 
