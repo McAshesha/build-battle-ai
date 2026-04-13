@@ -8,3 +8,6 @@ commands:
   testnpc:
     description: Test command for NPC spawning and despawning
     usage: /testnpc [skinName|remove <id>]
+  testml:
+    description: Test ML classification pipeline (render + predict)
+    usage: /testml

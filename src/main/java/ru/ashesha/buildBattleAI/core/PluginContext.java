@@ -10,8 +10,10 @@ import lombok.RequiredArgsConstructor;
 import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.ArenaManager;
+import ru.ashesha.buildBattleAI.core.api.BBAIMLService;
 import ru.ashesha.buildBattleAI.core.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.game.GameManager;
+import ru.ashesha.buildBattleAI.commands.TestMLCommand;
 import ru.ashesha.buildBattleAI.commands.TestNPCCommand;
 import ru.ashesha.buildBattleAI.core.api.BBAINPCService;
 import ru.ashesha.buildBattleAI.render.CpuRenderer;
@@ -25,6 +27,7 @@ import ru.ashesha.buildBattleAI.render.CpuRenderer;
  *     <li>Game manager — prepares game session handling</li>
  *     <li>Message service — resolves version-dependent packet factories</li>
  *     <li>NPC service — resolves version-dependent NPC packet factories</li>
+ *     <li>ML service — REST proxy to the ML classification microservice</li>
  *     <li>Commands and listeners — registered last, after all services are ready</li>
  * </ol>
  * Shutdown occurs in reverse dependency order (game manager before arena manager).
@@ -43,6 +46,8 @@ public class PluginContext {
     private BBAIMessageService messageService;
     @Getter
     private BBAINPCService npcService;
+    @Getter
+    private BBAIMLService mlService;
 
     /**
      * Initializes all plugin subsystems, registers commands and event listeners.
@@ -55,9 +60,11 @@ public class PluginContext {
 
         messageService = new MessageService(plugin);
         npcService = new NPCService(plugin);
+        mlService = new MLService(plugin);
 
         // Register commands
         new TestNPCCommand(plugin).register();
+        new TestMLCommand(plugin).register();
     }
 
     /**
@@ -65,6 +72,7 @@ public class PluginContext {
      * Called from {@link BuildBattleAI#onDisable()}.
      */
     public void disable() {
+        mlService.shutdown();
         npcService.shutdown();
         gameManager.shutdown();
         arenaManager.shutdown();
