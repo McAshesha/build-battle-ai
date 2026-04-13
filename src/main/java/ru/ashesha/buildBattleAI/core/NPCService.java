@@ -152,6 +152,7 @@ public class NPCService implements BBAINPCService {
         spawn(Collections.singletonList(viewer), npc, location);
     }
 
+    @SuppressWarnings({"rawtypes", "unchecked"})
     @Override
     public void spawn(@NonNull Collection<Player> viewers, @NonNull NPC npc, @NonNull Location location) {
         if (viewers.isEmpty()) return;
@@ -187,10 +188,9 @@ public class NPCService implements BBAINPCService {
         //    Async is safe here because PacketEvents packet sending is thread-safe.
         PacketWrapper<?> infoRemove = playerInfoRemoveFactory.create(profile);
         plugin.getServer().getScheduler().runTaskLaterAsynchronously(plugin, () -> {
-            for (Player viewer : viewers) {
+            for (Player viewer : viewers)
                 if (viewer.isOnline())
                     plugin.getContext().sendPacket(viewer, infoRemove);
-            }
         }, 20L);
     }
 
@@ -290,7 +290,7 @@ public class NPCService implements BBAINPCService {
     @Override
     public void shutdown() {
         // Scheduled tab-removal tasks are bound to the plugin's BukkitScheduler
-        // and are cancelled automatically when the plugin is disabled.
+        // and are canceled automatically when the plugin is disabled.
     }
 
     // ── internal helpers ────────────────────────────────────────────────────
@@ -341,9 +341,8 @@ public class NPCService implements BBAINPCService {
             conn.setConnectTimeout(5000);
             conn.setReadTimeout(5000);
 
-            if (conn.getResponseCode() != 200) {
+            if (conn.getResponseCode() != 200)
                 throw new IllegalArgumentException("Player not found: " + name);
-            }
 
             //noinspection deprecation — instance parse() is required for Gson 2.2.4 (Spigot 1.8)
             JsonObject nameResponse = new JsonParser()
@@ -359,9 +358,8 @@ public class NPCService implements BBAINPCService {
             conn.setConnectTimeout(5000);
             conn.setReadTimeout(5000);
 
-            if (conn.getResponseCode() != 200) {
+            if (conn.getResponseCode() != 200)
                 throw new RuntimeException("Failed to fetch profile for UUID: " + uuid);
-            }
 
             //noinspection deprecation
             JsonObject profileResponse = new JsonParser()
@@ -373,17 +371,14 @@ public class NPCService implements BBAINPCService {
             // Find the "textures" property containing the skin data
             for (int i = 0; i < properties.size(); i++) {
                 JsonObject prop = properties.get(i).getAsJsonObject();
-                if ("textures".equals(prop.get("name").getAsString())) {
+                if ("textures".equals(prop.get("name").getAsString()))
                     return new String[]{
                             prop.get("value").getAsString(),
                             prop.get("signature").getAsString()
                     };
-                }
             }
 
             throw new RuntimeException("No textures property found for player: " + name);
-        } catch (IllegalArgumentException e) {
-            throw e;
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
