@@ -16,6 +16,8 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDe
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityEquipment;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityHeadLook;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityRelativeMoveAndRotation;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerInfo;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerInfoRemove;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerInfoUpdate;
@@ -39,9 +41,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -108,19 +108,19 @@ public class NPCService implements BBAINPCService {
 
     @Override
     @NonNull
-    public NPC createNPC(@NonNull String name, @NonNull Location location,
+    public NPC createNPC(@NonNull String name,
                          @NonNull String texture, @NonNull String signature) {
         int entityId = entityIdCounter.getAndIncrement();
         UserProfile profile = new UserProfile(UUID.randomUUID(), name);
         profile.setTextureProperties(Collections.singletonList(
                 new TextureProperty("textures", texture, signature)
         ));
-        return new NPC(entityId, profile, location.clone());
+        return new NPC(entityId, profile);
     }
 
     @Override
     @NonNull
-    public NPC createNPC(@NonNull Player skinSource, @NonNull String name, @NonNull Location location) {
+    public NPC createNPC(@NonNull Player skinSource, @NonNull String name) {
         int entityId = entityIdCounter.getAndIncrement();
         UserProfile sourceProfile = plugin.getContext().getUserProfile(skinSource);
 
@@ -137,26 +137,25 @@ public class NPCService implements BBAINPCService {
 
         UserProfile npcProfile = new UserProfile(UUID.randomUUID(), name);
         npcProfile.setTextureProperties(textures);
-        return new NPC(entityId, npcProfile, location.clone());
+        return new NPC(entityId, npcProfile);
     }
 
     @Override
     @NonNull
-    public NPC createNPC(@NonNull String skinName, @NonNull String name, @NonNull Location location) {
+    public NPC createNPC(@NonNull String skinName, @NonNull String name) {
         String[] skin = fetchSkinByName(skinName);
-        return createNPC(name, location, skin[0], skin[1]);
+        return createNPC(name, skin[0], skin[1]);
     }
 
     @Override
-    public void spawn(@NonNull Player viewer, @NonNull NPC npc) {
-        spawn(Collections.singletonList(viewer), npc);
+    public void spawn(@NonNull Player viewer, @NonNull NPC npc, @NonNull Location location) {
+        spawn(Collections.singletonList(viewer), npc, location);
     }
 
     @Override
-    public void spawn(@NonNull Collection<Player> viewers, @NonNull NPC npc) {
+    public void spawn(@NonNull Collection<Player> viewers, @NonNull NPC npc, @NonNull Location location) {
         if (viewers.isEmpty()) return;
 
-        Location loc = npc.location;
         UserProfile profile = npc.profile;
         int entityId = npc.entityId;
 
@@ -165,8 +164,8 @@ public class NPCService implements BBAINPCService {
         for (Player viewer : viewers)
             plugin.getContext().sendPacket(viewer, infoAdd);
 
-        // 2. Spawn the player entity at the NPC location
-        PacketWrapper<?> spawn = spawnFactory.create(entityId, profile.getUUID(), loc);
+        // 2. Spawn the player entity at the given location
+        PacketWrapper<?> spawn = spawnFactory.create(entityId, profile.getUUID(), location);
         for (Player viewer : viewers)
             plugin.getContext().sendPacket(viewer, spawn);
 
@@ -178,17 +177,12 @@ public class NPCService implements BBAINPCService {
         for (Player viewer : viewers)
             plugin.getContext().sendPacket(viewer, metadata);
 
-        // 4. Set head rotation to match the NPC's yaw
-        WrapperPlayServerEntityHeadLook headLook = new WrapperPlayServerEntityHeadLook(entityId, loc.getYaw());
+        // 4. Set head rotation to match the spawn yaw
+        WrapperPlayServerEntityHeadLook headLook = new WrapperPlayServerEntityHeadLook(entityId, location.getYaw());
         for (Player viewer : viewers)
             plugin.getContext().sendPacket(viewer, headLook);
 
-        // 5. Send stored equipment so newly spawned viewers see the current gear
-        for (Map.Entry<EquipmentSlot, ItemStack> entry : npc.equipment.entrySet()) {
-            sendEquipmentPacket(viewers, npc, entry.getKey(), entry.getValue());
-        }
-
-        // 6. Remove the NPC from the tab list after 20 ticks (1 second) —
+        // 5. Remove the NPC from the tab list after 20 ticks (1 second) —
         //    gives the client time to download the skin before we clean up the tab entry.
         //    Async is safe here because PacketEvents packet sending is thread-safe.
         PacketWrapper<?> infoRemove = playerInfoRemoveFactory.create(profile);
@@ -215,6 +209,72 @@ public class NPCService implements BBAINPCService {
     }
 
     @Override
+    public void teleport(@NonNull Player viewer, @NonNull NPC npc, @NonNull Location destination) {
+        teleport(Collections.singletonList(viewer), npc, destination);
+    }
+
+    @Override
+    public void teleport(@NonNull Collection<Player> viewers, @NonNull NPC npc,
+                         @NonNull Location destination) {
+        if (viewers.isEmpty()) return;
+
+        int entityId = npc.entityId;
+
+        // Send absolute-position teleport packet
+        WrapperPlayServerEntityTeleport teleportPacket = new WrapperPlayServerEntityTeleport(
+                entityId,
+                new Vector3d(destination.getX(), destination.getY(), destination.getZ()),
+                destination.getYaw(), destination.getPitch(), true
+        );
+        for (Player viewer : viewers)
+            plugin.getContext().sendPacket(viewer, teleportPacket);
+
+        // Update head rotation to match the new facing direction
+        WrapperPlayServerEntityHeadLook headLook =
+                new WrapperPlayServerEntityHeadLook(entityId, destination.getYaw());
+        for (Player viewer : viewers)
+            plugin.getContext().sendPacket(viewer, headLook);
+    }
+
+    @Override
+    public void move(@NonNull Player viewer, @NonNull NPC npc,
+                     @NonNull Location from, @NonNull Location to) {
+        move(Collections.singletonList(viewer), npc, from, to);
+    }
+
+    @Override
+    public void move(@NonNull Collection<Player> viewers, @NonNull NPC npc,
+                     @NonNull Location from, @NonNull Location to) {
+        if (viewers.isEmpty()) return;
+
+        double dx = to.getX() - from.getX();
+        double dy = to.getY() - from.getY();
+        double dz = to.getZ() - from.getZ();
+
+        // Fall back to teleport if delta exceeds the relative-move limit of 8 blocks
+        if (Math.abs(dx) > 8 || Math.abs(dy) > 8 || Math.abs(dz) > 8) {
+            teleport(viewers, npc, to);
+            return;
+        }
+
+        int entityId = npc.entityId;
+
+        // Send relative-move-and-rotation packet
+        WrapperPlayServerEntityRelativeMoveAndRotation movePacket =
+                new WrapperPlayServerEntityRelativeMoveAndRotation(
+                        entityId, dx, dy, dz, to.getYaw(), to.getPitch(), true
+                );
+        for (Player viewer : viewers)
+            plugin.getContext().sendPacket(viewer, movePacket);
+
+        // Update head rotation to match the new facing direction
+        WrapperPlayServerEntityHeadLook headLook =
+                new WrapperPlayServerEntityHeadLook(entityId, to.getYaw());
+        for (Player viewer : viewers)
+            plugin.getContext().sendPacket(viewer, headLook);
+    }
+
+    @Override
     public void setEquipment(@NonNull Player viewer, @NonNull NPC npc,
                              @NonNull EquipmentSlot slot, ItemStack item) {
         setEquipment(Collections.singletonList(viewer), npc, slot, item);
@@ -224,14 +284,6 @@ public class NPCService implements BBAINPCService {
     public void setEquipment(@NonNull Collection<Player> viewers, @NonNull NPC npc,
                              @NonNull EquipmentSlot slot, ItemStack item) {
         if (viewers.isEmpty()) return;
-
-        // Update the NPC's stored equipment state
-        if (item == null) {
-            npc.equipment.remove(slot);
-        } else {
-            npc.equipment.put(slot, item.clone());
-        }
-
         sendEquipmentPacket(viewers, npc, slot, item);
     }
 
@@ -489,11 +541,8 @@ public class NPCService implements BBAINPCService {
      * Packet-based fake-player NPC.
      * <p>
      * NPCs exist only in clients' rendering — they are not real server entities.
-     * The server never tracks these entities; all visibility is controlled via
-     * player-info, spawn, metadata, and destroy packets sent per-viewer.
-     * <p>
-     * Equipment is stored internally and sent automatically when the NPC
-     * is spawned for new viewers via {@link NPCService#spawn}.
+     * The server never tracks these entities; all visibility, position, and equipment
+     * state is managed by the caller and communicated via packets sent per-viewer.
      * <p>
      * Create instances via the {@link BBAINPCService} create methods.
      */
@@ -509,30 +558,14 @@ public class NPCService implements BBAINPCService {
         private final UserProfile profile;
 
         /**
-         * The world position and facing direction (yaw/pitch) of this NPC.
-         * Stored as a defensive copy — mutations to the original location
-         * do not affect the NPC.
-         */
-        private final Location location;
-
-        /**
-         * Equipment currently displayed on this NPC, keyed by slot.
-         * Updated via {@link NPCService#setEquipment} and sent automatically
-         * during {@link NPCService#spawn}.
-         */
-        private final Map<EquipmentSlot, ItemStack> equipment = new HashMap<>();
-
-        /**
          * Package-private constructor — instances are created by {@link NPCService}.
          *
          * @param entityId the synthetic entity ID
          * @param profile  the user profile with skin textures
-         * @param location the world position (already cloned by the caller)
          */
-        NPC(int entityId, UserProfile profile, Location location) {
+        NPC(int entityId, UserProfile profile) {
             this.entityId = entityId;
             this.profile = profile;
-            this.location = location;
         }
 
         /**
@@ -542,31 +575,6 @@ public class NPCService implements BBAINPCService {
          */
         public int getId() {
             return entityId;
-        }
-
-        /**
-         * Returns a defensive copy of the NPC's world position and facing direction.
-         * <p>
-         * The returned {@link Location} is a clone — mutations do not affect
-         * the NPC's actual position.
-         *
-         * @return a cloned copy of the NPC's location
-         */
-        public Location getLocation() {
-            return location.clone();
-        }
-
-        /**
-         * Returns an unmodifiable view of the NPC's current equipment.
-         * <p>
-         * The map is keyed by {@link EquipmentSlot} and contains the Bukkit
-         * {@link ItemStack} displayed in each slot. Empty slots are absent
-         * from the map.
-         *
-         * @return unmodifiable map of the NPC's equipment
-         */
-        public Map<EquipmentSlot, ItemStack> getEquipment() {
-            return Collections.unmodifiableMap(equipment);
         }
     }
 }

@@ -10,6 +10,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.scheduler.BukkitTask;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.commands.base.PluginCommand;
 import ru.ashesha.buildBattleAI.core.NPCService;
@@ -45,6 +46,9 @@ public class TestNPCCommand extends PluginCommand {
     /** Tracks NPCs spawned via this command, keyed by entity ID for despawn lookup. */
     private final Map<Integer, NPCService.NPC> spawnedNPCs = new HashMap<>();
 
+    /** Active follow tasks, keyed by NPC entity ID. */
+    private final Map<Integer, BukkitTask> followTasks = new HashMap<>();
+
     /** Whether the server supports off-hand equipment (1.9+). */
     private final boolean offHandSupported;
 
@@ -74,6 +78,18 @@ public class TestNPCCommand extends PluginCommand {
             return;
         }
 
+        // /testnpc follow <id>
+        if (args.length >= 1 && "follow".equalsIgnoreCase(args[0])) {
+            handleFollow(player, npcService, args);
+            return;
+        }
+
+        // /testnpc stop <id>
+        if (args.length >= 1 && "stop".equalsIgnoreCase(args[0])) {
+            handleStop(player, args);
+            return;
+        }
+
         // Capture mutable state on the main thread before going async
         Location loc = player.getLocation();
         ItemStack[] equipment = captureEquipment(player);
@@ -84,8 +100,8 @@ public class TestNPCCommand extends PluginCommand {
             // doesn't expose the player's skin textures)
             Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
                 try {
-                    NPCService.NPC npc = npcService.createNPC(player, "", loc);
-                    npcService.spawn(player, npc);
+                    NPCService.NPC npc = npcService.createNPC(player, "");
+                    npcService.spawn(player, npc, loc);
                     applyEquipment(player, npc, npcService, equipment);
                     spawnedNPCs.put(npc.getId(), npc);
                     player.sendMessage("§aSpawned NPC with ID §e" + npc.getId() + " §a(your skin)");
@@ -102,8 +118,8 @@ public class TestNPCCommand extends PluginCommand {
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
-                NPCService.NPC npc = npcService.createNPC(skinName, "", loc);
-                npcService.spawn(player, npc);
+                NPCService.NPC npc = npcService.createNPC(skinName, "");
+                npcService.spawn(player, npc, loc);
                 applyEquipment(player, npc, npcService, equipment);
 
                 spawnedNPCs.put(npc.getId(), npc);
@@ -135,8 +151,119 @@ public class TestNPCCommand extends PluginCommand {
             player.sendMessage("§cNPC with ID " + id + " not found.");
             return;
         }
+        // Cancel follow task if active
+        BukkitTask task = followTasks.remove(id);
+        if (task != null) task.cancel();
         npcService.despawn(player, npc);
         player.sendMessage("§aDespawned NPC with ID §e" + id);
+    }
+
+    /**
+     * Handles the {@code /testnpc follow <id>} subcommand.
+     * Starts an async repeating task that moves the NPC toward the player
+     * every tick, maintaining a 2-block following distance.
+     */
+    private void handleFollow(Player player, BBAINPCService npcService, String[] args) {
+        if (args.length < 2) {
+            player.sendMessage("§cUsage: /testnpc follow <id>");
+            return;
+        }
+        int id;
+        try {
+            id = Integer.parseInt(args[1]);
+        } catch (NumberFormatException e) {
+            player.sendMessage("§cInvalid ID: " + args[1]);
+            return;
+        }
+        NPCService.NPC npc = spawnedNPCs.get(id);
+        if (npc == null) {
+            player.sendMessage("§cNPC with ID " + id + " not found.");
+            return;
+        }
+
+        // Cancel existing follow task for this NPC if any
+        BukkitTask existing = followTasks.remove(id);
+        if (existing != null) existing.cancel();
+
+        // Initialize NPC position: 2 blocks behind the player
+        Location playerLoc = player.getLocation();
+        double yawRad = Math.toRadians(playerLoc.getYaw());
+        Location startLoc = new Location(
+                playerLoc.getWorld(),
+                playerLoc.getX() + Math.sin(yawRad) * 2,
+                playerLoc.getY(),
+                playerLoc.getZ() - Math.cos(yawRad) * 2,
+                playerLoc.getYaw(), 0
+        );
+        npcService.teleport(player, npc, startLoc);
+
+        // Mutable position tracker for the async task
+        final double[] npcPos = {startLoc.getX(), startLoc.getY(), startLoc.getZ()};
+
+        BukkitTask task = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
+            if (!player.isOnline()) {
+                BukkitTask t = followTasks.remove(id);
+                if (t != null) t.cancel();
+                return;
+            }
+
+            Location pLoc = player.getLocation();
+            double dx = pLoc.getX() - npcPos[0];
+            double dy = pLoc.getY() - npcPos[1];
+            double dz = pLoc.getZ() - npcPos[2];
+            double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+            // Close enough — don't move
+            if (dist <= 2.0) return;
+
+            // Move toward player at ~0.28 blocks/tick (sprinting speed),
+            // but cap so the NPC stops 2 blocks away
+            double speed = Math.min(0.28, dist - 2.0);
+            double mx = (dx / dist) * speed;
+            double my = (dy / dist) * speed;
+            double mz = (dz / dist) * speed;
+
+            // Yaw facing the movement direction (toward the player)
+            float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+
+            Location from = new Location(pLoc.getWorld(), npcPos[0], npcPos[1], npcPos[2]);
+            Location to = new Location(pLoc.getWorld(),
+                    npcPos[0] + mx, npcPos[1] + my, npcPos[2] + mz, yaw, 0);
+
+            npcService.move(player, npc, from, to);
+
+            npcPos[0] += mx;
+            npcPos[1] += my;
+            npcPos[2] += mz;
+        }, 0L, 1L);
+
+        followTasks.put(id, task);
+        player.sendMessage("§aNPC §e" + id + " §ais now following you.");
+    }
+
+    /**
+     * Handles the {@code /testnpc stop <id>} subcommand.
+     * Cancels the follow task for the specified NPC.
+     */
+    private void handleStop(Player player, String[] args) {
+        if (args.length < 2) {
+            player.sendMessage("§cUsage: /testnpc stop <id>");
+            return;
+        }
+        int id;
+        try {
+            id = Integer.parseInt(args[1]);
+        } catch (NumberFormatException e) {
+            player.sendMessage("§cInvalid ID: " + args[1]);
+            return;
+        }
+        BukkitTask task = followTasks.remove(id);
+        if (task == null) {
+            player.sendMessage("§cNPC with ID " + id + " is not following anyone.");
+            return;
+        }
+        task.cancel();
+        player.sendMessage("§aNPC §e" + id + " §astopped following.");
     }
 
     /**
@@ -183,15 +310,26 @@ public class TestNPCCommand extends PluginCommand {
         if (args.length == 1) {
             List<String> suggestions = new ArrayList<>();
             suggestions.add("remove");
+            suggestions.add("follow");
+            suggestions.add("stop");
             for (Player online : Bukkit.getOnlinePlayers())
                 suggestions.add(online.getName());
             return filterPrefix(suggestions, args[0]);
         }
-        if (args.length == 2 && "remove".equalsIgnoreCase(args[0])) {
-            List<String> ids = new ArrayList<>();
-            for (Integer id : spawnedNPCs.keySet())
-                ids.add(String.valueOf(id));
-            return filterPrefix(ids, args[1]);
+        if (args.length == 2) {
+            String sub = args[0].toLowerCase();
+            if ("remove".equals(sub) || "follow".equals(sub)) {
+                List<String> ids = new ArrayList<>();
+                for (Integer id : spawnedNPCs.keySet())
+                    ids.add(String.valueOf(id));
+                return filterPrefix(ids, args[1]);
+            }
+            if ("stop".equals(sub)) {
+                List<String> ids = new ArrayList<>();
+                for (Integer id : followTasks.keySet())
+                    ids.add(String.valueOf(id));
+                return filterPrefix(ids, args[1]);
+            }
         }
         return Collections.emptyList();
     }
