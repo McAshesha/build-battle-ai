@@ -1,14 +1,10 @@
-name: BuildBattleAI
+#file: noinspection PluginYml
+name: ${project.name}
 version: '${project.version}'
-main: ru.ashesha.buildBattleAI.BuildBattleAI
+main: ${plugin.main}
 api-version: '1.13'
-authors: [ McAshesha ]
-description: A competitive mini-game on building and explaining the buildings of AI
-
-commands:
-  testnpc:
-    description: Test command for NPC spawning and despawning
-    usage: /testnpc [skinName|remove <id>]
-  testml:
-    description: Test ML classification pipeline (render + predict)
-    usage: /testml
+authors: ${plugin.authors}
+description: ${project.description}
+website: ${project.url}
+prefix: ${plugin.prefix}
+load: POSTWORLD

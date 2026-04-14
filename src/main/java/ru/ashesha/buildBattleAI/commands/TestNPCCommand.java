@@ -58,7 +58,8 @@ public class TestNPCCommand extends PluginCommand {
      * @param plugin the plugin instance
      */
     public TestNPCCommand(@NonNull BuildBattleAI plugin) {
-        super(plugin, "testnpc");
+        super(plugin, "testnpc", "Test command for NPC spawning and despawning",
+                "[skinName|remove <id>|follow <id>|stop <id>]");
         offHandSupported = PacketEvents.getAPI().getServerManager().getVersion()
                 .isNewerThanOrEquals(ServerVersion.V_1_9);
     }

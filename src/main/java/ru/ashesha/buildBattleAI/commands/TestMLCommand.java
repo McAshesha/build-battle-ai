@@ -57,7 +57,7 @@ public class TestMLCommand extends PluginCommand {
      * @param plugin the plugin instance
      */
     public TestMLCommand(@NonNull BuildBattleAI plugin) {
-        super(plugin, "testml");
+        super(plugin, "testml", "Test ML classification pipeline (render + predict)", "");
     }
 
     @Override

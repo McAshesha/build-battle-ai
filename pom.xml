@@ -9,11 +9,16 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
-    <name>buildbattleai</name>
+    <name>BuildBattleAI</name>
+    <description>A competitive mini-game on building and explaining the buildings of AI</description>
+    <url>https://github.com/McAshesha/BuildBattleAI</url>
 
     <properties>
         <java.version>1.8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <plugin.main>ru.ashesha.buildBattleAI.BuildBattleAI</plugin.main>
+        <plugin.authors>[ McAshesha ]</plugin.authors>
+        <plugin.prefix>BBAI</plugin.prefix>
     </properties>
 
     <build>

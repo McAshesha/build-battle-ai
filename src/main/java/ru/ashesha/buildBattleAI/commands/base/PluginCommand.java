@@ -1,23 +1,34 @@
 package ru.ashesha.buildBattleAI.commands.base;
 
 import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
-import org.bukkit.command.*;
+import org.bukkit.Bukkit;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandMap;
+import org.bukkit.command.CommandSender;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
+import ru.ashesha.buildBattleAI.util.ReflectionUtils;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
- * Base class for all plugin commands. Wraps Bukkit's {@link CommandExecutor}
- * and {@link TabCompleter} into a single abstract class with simplified
- * method signatures and automatic registration via {@link #register()}.
+ * Base class for all plugin commands. Extends Bukkit's {@link Command}
+ * and registers dynamically via the server's {@link CommandMap},
+ * eliminating the need to declare commands in {@code plugin.yml}.
  * <p>
  * Subclasses implement {@link #execute(CommandSender, String[])} for command logic
  * and {@link #suggest(CommandSender, String[])} for tab completion.
- * Commands must also be declared in {@code plugin.yml} for Bukkit registration to succeed.
+ * The command is registered at runtime through {@link #register()}, which
+ * accesses the server's internal {@link CommandMap} via reflection.
+ * This approach works on all CraftBukkit/Spigot/Paper versions from 1.8 to 1.21+.
  */
-@RequiredArgsConstructor
-public abstract class PluginCommand implements TabExecutor {
+public abstract class PluginCommand extends Command {
+
+    /**
+     * Cached reference to the server's command map, obtained via reflection.
+     * Package-private to allow test injection.
+     */
+    static CommandMap commandMap;
 
     /**
      * Reference to the plugin instance for accessing managers and server API.
@@ -26,10 +37,19 @@ public abstract class PluginCommand implements TabExecutor {
     protected final BuildBattleAI plugin;
 
     /**
-     * The command name as declared in plugin.yml.
+     * Creates a new command with the given name, description, and usage hint.
+     *
+     * @param plugin      the plugin instance
+     * @param name        the command name (what players type after {@code /})
+     * @param description a short description shown in {@code /help}
+     * @param usage       usage hint (e.g. {@code "[args]"}); the {@code /name} prefix is added automatically
      */
-    @NonNull
-    private final String name;
+    protected PluginCommand(@NonNull BuildBattleAI plugin, @NonNull String name,
+                            @NonNull String description, @NonNull String usage) {
+        super(name, description, "/" + name + (usage.isEmpty() ? "" : " " + usage),
+                Collections.emptyList());
+        this.plugin = plugin;
+    }
 
     /**
      * Executes the command logic.
@@ -53,7 +73,7 @@ public abstract class PluginCommand implements TabExecutor {
      * to suppress Bukkit's default usage message.
      */
     @Override
-    public final boolean onCommand(@NonNull CommandSender sender,@NonNull  Command command,@NonNull  String label, String[] args) {
+    public final boolean execute(CommandSender sender, String label, String[] args) {
         execute(sender, args);
         return true;
     }
@@ -62,22 +82,30 @@ public abstract class PluginCommand implements TabExecutor {
      * Delegates to {@link #suggest(CommandSender, String[])}.
      */
     @Override
-    public final List<String> onTabComplete(@NonNull CommandSender sender,@NonNull  Command command,@NonNull  String label, String[] args) {
+    public final List<String> tabComplete(CommandSender sender, String alias, String[] args) {
         return suggest(sender, args);
     }
 
     /**
-     * Registers this command with Bukkit by looking up the command name in {@code plugin.yml}
-     * and binding this instance as both the executor and tab completer.
-     * Logs a warning if the command is not declared in {@code plugin.yml}.
+     * Registers this command with the server's {@link CommandMap}.
+     * The command becomes available immediately without a server restart
+     * and without needing a {@code plugin.yml} declaration.
      */
     public final void register() {
-        org.bukkit.command.PluginCommand bukkitCommand = plugin.getCommand(name);
-        if (bukkitCommand == null) {
-            plugin.getLogger().warning("Command '" + name + "' is not registered in plugin.yml!");
-            return;
-        }
-        bukkitCommand.setExecutor(this);
-        bukkitCommand.setTabCompleter(this);
+        getCommandMap().register(plugin.getName().toLowerCase(), this);
+    }
+
+    /**
+     * Resolves the server's {@link CommandMap} via reflection, caching the result.
+     * All CraftBukkit/Spigot/Paper implementations expose a {@code commandMap}
+     * field on the server instance, making this reliable across 1.8–1.21+.
+     *
+     * @return the server command map
+     * @throws RuntimeException if the field cannot be accessed
+     */
+    private static CommandMap getCommandMap() {
+        if (commandMap == null)
+            commandMap = ReflectionUtils.getFieldValue(Bukkit.getServer(), "commandMap");
+        return commandMap;
     }
 }
