@@ -91,13 +91,48 @@ public class BlockPalette {
     };
 
     /**
-     * Corresponding RGB colors for each dye prefix.
+     * Corresponding RGB colors for each dye prefix — standard Minecraft dye item colors.
+     * Used as default for wool, beds, banners, candles, and stained glass.
      */
     private static final int[] DYE_COLORS = {
-            0x3AB3DA, 0x9D9D97,
-            0xC74EBD, 0xF9801D, 0xFED83D, 0x8932B8,
-            0x5E7C16, 0x835432, 0x1D1D21, 0xF9FFFE,
-            0x80C71F, 0xF38BAA, 0x474F52, 0x169C9C, 0x3C44AA, 0xB02E26
+            0x3AB3DA, 0x9D9D97,  // light_blue, light_gray
+            0xC74EBD, 0xF9801D, 0xFED83D, 0x8932B8,  // magenta, orange, yellow, purple
+            0x5E7C16, 0x835432, 0x1D1D21, 0xF9FFFE,  // green, brown, black, white
+            0x80C71F, 0xF38BAA, 0x474F52, 0x169C9C, 0x3C44AA, 0xB02E26  // lime, pink, gray, cyan, blue, red
+    };
+
+    /**
+     * Concrete colors — darker and more saturated than wool.
+     * Same index order as {@link #DYE_PREFIXES}.
+     */
+    private static final int[] CONCRETE_COLORS = {
+            0x2389C7, 0x7D7D73,  // light_blue, light_gray
+            0xA9309F, 0xE06101, 0xF0AF15, 0x7B2FBE,  // magenta, orange, yellow, purple
+            0x495B24, 0x603C20, 0x080A0F, 0xCFD5D6,  // green, brown, black, white
+            0x5EA818, 0xD5658F, 0x363A3E, 0x157788, 0x2C2E8F, 0x8E2121  // lime, pink, gray, cyan, blue, red
+    };
+
+    /**
+     * Concrete powder colors — softer/more pastel than concrete.
+     * Same index order as {@link #DYE_PREFIXES}.
+     */
+    private static final int[] CONCRETE_POWDER_COLORS = {
+            0x4AB4D5, 0x9A9A8E,  // light_blue, light_gray
+            0xC074BB, 0xE38429, 0xE8C736, 0x8337B3,  // magenta, orange, yellow, purple
+            0x61772D, 0x7A5535, 0x1B1D22, 0xE1E3E3,  // green, brown, black, white
+            0x7DB836, 0xE39AB4, 0x4D5155, 0x24939B, 0x4649A6, 0xA33535  // lime, pink, gray, cyan, blue, red
+    };
+
+    /**
+     * Terracotta (glazed and stained) colors — earthy, muted tones from Minecraft's MapColor system.
+     * These are completely different from dye colors.
+     * Same index order as {@link #DYE_PREFIXES}.
+     */
+    private static final int[] TERRACOTTA_COLORS = {
+            0x706C8A, 0x876B62,  // light_blue, light_gray
+            0x95576C, 0x9F5224, 0xBA8524, 0x7A4958,  // magenta, orange, yellow, purple
+            0x4C522A, 0x4C3223, 0x251610, 0xD1B1A1,  // green, brown, black, white
+            0x677535, 0xA04D4E, 0x392923, 0x575C5C, 0x4C3E5C, 0x8E3C2E  // lime, pink, gray, cyan, blue, red
     };
 
     static {
@@ -494,7 +529,7 @@ public class BlockPalette {
         put(XMaterial.CAULDRON, 0x4A4A4A);
         put(XMaterial.HOPPER, 0x4A4A4A);
         put(XMaterial.BREWING_STAND, 0x6A6A42);
-        put(XMaterial.LECTERN, 0xA88654);
+        put(XMaterial.LECTERN, 0xAA8856);
         put(XMaterial.BEE_NEST, 0xC8A050);
         put(XMaterial.BEEHIVE, 0x9A7842);
         put(XMaterial.TARGET, 0xE0B0A0);
@@ -571,6 +606,32 @@ public class BlockPalette {
         put(XMaterial.DEAD_FIRE_CORAL_BLOCK, 0x7E7567);
         put(XMaterial.DEAD_HORN_CORAL_BLOCK, 0x7E7567);
 
+        // Additional blocks that don't match name-inference patterns well
+        put(XMaterial.DRIPSTONE_BLOCK, 0x866B5C);
+        put(XMaterial.GLOW_LICHEN, 0x7FA796);
+        put(XMaterial.SCULK_VEIN, 0x052127);
+        put(XMaterial.SCULK_SHRIEKER, 0x0E2924);
+
+        // Froglight variants
+        for (XMaterial mat : XMaterial.values()) {
+            String name = mat.name();
+            if (name.equals("OCHRE_FROGLIGHT"))
+                put(mat, 0xE8D68C);
+            else if (name.equals("VERDANT_FROGLIGHT"))
+                put(mat, 0x6BBE6B);
+            else if (name.equals("PEARLESCENT_FROGLIGHT"))
+                put(mat, 0xC5A3C8);
+        }
+
+        // Mangrove extras
+        for (XMaterial mat : XMaterial.values()) {
+            String name = mat.name();
+            if (name.equals("MANGROVE_ROOTS"))
+                put(mat, 0x4E3728);
+            else if (name.equals("MUDDY_MANGROVE_ROOTS"))
+                put(mat, 0x4A3F2F);
+        }
+
         // Fill remaining via name-based inference
         for (XMaterial mat : XMaterial.values())
             if (COLORS[mat.ordinal()] == NOT_MAPPED)
@@ -621,6 +682,34 @@ public class BlockPalette {
             String name = mat.name();
             if (name.endsWith("_FROGLIGHT"))
                 EMISSIVE[mat.ordinal()] = true;
+        }
+
+        // === Color deduplication pass ===
+        // Ensures no two non-transparent materials share the exact same RGB color.
+        // On collision, increments the blue channel by 1 (wrapping to green) until unique.
+        // Minimal visual impact — at most a few LSB changes per block.
+        {
+            java.util.Set<Integer> seen = new java.util.HashSet<>();
+            for (XMaterial mat : XMaterial.values()) {
+                int ord = mat.ordinal();
+                int color = COLORS[ord];
+                if (color == TRANSPARENT)
+                    continue;
+                int attempts = 0;
+                while (seen.contains(color) && attempts < 256) {
+                    int b = (color & 0xFF) + 1;
+                    if (b > 255) {
+                        b = 0;
+                        int g = ((color >> 8) & 0xFF) + 1;
+                        color = rgb((color >> 16) & 0xFF, Math.min(g, 255), b);
+                    } else {
+                        color = rgb((color >> 16) & 0xFF, (color >> 8) & 0xFF, b);
+                    }
+                    attempts++;
+                }
+                COLORS[ord] = color;
+                seen.add(color);
+            }
         }
 
         // Populate per-material flag bits from name-based helpers (executed once at class load)
@@ -811,10 +900,17 @@ public class BlockPalette {
      * @return the inferred color, or {@code null} if no pattern matches
      */
     private static Integer inferBaseColor(String name) {
-        // Dye-colored block families
+        // Dye-colored block families — use type-specific color palettes
         for (int i = 0; i < DYE_PREFIXES.length; i++)
-            if (name.startsWith(DYE_PREFIXES[i]))
+            if (name.startsWith(DYE_PREFIXES[i])) {
+                if (name.endsWith("_TERRACOTTA") || name.contains("GLAZED_TERRACOTTA"))
+                    return TERRACOTTA_COLORS[i];
+                if (name.endsWith("_CONCRETE_POWDER"))
+                    return CONCRETE_POWDER_COLORS[i];
+                if (name.endsWith("_CONCRETE"))
+                    return CONCRETE_COLORS[i];
                 return DYE_COLORS[i];
+            }
 
         // Wood type inference (check more specific names first)
         if (name.contains("DARK_OAK"))
@@ -1219,7 +1315,9 @@ public class BlockPalette {
                 || ("z".equals(axis) && hitFace == 2);
         if (!endFace)
             return sideColor;
-        return blend(scaleBrightness(sideColor, 1.18), 0xD2B48C, 0.24);
+        // Simple brightness scale for end-grain — avoids blending with tan that
+        // washes out dark logs (spruce, dark oak).
+        return scaleBrightness(sideColor, 1.15);
     }
 
     /**

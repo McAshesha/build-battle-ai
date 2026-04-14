@@ -70,11 +70,14 @@ public class CpuRenderer {
             Runtime.getRuntime().availableProcessors()
     );
 
-    // Face brightness multipliers (Minecraft-style ambient shading)
+    // Face brightness multipliers (Minecraft-style directional shading).
+    // Raised above vanilla values (vanilla: bottom=0.5, X=0.6, Z=0.8) because the
+    // flat-color renderer has no texture detail — darker multipliers make blocks
+    // unrecognizable, especially dark greens and browns.
     private static final double BRIGHTNESS_Y_TOP = 1.0;
-    private static final double BRIGHTNESS_Y_BOTTOM = 0.5;
-    private static final double BRIGHTNESS_X = 0.6;
-    private static final double BRIGHTNESS_Z = 0.8;
+    private static final double BRIGHTNESS_Y_BOTTOM = 0.6;
+    private static final double BRIGHTNESS_X = 0.7;
+    private static final double BRIGHTNESS_Z = 0.85;
 
     /**
      * AO darkening table: index = number of solid corner neighbors (0–3).

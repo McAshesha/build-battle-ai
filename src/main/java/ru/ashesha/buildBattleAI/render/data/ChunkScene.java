@@ -154,7 +154,12 @@ public class ChunkScene implements SceneData {
                         legacyDataArray[flatIndex] = (byte) ld;
                     } else {
                         Material material = snapshot.getBlockType(localX, y, localZ);
-                        XMaterial xMaterial = XMaterial.matchXMaterial(material);
+                        // Fast path: skip matchModernMaterial for plain AIR (most common block
+                        // in typical scenes — ~70% of voxels). Avoids XSeries enum lookup overhead.
+                        // Uses identity comparison instead of isAir() for 1.13–1.14 compatibility.
+                        XMaterial xMaterial = material == Material.AIR
+                                ? XMaterial.AIR
+                                : matchModernMaterial(material);
                         data[flatIndex] = (short) xMaterial.ordinal();
                     }
                 }
@@ -178,8 +183,17 @@ public class ChunkScene implements SceneData {
         if (opt.isPresent())
             return opt.get();
 
-        // For blocks with mixed type+state data (slabs with bit 3 = position,
-        // logs with bits 2–3 = axis), mask out state bits and retry.
+        // For logs/wood: data bits 0–1 = wood type, bits 2–3 = axis.
+        // Try wood-type-only match (mask off axis bits) for data values 4+ where
+        // the axis bits cause the full-data match to fail.
+        if (data >= 4) {
+            opt = XMaterial.matchXMaterial(material.name() + ":" + (data & 3));
+            if (opt.isPresent())
+                return opt.get();
+        }
+
+        // For slabs and other blocks: bit 3 often encodes state (top/bottom).
+        // Mask to bits 0–2 for the material sub-type.
         if (data > 7) {
             opt = XMaterial.matchXMaterial(material.name() + ":" + (data & 7));
             if (opt.isPresent())
@@ -193,6 +207,40 @@ public class ChunkScene implements SceneData {
         } catch (IllegalArgumentException e) {
             return XMaterial.AIR;
         }
+    }
+
+    /**
+     * Matches a modern (1.13+) Material to XMaterial with fallback strategies.
+     * Primary: XMaterial.matchXMaterial(Material). If that fails (unknown material),
+     * falls back to name-based valueOf lookup, then to STONE as a visible sentinel.
+     * Never returns AIR for a non-AIR input — ensures unknown blocks remain visible
+     * in the render rather than disappearing.
+     */
+    private static XMaterial matchModernMaterial(Material material) {
+        // Fast path — works for all materials known to XSeries
+        try {
+            return XMaterial.matchXMaterial(material);
+        } catch (Throwable ignored) {
+            // Swallow: material not in XSeries mapping
+        }
+
+        // Fallback: direct enum name match (handles materials added after XSeries release)
+        try {
+            return XMaterial.valueOf(material.name());
+        } catch (IllegalArgumentException ignored) {
+            // Swallow: material name not in XMaterial enum
+        }
+
+        // Fallback: name-based match via XSeries string resolver
+        Optional<XMaterial> opt = XMaterial.matchXMaterial(material.name());
+        if (opt.isPresent())
+            return opt.get();
+
+        // Last resort: visible fallback so unknown blocks don't vanish.
+        // AIR-like materials return AIR; everything else returns STONE.
+        if (material.name().contains("AIR"))
+            return XMaterial.AIR;
+        return XMaterial.STONE;
     }
 
     // ── Capture ──────────────────────────────────────────────────────────────

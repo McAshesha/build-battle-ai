@@ -4,6 +4,9 @@ import com.cryptomorin.xseries.XMaterial;
 import org.junit.jupiter.api.Test;
 import ru.ashesha.buildBattleAI.render.data.SceneData;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class BlockPaletteTest {
@@ -83,7 +86,15 @@ class BlockPaletteTest {
 
     @Test
     void oakPlanksHasColor() {
-        assertEquals(0xA88654, BlockPalette.getColor(XMaterial.OAK_PLANKS));
+        // Exact value may shift by ±1 per channel due to the deduplication pass,
+        // so verify it's close to the registered 0xA88654 rather than exact.
+        int color = BlockPalette.getColor(XMaterial.OAK_PLANKS);
+        assertNotEquals(-1, color, "Oak planks should not be transparent");
+        int dr = Math.abs(((color >> 16) & 0xFF) - 0xA8);
+        int dg = Math.abs(((color >> 8) & 0xFF) - 0x86);
+        int db = Math.abs((color & 0xFF) - 0x54);
+        assertTrue(dr + dg + db <= 10,
+                "Oak planks color 0x" + Integer.toHexString(color) + " too far from expected 0xA88654");
     }
 
     @Test
@@ -599,5 +610,224 @@ class BlockPaletteTest {
         int flags = BlockPalette.BLOCK_FLAGS[XMaterial.OAK_FENCE_GATE.ordinal()];
         assertTrue((flags & BlockPalette.FLAG_NEEDS_STATE) != 0, "Fence gate should have FLAG_NEEDS_STATE");
         assertEquals(0, flags & BlockPalette.FLAG_FENCE, "Fence gate should NOT have FLAG_FENCE");
+    }
+
+    // ===== Color uniqueness (deduplication) =====
+
+    @Test
+    void noTwoNonTransparentBlocksShareSameColor() {
+        Map<Integer, String> seen = new HashMap<>();
+        for (XMaterial mat : XMaterial.values()) {
+            int color = BlockPalette.getColor(mat);
+            if (color == -1)
+                continue;
+            String existing = seen.get(color);
+            assertNull(existing,
+                    "Duplicate color 0x" + Integer.toHexString(color)
+                            + " shared by " + existing + " and " + mat.name());
+            seen.put(color, mat.name());
+        }
+    }
+
+    // ===== Solid blocks must have colors =====
+
+    @Test
+    void commonSolidBlocksAreNotTransparent() {
+        // These blocks should always be visible in the renderer
+        XMaterial[] solidBlocks = {
+                XMaterial.STONE, XMaterial.COBBLESTONE, XMaterial.DIRT,
+                XMaterial.GRASS_BLOCK, XMaterial.OAK_PLANKS, XMaterial.SPRUCE_PLANKS,
+                XMaterial.IRON_BLOCK, XMaterial.GOLD_BLOCK, XMaterial.DIAMOND_BLOCK,
+                XMaterial.BRICKS, XMaterial.SANDSTONE, XMaterial.OBSIDIAN,
+                XMaterial.NETHERRACK, XMaterial.DEEPSLATE, XMaterial.TUFF,
+                XMaterial.BEDROCK, XMaterial.TERRACOTTA, XMaterial.CLAY,
+                XMaterial.SNOW_BLOCK, XMaterial.ICE, XMaterial.PACKED_ICE,
+                XMaterial.SPONGE, XMaterial.MELON, XMaterial.PUMPKIN,
+                XMaterial.HAY_BLOCK, XMaterial.TNT, XMaterial.BONE_BLOCK,
+                XMaterial.HONEY_BLOCK, XMaterial.SLIME_BLOCK
+        };
+        for (XMaterial mat : solidBlocks) {
+            int color = BlockPalette.getColor(mat);
+            assertNotEquals(-1, color, mat.name() + " should not be transparent");
+        }
+    }
+
+    // ===== Cherry / 1.20+ blocks =====
+
+    @Test
+    void cherryBlocksHaveColors() {
+        assertNotEquals(-1, BlockPalette.getColor(XMaterial.CHERRY_PLANKS));
+        assertNotEquals(-1, BlockPalette.getColor(XMaterial.CHERRY_LOG));
+        assertNotEquals(-1, BlockPalette.getColor(XMaterial.CHERRY_LEAVES));
+        assertNotEquals(-1, BlockPalette.getColor(XMaterial.CHERRY_SLAB));
+        assertNotEquals(-1, BlockPalette.getColor(XMaterial.CHERRY_STAIRS));
+    }
+
+    @Test
+    void cherryLeavesArePink() {
+        int color = BlockPalette.getColor(XMaterial.CHERRY_LEAVES);
+        int r = (color >> 16) & 0xFF;
+        int g = (color >> 8) & 0xFF;
+        int b = color & 0xFF;
+        // Cherry leaves should have high red and blue (pinkish), low green
+        assertTrue(r > 180, "Cherry leaves red channel too low: " + r);
+        assertTrue(b > 150, "Cherry leaves blue channel too low: " + b);
+        assertTrue(g < r, "Cherry leaves green should be less than red");
+    }
+
+    @Test
+    void bambooBlocksHaveColors() {
+        assertNotEquals(-1, BlockPalette.getColor(XMaterial.BAMBOO_PLANKS));
+        assertNotEquals(-1, BlockPalette.getColor(XMaterial.BAMBOO_BLOCK));
+        assertNotEquals(-1, BlockPalette.getColor(XMaterial.BAMBOO_MOSAIC));
+    }
+
+    @Test
+    void mangroveBlocksHaveColors() {
+        assertNotEquals(-1, BlockPalette.getColor(XMaterial.MANGROVE_PLANKS));
+        assertNotEquals(-1, BlockPalette.getColor(XMaterial.MANGROVE_LOG));
+        assertNotEquals(-1, BlockPalette.getColor(XMaterial.MANGROVE_LEAVES));
+    }
+
+    // ===== Type-specific dye colors =====
+
+    @Test
+    void terracottaColorsDifferFromWool() {
+        // Each colored terracotta should have a different color than the matching wool
+        String[] prefixes = {"RED_", "BLUE_", "GREEN_", "YELLOW_", "BLACK_", "WHITE_",
+                "ORANGE_", "MAGENTA_", "LIGHT_BLUE_", "LIME_", "PINK_", "GRAY_",
+                "LIGHT_GRAY_", "CYAN_", "PURPLE_", "BROWN_"};
+        for (String prefix : prefixes) {
+            try {
+                XMaterial wool = XMaterial.valueOf(prefix + "WOOL");
+                XMaterial terracotta = XMaterial.valueOf(prefix + "TERRACOTTA");
+                int woolColor = BlockPalette.getColor(wool);
+                int terracottaColor = BlockPalette.getColor(terracotta);
+                assertNotEquals(woolColor, terracottaColor,
+                        prefix + " wool and terracotta should have different colors");
+            } catch (IllegalArgumentException e) {
+                // Skip if material doesn't exist
+            }
+        }
+    }
+
+    @Test
+    void concreteColorsDifferFromWool() {
+        String[] prefixes = {"RED_", "BLUE_", "WHITE_", "BLACK_"};
+        for (String prefix : prefixes) {
+            try {
+                XMaterial wool = XMaterial.valueOf(prefix + "WOOL");
+                XMaterial concrete = XMaterial.valueOf(prefix + "CONCRETE");
+                int woolColor = BlockPalette.getColor(wool);
+                int concreteColor = BlockPalette.getColor(concrete);
+                assertNotEquals(woolColor, concreteColor,
+                        prefix + " wool and concrete should have different colors");
+            } catch (IllegalArgumentException e) {
+                // Skip if material doesn't exist
+            }
+        }
+    }
+
+    @Test
+    void concretePowderDiffersFromConcrete() {
+        String[] prefixes = {"RED_", "BLUE_", "WHITE_", "BLACK_"};
+        for (String prefix : prefixes) {
+            try {
+                XMaterial concrete = XMaterial.valueOf(prefix + "CONCRETE");
+                XMaterial powder = XMaterial.valueOf(prefix + "CONCRETE_POWDER");
+                int concreteColor = BlockPalette.getColor(concrete);
+                int powderColor = BlockPalette.getColor(powder);
+                assertNotEquals(concreteColor, powderColor,
+                        prefix + " concrete and concrete powder should have different colors");
+            } catch (IllegalArgumentException e) {
+                // Skip if material doesn't exist
+            }
+        }
+    }
+
+    @Test
+    void terracottaColorsAreEarthy() {
+        // Terracotta should be more muted/earthy than the bright dye colors used for wool
+        try {
+            int redTerracotta = BlockPalette.getColor(XMaterial.valueOf("RED_TERRACOTTA"));
+            int redWool = BlockPalette.getColor(XMaterial.valueOf("RED_WOOL"));
+            int trR = (redTerracotta >> 16) & 0xFF;
+            int wR = (redWool >> 16) & 0xFF;
+            // Red terracotta should be less saturated (lower R) than red wool
+            assertTrue(trR < wR,
+                    "Red terracotta R=" + trR + " should be less saturated than red wool R=" + wR);
+        } catch (IllegalArgumentException e) {
+            // Skip if material doesn't exist
+        }
+    }
+
+    // ===== Leaves have colors =====
+
+    @Test
+    void allLeafTypesHaveColors() {
+        for (XMaterial mat : XMaterial.values()) {
+            if (mat.name().endsWith("_LEAVES")) {
+                int color = BlockPalette.getColor(mat);
+                assertNotEquals(-1, color, mat.name() + " should have a color");
+            }
+        }
+    }
+
+    // ===== Copper oxidation stages are distinct =====
+
+    @Test
+    void copperOxidationStagesAreDistinct() {
+        int base = BlockPalette.getColor(XMaterial.COPPER_BLOCK);
+        int exposed = BlockPalette.getColor(XMaterial.EXPOSED_COPPER);
+        int weathered = BlockPalette.getColor(XMaterial.WEATHERED_COPPER);
+        int oxidized = BlockPalette.getColor(XMaterial.OXIDIZED_COPPER);
+        assertNotEquals(base, exposed, "Copper and exposed copper should differ");
+        assertNotEquals(exposed, weathered, "Exposed and weathered copper should differ");
+        assertNotEquals(weathered, oxidized, "Weathered and oxidized copper should differ");
+        assertNotEquals(base, oxidized, "Copper and oxidized copper should differ");
+    }
+
+    // ===== Decorative blocks have colors =====
+
+    @Test
+    void decorativeBlocksHaveColors() {
+        XMaterial[] decorative = {
+                XMaterial.CHEST, XMaterial.CRAFTING_TABLE, XMaterial.FURNACE,
+                XMaterial.ANVIL, XMaterial.ENCHANTING_TABLE, XMaterial.BREWING_STAND,
+                XMaterial.CAULDRON, XMaterial.BELL, XMaterial.LANTERN,
+                XMaterial.CAMPFIRE, XMaterial.BARREL, XMaterial.COMPOSTER,
+                XMaterial.LECTERN, XMaterial.BEEHIVE, XMaterial.BEE_NEST,
+                XMaterial.DECORATED_POT
+        };
+        for (XMaterial mat : decorative) {
+            int color = BlockPalette.getColor(mat);
+            assertNotEquals(-1, color, mat.name() + " should have a color");
+        }
+    }
+
+    // ===== Stained glass has colors and alpha =====
+
+    @Test
+    void stainedGlassHasColorsAndAlpha() {
+        for (XMaterial mat : XMaterial.values()) {
+            if (mat.name().endsWith("_STAINED_GLASS")) {
+                int color = BlockPalette.getColor(mat);
+                int alpha = BlockPalette.getAlpha(mat);
+                assertNotEquals(-1, color, mat.name() + " should have a color");
+                assertTrue(alpha < 255 && alpha > 0,
+                        mat.name() + " should be translucent, alpha=" + alpha);
+            }
+        }
+    }
+
+    // ===== Deepslate family has colors =====
+
+    @Test
+    void deepslateVariantsHaveColors() {
+        assertNotEquals(-1, BlockPalette.getColor(XMaterial.DEEPSLATE));
+        assertNotEquals(-1, BlockPalette.getColor(XMaterial.COBBLED_DEEPSLATE));
+        assertNotEquals(-1, BlockPalette.getColor(XMaterial.DEEPSLATE_BRICKS));
+        assertNotEquals(-1, BlockPalette.getColor(XMaterial.DEEPSLATE_TILES));
+        assertNotEquals(-1, BlockPalette.getColor(XMaterial.POLISHED_DEEPSLATE));
     }
 }

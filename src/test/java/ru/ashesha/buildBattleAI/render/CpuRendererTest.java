@@ -540,6 +540,61 @@ class CpuRendererTest {
         assertTrue(hasDarkerPixel, "Stair pixels should be darkened by AO when surrounded by opaque blocks");
     }
 
+    // ===== Cherry / 1.20+ block rendering =====
+
+    @Test
+    void renderCherryBlocksProducesVisiblePixels() {
+        // Proves cherry blocks render through the full pipeline (FlatScene → CpuRenderer).
+        // If this passes but cherry trees are invisible on the live server,
+        // the issue is in ChunkScene material resolution.
+        int size = 11;
+        short[] data = airArray(size * size * size);
+        // Place cherry log and cherry leaves in front of camera
+        data[5 * size * size + 5 * size + 8] = (short) XMaterial.CHERRY_LOG.ordinal();
+        data[5 * size * size + 6 * size + 8] = (short) XMaterial.CHERRY_LEAVES.ordinal();
+        data[5 * size * size + 7 * size + 8] = (short) XMaterial.CHERRY_LEAVES.ordinal();
+
+        FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
+        byte[] pixels = CpuRenderer.render(scene, 5.5, 5.5, 5.5, 0, 0);
+
+        assertTrue(hasNonBackgroundPixels(pixels),
+                "Cherry log + leaves should render visible pixels");
+
+        // Verify center area has pinkish/salmon pixels (not gray or background)
+        int centerIdx = (112 * 224 + 112) * 3;
+        int r = pixels[centerIdx] & 0xFF;
+        int g = pixels[centerIdx + 1] & 0xFF;
+        int b = pixels[centerIdx + 2] & 0xFF;
+        // Cherry log or leaves should produce warm-toned pixels, not background blue
+        boolean notBackground = (r != 0xC8 || g != 0xD8 || b != 0xE8);
+        assertTrue(notBackground, "Center pixel should not be background sky color");
+    }
+
+    @Test
+    void renderGreenWoolIsVisiblyGreen() {
+        // Green wool must not appear black after face shading
+        int size = 11;
+        short[] data = airArray(size * size * size);
+        data[5 * size * size + 5 * size + 8] = (short) XMaterial.GREEN_WOOL.ordinal();
+
+        FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
+        byte[] pixels = CpuRenderer.render(scene, 5.5, 5.5, 5.5, 0, 0);
+
+        // Find a non-background pixel (the wool block)
+        int centerIdx = (112 * 224 + 112) * 3;
+        int r = pixels[centerIdx] & 0xFF;
+        int g = pixels[centerIdx + 1] & 0xFF;
+        int b = pixels[centerIdx + 2] & 0xFF;
+
+        boolean notBackground = (r != 0xC8 || g != 0xD8 || b != 0xE8);
+        assertTrue(notBackground, "Green wool should be visible");
+
+        // Green channel should dominate (it's green wool!)
+        assertTrue(g > r, "Green wool should have G > R, got R=" + r + " G=" + g + " B=" + b);
+        // Should not be too dark (not black)
+        assertTrue(g > 30, "Green wool should not be near-black, G=" + g);
+    }
+
     // ===== Helpers =====
 
     @Test
