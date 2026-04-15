@@ -341,10 +341,9 @@ public class TestNPCCommand extends PluginCommand {
     private static List<String> filterPrefix(List<String> options, String prefix) {
         String lower = prefix.toLowerCase();
         List<String> result = new ArrayList<>();
-        for (String option : options) {
+        for (String option : options)
             if (option.toLowerCase().startsWith(lower))
                 result.add(option);
-        }
         return result;
     }
 }

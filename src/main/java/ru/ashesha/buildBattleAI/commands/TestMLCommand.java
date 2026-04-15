@@ -121,11 +121,10 @@ public class TestMLCommand extends PluginCommand {
 
         // Save the rendered image to the plugin data folder with a timestamp filename
         String savedPath = saveRender(pixels);
-        if (savedPath != null) {
+        if (savedPath != null)
             player.sendMessage("§7Saved: §f" + savedPath);
-        } else {
+        else
             player.sendMessage("§cFailed to save render to disk");
-        }
 
         // ── 2. Health endpoint ─────────────────────────────────────────────
         player.sendMessage("");
@@ -152,9 +151,8 @@ public class TestMLCommand extends PluginCommand {
 
         player.sendMessage("§7Response time: §e" + centroidsMs + "ms");
         player.sendMessage("§7Total classes: §e" + centroids.size());
-        for (Map.Entry<String, float[]> entry : centroids.entrySet()) {
+        for (Map.Entry<String, float[]> entry : centroids.entrySet())
             player.sendMessage("§e" + entry.getKey() + " §7" + formatVector(entry.getValue()));
-        }
 
         // ── 4. Predict endpoint ────────────────────────────────────────────
         player.sendMessage("");
@@ -226,7 +224,7 @@ public class TestMLCommand extends PluginCommand {
             BufferedImage image = new BufferedImage(
                     CpuRenderer.WIDTH, CpuRenderer.HEIGHT, BufferedImage.TYPE_INT_RGB
             );
-            for (int y = 0; y < CpuRenderer.HEIGHT; y++) {
+            for (int y = 0; y < CpuRenderer.HEIGHT; y++)
                 for (int x = 0; x < CpuRenderer.WIDTH; x++) {
                     int idx = (y * CpuRenderer.WIDTH + x) * 3;
                     int r = rgbPixels[idx] & 0xFF;
@@ -234,7 +232,6 @@ public class TestMLCommand extends PluginCommand {
                     int b = rgbPixels[idx + 2] & 0xFF;
                     image.setRGB(x, y, (r << 16) | (g << 8) | b);
                 }
-            }
             ImageIO.write(image, "PNG", file);
             return file.getPath();
         } catch (Exception e) {

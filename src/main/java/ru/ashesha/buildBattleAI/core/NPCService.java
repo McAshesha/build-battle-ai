@@ -125,7 +125,7 @@ public class NPCService implements BBAINPCService {
         UserProfile sourceProfile = plugin.getContext().getUserProfile(skinSource);
 
         List<TextureProperty> textures = sourceProfile.getTextureProperties();
-        if (textures == null || textures.isEmpty()) {
+        if (textures.isEmpty()) {
             // On older server versions (notably 1.8), PacketEvents may not expose
             // skin texture properties from the player's profile — fall back to
             // fetching from Mojang API by the player's name.
