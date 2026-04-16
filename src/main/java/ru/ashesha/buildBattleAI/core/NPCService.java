@@ -1,6 +1,5 @@
 package ru.ashesha.buildBattleAI.core;
 
-import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
@@ -97,7 +96,7 @@ public class NPCService implements BBAINPCService {
      */
     public NPCService(@NonNull BuildBattleAI plugin) {
         this.plugin = plugin;
-        ServerVersion version = PacketEvents.getAPI().getServerManager().getVersion();
+        ServerVersion version = plugin.getServerVersion();
         this.playerInfoAddFactory = resolvePlayerInfoAddFactory(version);
         this.playerInfoRemoveFactory = resolvePlayerInfoRemoveFactory(version);
         this.spawnFactory = resolveSpawnFactory(version);

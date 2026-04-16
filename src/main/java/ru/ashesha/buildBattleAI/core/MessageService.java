@@ -1,6 +1,5 @@
 package ru.ashesha.buildBattleAI.core;
 
-import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import lombok.NonNull;
 import lombok.experimental.Delegate;
@@ -65,7 +64,7 @@ class MessageService implements BBAIMessageService {
      * @param plugin the plugin instance
      */
     MessageService(@NonNull BuildBattleAI plugin) {
-        ServerVersion version = PacketEvents.getAPI().getServerManager().getVersion();
+        ServerVersion version = plugin.getServerVersion();
         this.chatService = new ChatService(plugin, version);
         this.barService = new BarService(plugin, version);
         this.titleService = new TitleService(plugin, version);

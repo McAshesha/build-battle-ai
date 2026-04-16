@@ -10,12 +10,14 @@ import lombok.RequiredArgsConstructor;
 import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.ArenaManager;
+import ru.ashesha.buildBattleAI.arena.api.BBAIArenaManager;
 import ru.ashesha.buildBattleAI.core.api.BBAIMLService;
 import ru.ashesha.buildBattleAI.core.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.game.GameManager;
 import ru.ashesha.buildBattleAI.commands.TestMLCommand;
 import ru.ashesha.buildBattleAI.commands.TestNPCCommand;
 import ru.ashesha.buildBattleAI.core.api.BBAINPCService;
+import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
 import ru.ashesha.buildBattleAI.render.CpuRenderer;
 
 /**
@@ -39,15 +41,19 @@ public class PluginContext {
     private final BuildBattleAI plugin;
 
     @Getter
-    private ArenaManager arenaManager;
+    private BBAIArenaManager arenaManager;
     @Getter
-    private GameManager gameManager;
+    private BBAIGameManager gameManager;
     @Getter
     private BBAIMessageService messageService;
     @Getter
     private BBAINPCService npcService;
     @Getter
     private BBAIMLService mlService;
+    @Getter
+    private CommandService commandService;
+    @Getter
+    private ListenerService listenerService;
 
     /**
      * Initializes all plugin subsystems, registers commands and event listeners.
@@ -62,9 +68,12 @@ public class PluginContext {
         npcService = new NPCService(plugin);
         mlService = new MLService(plugin);
 
-        // Register commands
-        new TestNPCCommand(plugin).register();
-        new TestMLCommand(plugin).register();
+        // Register commands and listeners
+        commandService = new CommandService(plugin);
+        commandService.register(new TestNPCCommand(plugin));
+        commandService.register(new TestMLCommand(plugin));
+
+        listenerService = new ListenerService(plugin);
     }
 
     /**
@@ -72,6 +81,8 @@ public class PluginContext {
      * Called from {@link BuildBattleAI#onDisable()}.
      */
     public void disable() {
+        listenerService.shutdown();
+        commandService.shutdown();
         mlService.shutdown();
         npcService.shutdown();
         gameManager.shutdown();

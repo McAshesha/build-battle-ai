@@ -1,6 +1,5 @@
 package ru.ashesha.buildBattleAI.commands;
 
-import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import com.github.retrooper.packetevents.protocol.player.EquipmentSlot;
 import lombok.NonNull;
@@ -12,7 +11,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.scheduler.BukkitTask;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
-import ru.ashesha.buildBattleAI.commands.base.PluginCommand;
+import ru.ashesha.buildBattleAI.core.CommandService.PluginCommand;
 import ru.ashesha.buildBattleAI.core.NPCService;
 import ru.ashesha.buildBattleAI.core.api.BBAINPCService;
 
@@ -60,8 +59,7 @@ public class TestNPCCommand extends PluginCommand {
     public TestNPCCommand(@NonNull BuildBattleAI plugin) {
         super(plugin, "testnpc", "Test command for NPC spawning and despawning",
                 "[skinName|remove <id>|follow <id>|stop <id>]");
-        offHandSupported = PacketEvents.getAPI().getServerManager().getVersion()
-                .isNewerThanOrEquals(ServerVersion.V_1_9);
+        offHandSupported = plugin.getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_9);
     }
 
     @Override

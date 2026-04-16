@@ -1,7 +1,6 @@
 package ru.ashesha.buildBattleAI.render.data;
 
 import com.cryptomorin.xseries.XMaterial;
-import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import lombok.Getter;
 import lombok.NonNull;
@@ -10,6 +9,8 @@ import lombok.experimental.Accessors;
 import org.bukkit.ChunkSnapshot;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.plugin.java.JavaPlugin;
+import ru.ashesha.buildBattleAI.BuildBattleAI;
 
 import java.lang.reflect.Method;
 import java.util.Optional;
@@ -408,7 +409,7 @@ public class ChunkScene implements SceneData {
         static final Method GET_MATERIAL_BY_ID;
 
         static {
-            ServerVersion sv = PacketEvents.getAPI().getServerManager().getVersion();
+            ServerVersion sv = JavaPlugin.getPlugin(BuildBattleAI.class).getServerVersion();
             IS_LEGACY = !sv.isNewerThanOrEquals(ServerVersion.V_1_13);
             if (IS_LEGACY)
                 try {
