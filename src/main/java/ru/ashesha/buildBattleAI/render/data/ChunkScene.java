@@ -1,7 +1,6 @@
 package ru.ashesha.buildBattleAI.render.data;
 
 import com.cryptomorin.xseries.XMaterial;
-import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -9,8 +8,6 @@ import lombok.experimental.Accessors;
 import org.bukkit.ChunkSnapshot;
 import org.bukkit.Material;
 import org.bukkit.World;
-import org.bukkit.plugin.java.JavaPlugin;
-import ru.ashesha.buildBattleAI.BuildBattleAI;
 
 import java.lang.reflect.Method;
 import java.util.Optional;
@@ -103,13 +100,18 @@ public class ChunkScene implements SceneData {
      * Capture chunk snapshots for the given region.
      * MUST be called on the main server thread.
      * <p>
-     * On 1.8–1.12 servers, additionally captures legacy data values via reflection
-     * and resolves materials through {@code XMaterial.matchXMaterial("NAME:data")}
+     * On 1.8–1.12 servers ({@code legacy == true}), additionally captures legacy data values
+     * via reflection and resolves materials through {@code XMaterial.matchXMaterial("NAME:data")}
      * for correct sub-type mapping (e.g., colored wool, wood variants).
+     * <p>
+     * The {@code legacy} flag is resolved once at plugin startup by
+     * {@link ru.ashesha.buildBattleAI.core.RenderService} to avoid repeated
+     * {@code ServerVersion} checks in this hot path.
+     *
+     * @param region the region to capture
+     * @param legacy {@code true} on 1.8–1.12 servers (pre-flattening); {@code false} on 1.13+
      */
-    public static ChunkScene capture(@NonNull RenderRegion region) {
-        boolean legacy = Version.IS_LEGACY;
-
+    public static ChunkScene capture(@NonNull RenderRegion region, boolean legacy) {
         int minCx = region.minX() >> 4;
         int minCz = region.minZ() >> 4;
         int maxCx = region.maxX() >> 4;
@@ -369,19 +371,18 @@ public class ChunkScene implements SceneData {
     }
 
     /**
-     * Lazily-initialized version state. The inner class is loaded (and its static
-     * initializer runs) on first access to any of its fields — guaranteed to happen
-     * after PacketEvents is initialized, because {@link #capture(RenderRegion)} is
-     * only called from commands/game logic (post-enable).
+     * Holder for reflective handles to legacy (1.8–1.12) Bukkit APIs.
+     * <p>
+     * The class is loaded (and its static initializer runs) lazily on first access
+     * to any of its members, i.e. only when a legacy capture is actually performed.
+     * Each handle is resolved independently so that initialization does not fail
+     * on 1.13+ servers, where these methods no longer exist. Callers MUST guard
+     * usage with the {@code legacy} flag passed to {@link #capture(RenderRegion, boolean)}.
      * <p>
      * Thread-safe: JVM guarantees that class initialization is synchronized.
      */
     @SuppressWarnings("JavaReflectionMemberAccess")
     private static class Version {
-        /**
-         * {@code true} on 1.8–1.12 servers (pre-flattening).
-         */
-        static final boolean IS_LEGACY;
 
         /**
          * Reflective handle to the legacy {@code ChunkSnapshot.getBlockTypeId(int, int, int)}
@@ -394,10 +395,8 @@ public class ChunkScene implements SceneData {
 
         /**
          * Reflective handle to the legacy {@code ChunkSnapshot.getBlockData(int, int, int)}
-         * which returns {@code int} (0–15) on 1.8–1.12. {@code null} on 1.13+.
-         * <p>
-         * On 1.13+ the same method name returns {@code org.bukkit.block.data.BlockData},
-         * so we must use reflection to call the int-returning version on legacy servers.
+         * which returns {@code int} (0–15) on 1.8–1.12. The method exists on 1.13+ as well
+         * but with return type {@code BlockData}; callers must only invoke this on legacy servers.
          */
         static final Method GET_LEGACY_DATA;
 
@@ -409,22 +408,22 @@ public class ChunkScene implements SceneData {
         static final Method GET_MATERIAL_BY_ID;
 
         static {
-            ServerVersion sv = JavaPlugin.getPlugin(BuildBattleAI.class).getServerVersion();
-            IS_LEGACY = !sv.isNewerThanOrEquals(ServerVersion.V_1_13);
-            if (IS_LEGACY)
-                try {
-                    GET_BLOCK_TYPE_ID = ChunkSnapshot.class.getMethod("getBlockTypeId",
-                            int.class, int.class, int.class);
-                    GET_LEGACY_DATA = ChunkSnapshot.class.getMethod("getBlockData",
-                            int.class, int.class, int.class);
-                    GET_MATERIAL_BY_ID = Material.class.getMethod("getMaterial", int.class);
-                } catch (NoSuchMethodException e) {
-                    throw new ExceptionInInitializerError(e);
-                }
-            else {
-                GET_BLOCK_TYPE_ID = null;
-                GET_LEGACY_DATA = null;
-                GET_MATERIAL_BY_ID = null;
+            GET_BLOCK_TYPE_ID = findMethod(ChunkSnapshot.class, "getBlockTypeId",
+                    int.class, int.class, int.class);
+            GET_LEGACY_DATA = findMethod(ChunkSnapshot.class, "getBlockData",
+                    int.class, int.class, int.class);
+            GET_MATERIAL_BY_ID = findMethod(Material.class, "getMaterial", int.class);
+        }
+
+        /**
+         * Resolves a method reflectively, returning {@code null} if the method
+         * does not exist on the running server's Bukkit version.
+         */
+        private static Method findMethod(Class<?> owner, String name, Class<?>... params) {
+            try {
+                return owner.getMethod(name, params);
+            } catch (NoSuchMethodException e) {
+                return null;
             }
         }
 

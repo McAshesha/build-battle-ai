@@ -8,6 +8,7 @@ import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.core.CommandService.PluginCommand;
 import ru.ashesha.buildBattleAI.core.MLService;
+import ru.ashesha.buildBattleAI.core.RenderService;
 import ru.ashesha.buildBattleAI.core.api.BBAIMLService;
 import ru.ashesha.buildBattleAI.render.CpuRenderer;
 import ru.ashesha.buildBattleAI.render.data.ChunkScene;
@@ -68,6 +69,7 @@ public class TestMLCommand extends PluginCommand {
         }
         Player player = (Player) sender;
         BBAIMLService mlService = plugin.getContext().getMlService();
+        RenderService renderService = plugin.getContext().getRenderService();
         Location loc = player.getLocation();
 
         player.sendMessage("§7Capturing scene...");
@@ -85,7 +87,7 @@ public class TestMLCommand extends PluginCommand {
         ChunkScene.RenderRegion region = new ChunkScene.RenderRegion.Cuboid(
                 minX, minY, minZ, maxX, maxY, maxZ, loc.getWorld()
         );
-        ChunkScene scene = ChunkScene.capture(region);
+        ChunkScene scene = renderService.capture(region);
 
         // Camera at eye level: player Y + 1.62 (standing eye height)
         final double camX = loc.getX();
@@ -97,7 +99,7 @@ public class TestMLCommand extends PluginCommand {
         // All remaining work (render + ML REST calls) runs asynchronously
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
-                runPipeline(player, mlService, scene, camX, camY, camZ, yaw, pitch);
+                runPipeline(player, mlService, renderService, scene, camX, camY, camZ, yaw, pitch);
             } catch (Exception e) {
                 player.sendMessage("§cML test failed: §f" + e.getMessage());
                 plugin.getLogger().warning("TestML failed: " + e.getMessage());
@@ -110,12 +112,13 @@ public class TestMLCommand extends PluginCommand {
      * Executes the full render → classify pipeline and prints results to chat.
      * Must be called from an async thread.
      */
-    private void runPipeline(Player player, BBAIMLService mlService, ChunkScene scene,
+    private void runPipeline(Player player, BBAIMLService mlService, RenderService renderService,
+                             ChunkScene scene,
                              double camX, double camY, double camZ, float yaw, float pitch) {
         // ── 1. Render ──────────────────────────────────────────────────────
         player.sendMessage("§7Rendering image...");
         long renderStart = System.currentTimeMillis();
-        byte[] pixels = CpuRenderer.render(scene, camX, camY, camZ, yaw, pitch);
+        byte[] pixels = renderService.render(scene, camX, camY, camZ, yaw, pitch);
         long renderMs = System.currentTimeMillis() - renderStart;
         player.sendMessage("§aRender complete §7(" + renderMs + "ms)");
 

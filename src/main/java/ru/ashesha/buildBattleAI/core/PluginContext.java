@@ -18,7 +18,6 @@ import ru.ashesha.buildBattleAI.commands.TestMLCommand;
 import ru.ashesha.buildBattleAI.commands.TestNPCCommand;
 import ru.ashesha.buildBattleAI.core.api.BBAINPCService;
 import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
-import ru.ashesha.buildBattleAI.render.CpuRenderer;
 
 /**
  * Centralized startup and shutdown coordinator for the plugin.
@@ -54,6 +53,8 @@ public class PluginContext {
     private CommandService commandService;
     @Getter
     private ListenerService listenerService;
+    @Getter
+    private RenderService renderService;
 
     /**
      * Initializes all plugin subsystems, registers commands and event listeners.
@@ -67,6 +68,7 @@ public class PluginContext {
         messageService = new MessageService(plugin);
         npcService = new NPCService(plugin);
         mlService = new MLService(plugin);
+        renderService = new RenderService(plugin);
 
         // Register commands and listeners
         commandService = new CommandService(plugin);
@@ -83,11 +85,11 @@ public class PluginContext {
     public void disable() {
         listenerService.shutdown();
         commandService.shutdown();
+        renderService.shutdown();
         mlService.shutdown();
         npcService.shutdown();
         gameManager.shutdown();
         arenaManager.shutdown();
-        CpuRenderer.shutdown();
     }
 
     /**
