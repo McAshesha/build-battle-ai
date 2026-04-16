@@ -13,7 +13,7 @@ import java.util.Collection;
  * Sub-service responsible for sending player list (tab) header and footer via packets.
  */
 @RequiredArgsConstructor
-public class TabService {
+public class TabMicroService {
 
     @NonNull
     private final BuildBattleAI plugin;

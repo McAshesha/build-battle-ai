@@ -1,7 +1,6 @@
 package ru.ashesha.buildBattleAI;
 
 import com.github.retrooper.packetevents.PacketEvents;
-import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
 import lombok.Getter;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -50,26 +49,14 @@ public final class BuildBattleAI extends JavaPlugin {
 
     /**
      * Called when the plugin is disabled (server shutdown or plugin reload).
-     * Gracefully shuts down game and arena managers, then terminates PacketEvents.
+     * Gracefully shuts down every plugin service through the uniform
+     * {@link PluginContext#shutdown()} pipeline, then terminates PacketEvents.
      */
     @Override
     public void onDisable() {
-        context.disable();
+        context.shutdown();
         PacketEvents.getAPI().terminate();
         getLogger().info("BuildBattleAI has been disabled.");
-    }
-
-    /**
-     * Returns the Minecraft server version resolved by PacketEvents.
-     * <p>
-     * Safe to call from {@link #onLoad()} onwards — the version is resolved
-     * lazily from {@code Bukkit.getBukkitVersion()} on first access and then cached
-     * inside the PacketEvents {@code ServerManager}.
-     *
-     * @return the running server's {@link ServerVersion}
-     */
-    public ServerVersion getServerVersion() {
-        return PacketEvents.getAPI().getServerManager().getVersion();
     }
 
 }

@@ -27,12 +27,12 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Tests for {@link NameService} — player list display name updates via version-resolved packets.
+ * Tests for {@link NameMicroService} — player list display name updates via version-resolved packets.
  * <p>
  * Verifies version-dependent factory selection (1.19.3+ vs legacy),
  * Bukkit-to-PacketEvents game mode conversion, and delivery to single/multiple viewers.
  */
-class NameServiceTest {
+class NameMicroServiceTest {
 
     private BuildBattleAI plugin;
     private PluginContext context;
@@ -62,7 +62,7 @@ class NameServiceTest {
 
         PacketEventsSettings settings = new PacketEventsSettings();
         settings.customResourceProvider(
-                name -> NameServiceTest.class.getClassLoader().getResourceAsStream(name));
+                name -> NameMicroServiceTest.class.getClassLoader().getResourceAsStream(name));
         when(api.getSettings()).thenReturn(settings);
     }
 
@@ -71,11 +71,20 @@ class NameServiceTest {
         packetEventsMock.close();
     }
 
+    /**
+     * Creates a {@link NameMicroService} bound to the given server version by
+     * stubbing {@link PluginContext#getServerVersion()} before construction.
+     */
+    private NameMicroService serviceFor(ServerVersion version) {
+        when(context.getServerVersion()).thenReturn(version);
+        return new NameMicroService(plugin);
+    }
+
     // ===== Version factory selection =====
 
     @Test
     void modernVersionUsesPlayerInfoUpdate() {
-        NameService service = new NameService(plugin, ServerVersion.V_1_19_3);
+        NameMicroService service = serviceFor(ServerVersion.V_1_19_3);
         service.sendPlayerListName(target, "&aGreenName", viewer);
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
@@ -86,7 +95,7 @@ class NameServiceTest {
 
     @Test
     void legacyVersionUsesPlayerInfo() {
-        NameService service = new NameService(plugin, ServerVersion.V_1_8);
+        NameMicroService service = serviceFor(ServerVersion.V_1_8);
         service.sendPlayerListName(target, "&cRedName", viewer);
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
@@ -99,7 +108,7 @@ class NameServiceTest {
 
     @Test
     void sendPlayerListNameToSingleViewer() {
-        NameService service = new NameService(plugin, ServerVersion.V_1_19_3);
+        NameMicroService service = serviceFor(ServerVersion.V_1_19_3);
         service.sendPlayerListName(target, "DisplayName", viewer);
 
         verify(context, times(1)).sendPacket(eq(viewer), any(PacketWrapper.class));
@@ -107,7 +116,7 @@ class NameServiceTest {
 
     @Test
     void sendPlayerListNameWithNullNameDoesNotThrow() {
-        NameService service = new NameService(plugin, ServerVersion.V_1_19_3);
+        NameMicroService service = serviceFor(ServerVersion.V_1_19_3);
         assertDoesNotThrow(() -> service.sendPlayerListName(target, null, viewer));
         verify(context, times(1)).sendPacket(eq(viewer), any(PacketWrapper.class));
     }
@@ -116,7 +125,7 @@ class NameServiceTest {
 
     @Test
     void sendPlayerListNameToMultipleViewers() {
-        NameService service = new NameService(plugin, ServerVersion.V_1_19_3);
+        NameMicroService service = serviceFor(ServerVersion.V_1_19_3);
         Player viewer2 = mock(Player.class);
 
         service.sendPlayerListName(target, "Name", Arrays.asList(viewer, viewer2));
@@ -127,7 +136,7 @@ class NameServiceTest {
 
     @Test
     void sendPlayerListNameToEmptyCollectionSendsNothing() {
-        NameService service = new NameService(plugin, ServerVersion.V_1_19_3);
+        NameMicroService service = serviceFor(ServerVersion.V_1_19_3);
 
         service.sendPlayerListName(target, "Name", Collections.<Player>emptyList());
 
@@ -139,7 +148,7 @@ class NameServiceTest {
     @Test
     void creativeGameModeConvertsCorrectly() {
         when(target.getGameMode()).thenReturn(GameMode.CREATIVE);
-        NameService service = new NameService(plugin, ServerVersion.V_1_19_3);
+        NameMicroService service = serviceFor(ServerVersion.V_1_19_3);
 
         assertDoesNotThrow(() -> service.sendPlayerListName(target, "Name", viewer));
         verify(context).sendPacket(eq(viewer), any(PacketWrapper.class));
@@ -148,7 +157,7 @@ class NameServiceTest {
     @Test
     void adventureGameModeConvertsCorrectly() {
         when(target.getGameMode()).thenReturn(GameMode.ADVENTURE);
-        NameService service = new NameService(plugin, ServerVersion.V_1_19_3);
+        NameMicroService service = serviceFor(ServerVersion.V_1_19_3);
 
         assertDoesNotThrow(() -> service.sendPlayerListName(target, "Name", viewer));
         verify(context).sendPacket(eq(viewer), any(PacketWrapper.class));
@@ -157,7 +166,7 @@ class NameServiceTest {
     @Test
     void spectatorGameModeConvertsCorrectly() {
         when(target.getGameMode()).thenReturn(GameMode.SPECTATOR);
-        NameService service = new NameService(plugin, ServerVersion.V_1_19_3);
+        NameMicroService service = serviceFor(ServerVersion.V_1_19_3);
 
         assertDoesNotThrow(() -> service.sendPlayerListName(target, "Name", viewer));
         verify(context).sendPacket(eq(viewer), any(PacketWrapper.class));
@@ -166,7 +175,7 @@ class NameServiceTest {
     @Test
     void survivalGameModeConvertsCorrectly() {
         when(target.getGameMode()).thenReturn(GameMode.SURVIVAL);
-        NameService service = new NameService(plugin, ServerVersion.V_1_19_3);
+        NameMicroService service = serviceFor(ServerVersion.V_1_19_3);
 
         assertDoesNotThrow(() -> service.sendPlayerListName(target, "Name", viewer));
         verify(context).sendPacket(eq(viewer), any(PacketWrapper.class));

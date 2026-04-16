@@ -24,7 +24,7 @@ import java.util.Collection;
  * messages are sent via the chat packet with {@code GAME_INFO} position. On 1.11+,
  * the dedicated {@link WrapperPlayServerActionBar} wrapper is used.
  */
-public class BarService {
+public class BarMicroService {
 
     private final BuildBattleAI plugin;
 
@@ -34,14 +34,18 @@ public class BarService {
     private final BarPacketFactory barPacketFactory;
 
     /**
-     * Creates the bar service and resolves the version-appropriate packet factory.
+     * Creates the bar micro-service and resolves the version-appropriate packet factory.
+     * <p>
+     * The server version is obtained from
+     * {@link ru.ashesha.buildBattleAI.core.PluginContext#getServerVersion()},
+     * so this constructor must only be invoked after the plugin context has
+     * been published — i.e. from inside a {@code PluginService.enable()} call.
      *
-     * @param plugin  the plugin instance
-     * @param version the current server version
+     * @param plugin the plugin instance
      */
-    public BarService(@NonNull BuildBattleAI plugin, @NonNull ServerVersion version) {
+    public BarMicroService(@NonNull BuildBattleAI plugin) {
         this.plugin = plugin;
-        this.barPacketFactory = resolveBarFactory(version);
+        this.barPacketFactory = resolveBarFactory(plugin.getContext().getServerVersion());
     }
 
     /**

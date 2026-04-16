@@ -5,6 +5,7 @@ import com.github.retrooper.packetevents.event.PacketListener;
 import com.github.retrooper.packetevents.event.PacketListenerCommon;
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
@@ -19,23 +20,22 @@ import java.util.List;
  * Listeners are represented by the nested {@link PluginListener} abstract class.
  * Subclass it to define event handling, then pass instances to
  * {@link #register(PluginListener)} and {@link #unregister(PluginListener)}.
+ * <p>
+ * Implements {@link PluginService} so the listener service participates in the
+ * uniform plugin lifecycle. {@link #enable()} is a no-op because the actual
+ * listener registrations are business actions owned by {@link PluginContext};
+ * {@link #shutdown()} bulk-unregisters every listener this service registered
+ * so no handlers leak into Bukkit or PacketEvents after the plugin is disabled.
  */
-public class ListenerService {
+@RequiredArgsConstructor
+public class ListenerService implements PluginService {
 
     /** The plugin instance, used for Bukkit event registration. */
+    @NonNull
     private final BuildBattleAI plugin;
 
     /** All listeners registered through this service, for bulk unregistration on shutdown. */
     private final List<PluginListener> registeredListeners = new ArrayList<>();
-
-    /**
-     * Creates the listener service.
-     *
-     * @param plugin the plugin instance
-     */
-    public ListenerService(@NonNull BuildBattleAI plugin) {
-        this.plugin = plugin;
-    }
 
     /**
      * Registers a listener with both Bukkit and PacketEvents event systems.
@@ -65,9 +65,22 @@ public class ListenerService {
     }
 
     /**
-     * Unregisters all listeners that were registered through this service.
-     * Called during plugin shutdown.
+     * No per-cycle setup is required — actual listener registrations are
+     * driven by {@link PluginContext#enable()} (a business-layer concern),
+     * not by the service itself. Kept for {@link PluginService} conformance.
      */
+    @Override
+    public void enable() {
+        // Intentionally empty — listeners are registered by PluginContext.
+    }
+
+    /**
+     * Unregisters all listeners that were registered through this service.
+     * Called during plugin shutdown. Touches only handlers that this service
+     * registered, so Bukkit and PacketEvents state owned by other plugins
+     * remains intact.
+     */
+    @Override
     public void shutdown() {
         for (PluginListener listener : registeredListeners) {
             HandlerList.unregisterAll(listener);

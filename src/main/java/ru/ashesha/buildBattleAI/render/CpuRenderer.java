@@ -65,10 +65,22 @@ public class CpuRenderer {
      * Dedicated pool for render tasks — avoids contention with the shared common pool,
      * which is used by CompletableFuture, parallel streams, and Bukkit scheduler internals.
      * A dedicated pool prevents unpredictable render times under server load.
+     * <p>
+     * Non-final and guarded by {@link #POOL_LOCK} so it can be torn down and
+     * rebuilt across plugin reload cycles. A {@link #shutdown()} call nulls the
+     * reference; the next {@link #render} invocation recreates the pool lazily
+     * via {@link #getPool()}, which is how the renderer supports the
+     * shutdown/enable cycle required by the plugin-wide lifecycle contract.
      */
-    private static final ForkJoinPool RENDER_POOL = new ForkJoinPool(
-            Runtime.getRuntime().availableProcessors()
-    );
+    private static volatile ForkJoinPool renderPool = createPool();
+
+    /**
+     * Coordinates concurrent access to {@link #renderPool} while it is being
+     * recreated or torn down. All reads on the hot render path go through
+     * {@link #getPool()} which only enters the synchronized block when the
+     * pool is missing or shut down.
+     */
+    private static final Object POOL_LOCK = new Object();
 
     // Face brightness multipliers (Minecraft-style directional shading).
     // Raised above vanilla values (vanilla: bottom=0.5, X=0.6, Z=0.8) because the
@@ -90,12 +102,49 @@ public class CpuRenderer {
     private static final double MIN_REMAINING = 0.01;
 
     /**
-     * Shuts down the dedicated render thread pool.
-     * Should be called during plugin disable to release threads promptly.
-     * Any render calls after shutdown will throw {@link java.util.concurrent.RejectedExecutionException}.
+     * Shuts down the dedicated render thread pool, releasing its worker
+     * threads back to the OS.
+     * <p>
+     * Unlike a hard shutdown, this method leaves the renderer re-usable:
+     * the next call to {@link #render} transparently creates a fresh pool
+     * via {@link #getPool()}. This is what makes the renderer survive a
+     * plugin reload (shutdown followed by enable) without getting stuck
+     * in a permanently unusable state.
      */
     public static void shutdown() {
-        RENDER_POOL.shutdownNow();
+        synchronized (POOL_LOCK) {
+            ForkJoinPool pool = renderPool;
+            if (pool != null) {
+                pool.shutdownNow();
+                renderPool = null;
+            }
+        }
+    }
+
+    /**
+     * Creates a new dedicated render pool sized to the number of available
+     * processors. Extracted so both the static initializer and the lazy
+     * re-creation path in {@link #getPool()} use an identical construction.
+     */
+    private static ForkJoinPool createPool() {
+        return new ForkJoinPool(Runtime.getRuntime().availableProcessors());
+    }
+
+    /**
+     * Returns a live render pool, lazily recreating it if a prior
+     * {@link #shutdown()} call tore it down. Hot path is a single volatile
+     * read; the synchronized block is only entered when re-creation is
+     * required, so steady-state render calls incur no contention.
+     */
+    private static ForkJoinPool getPool() {
+        ForkJoinPool pool = renderPool;
+        if (pool != null && !pool.isShutdown())
+            return pool;
+        synchronized (POOL_LOCK) {
+            if (renderPool == null || renderPool.isShutdown())
+                renderPool = createPool();
+            return renderPool;
+        }
     }
 
     /**
@@ -157,7 +206,7 @@ public class CpuRenderer {
                 heightMap
         );
 
-        RENDER_POOL.invoke(new RenderTask(ctx, 0, HEIGHT));
+        getPool().invoke(new RenderTask(ctx, 0, HEIGHT));
 
         return pixels;
     }

@@ -6,7 +6,8 @@ import com.github.retrooper.packetevents.manager.server.ServerManager;
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import com.github.retrooper.packetevents.settings.PacketEventsSettings;
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerListHeaderAndFooter;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerActionBar;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerChatMessage;
 import org.bukkit.entity.Player;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,12 +24,12 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Tests for {@link TabService} — player list header/footer sending.
+ * Tests for {@link BarMicroService} — action bar message sending via version-resolved packets.
  * <p>
- * TabService is version-independent (uses a single packet type for all versions),
- * so tests focus on correct delegation and packet construction.
+ * Verifies that 1.11+ uses the dedicated {@link WrapperPlayServerActionBar} and
+ * older versions fall back to the chat packet with GAME_INFO position.
  */
-class TabServiceTest {
+class BarMicroServiceTest {
 
     private BuildBattleAI plugin;
     private PluginContext context;
@@ -51,7 +52,7 @@ class TabServiceTest {
 
         PacketEventsSettings settings = new PacketEventsSettings();
         settings.customResourceProvider(
-                name -> TabServiceTest.class.getClassLoader().getResourceAsStream(name));
+                name -> BarMicroServiceTest.class.getClassLoader().getResourceAsStream(name));
         when(api.getSettings()).thenReturn(settings);
     }
 
@@ -60,63 +61,67 @@ class TabServiceTest {
         packetEventsMock.close();
     }
 
+    /**
+     * Creates a {@link BarMicroService} bound to the given server version by
+     * stubbing {@link PluginContext#getServerVersion()} before construction.
+     */
+    private BarMicroService serviceFor(ServerVersion version) {
+        when(context.getServerVersion()).thenReturn(version);
+        return new BarMicroService(plugin);
+    }
+
+    // ===== Version factory selection =====
+
     @Test
-    void constructorRejectsNullPlugin() {
-        assertThrows(NullPointerException.class, () -> new TabService(null));
+    void modernVersionUsesActionBarPacket() {
+        BarMicroService service = serviceFor(ServerVersion.V_1_11);
+        service.sendActionBar(player, "Test");
+
+        ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
+        verify(context).sendPacket(eq(player), captor.capture());
+        assertTrue(captor.getValue() instanceof WrapperPlayServerActionBar,
+                "1.11+ should use WrapperPlayServerActionBar");
+    }
+
+    @Test
+    void legacyVersionUsesChatPacket() {
+        BarMicroService service = serviceFor(ServerVersion.V_1_8);
+        service.sendActionBar(player, "Test");
+
+        ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
+        verify(context).sendPacket(eq(player), captor.capture());
+        assertTrue(captor.getValue() instanceof WrapperPlayServerChatMessage,
+                "1.8 should use WrapperPlayServerChatMessage for action bar");
     }
 
     // ===== Single player =====
 
     @Test
-    void sendTabToSinglePlayer() {
-        TabService service = new TabService(plugin);
-        service.sendTab(player, "&6Header", "&7Footer");
+    void sendActionBarToSinglePlayer() {
+        BarMicroService service = serviceFor(ServerVersion.V_1_19);
+        service.sendActionBar(player, "&cImportant!");
 
-        ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
-        verify(context, times(1)).sendPacket(eq(player), captor.capture());
-        assertTrue(captor.getValue() instanceof WrapperPlayServerPlayerListHeaderAndFooter,
-                "Should use WrapperPlayServerPlayerListHeaderAndFooter");
-    }
-
-    @Test
-    void sendTabWithNullHeaderDoesNotThrow() {
-        TabService service = new TabService(plugin);
-        assertDoesNotThrow(() -> service.sendTab(player, null, "Footer"));
-        verify(context, times(1)).sendPacket(eq(player), any(PacketWrapper.class));
-    }
-
-    @Test
-    void sendTabWithNullFooterDoesNotThrow() {
-        TabService service = new TabService(plugin);
-        assertDoesNotThrow(() -> service.sendTab(player, "Header", null));
-        verify(context, times(1)).sendPacket(eq(player), any(PacketWrapper.class));
-    }
-
-    @Test
-    void sendTabWithBothNullDoesNotThrow() {
-        TabService service = new TabService(plugin);
-        assertDoesNotThrow(() -> service.sendTab(player, null, null));
         verify(context, times(1)).sendPacket(eq(player), any(PacketWrapper.class));
     }
 
     // ===== Multiple players =====
 
     @Test
-    void sendTabToMultiplePlayers() {
-        TabService service = new TabService(plugin);
+    void sendActionBarToMultiplePlayers() {
+        BarMicroService service = serviceFor(ServerVersion.V_1_19);
         Player player2 = mock(Player.class);
 
-        service.sendTab(Arrays.asList(player, player2), "Header", "Footer");
+        service.sendActionBar(Arrays.asList(player, player2), "Broadcast bar");
 
         verify(context).sendPacket(eq(player), any(PacketWrapper.class));
         verify(context).sendPacket(eq(player2), any(PacketWrapper.class));
     }
 
     @Test
-    void sendTabToEmptyCollectionSendsNothing() {
-        TabService service = new TabService(plugin);
+    void sendActionBarToEmptyCollectionSendsNothing() {
+        BarMicroService service = serviceFor(ServerVersion.V_1_19);
 
-        service.sendTab(Collections.<Player>emptyList(), "Header", "Footer");
+        service.sendActionBar(Collections.<Player>emptyList(), "Nobody");
 
         verify(context, never()).sendPacket(any(Player.class), any(PacketWrapper.class));
     }
@@ -124,8 +129,8 @@ class TabServiceTest {
     // ===== Color code support =====
 
     @Test
-    void sendTabWithColorCodesDoesNotThrow() {
-        TabService service = new TabService(plugin);
-        assertDoesNotThrow(() -> service.sendTab(player, "&a&lHeader", "&c&oFooter"));
+    void actionBarWithColorCodesDoesNotThrow() {
+        BarMicroService service = serviceFor(ServerVersion.V_1_19);
+        assertDoesNotThrow(() -> service.sendActionBar(player, "&a&lBold Green"));
     }
 }

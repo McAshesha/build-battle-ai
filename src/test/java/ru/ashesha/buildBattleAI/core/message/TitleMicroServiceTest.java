@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Tests for {@link TitleService} — title/subtitle overlay sending via version-resolved packets.
+ * Tests for {@link TitleMicroService} — title/subtitle overlay sending via version-resolved packets.
  * <p>
  * Verifies that 1.17+ uses separate packets for times, title, and subtitle,
  * while older versions use the combined title packet with action enum.
@@ -37,7 +37,7 @@ import static org.mockito.Mockito.*;
  * {@link ru.ashesha.buildBattleAI.util.MessageUtils#toComponent(String)}, so
  * the factory's null checks always pass — all 3 packets are always sent.
  */
-class TitleServiceTest {
+class TitleMicroServiceTest {
 
     private BuildBattleAI plugin;
     private PluginContext context;
@@ -60,7 +60,7 @@ class TitleServiceTest {
 
         PacketEventsSettings settings = new PacketEventsSettings();
         settings.customResourceProvider(
-                name -> TitleServiceTest.class.getClassLoader().getResourceAsStream(name));
+                name -> TitleMicroServiceTest.class.getClassLoader().getResourceAsStream(name));
         when(api.getSettings()).thenReturn(settings);
     }
 
@@ -69,11 +69,20 @@ class TitleServiceTest {
         packetEventsMock.close();
     }
 
+    /**
+     * Creates a {@link TitleMicroService} bound to the given server version by
+     * stubbing {@link PluginContext#getServerVersion()} before construction.
+     */
+    private TitleMicroService serviceFor(ServerVersion version) {
+        when(context.getServerVersion()).thenReturn(version);
+        return new TitleMicroService(plugin);
+    }
+
     // ===== Modern version (1.17+) =====
 
     @Test
     void modernVersionSendsSeparatePackets() {
-        TitleService service = new TitleService(plugin, ServerVersion.V_1_17);
+        TitleMicroService service = serviceFor(ServerVersion.V_1_17);
         service.sendTitle(player, "Title", "Subtitle", 10, 70, 20);
 
         // 1.17+: times + title + subtitle = 3 packets
@@ -93,7 +102,7 @@ class TitleServiceTest {
     void modernVersionWithNullTitleStillSendsThreePackets() {
         // null title → empty Component (non-null) via MessageUtils.toComponent(null),
         // so the factory's "if (title != null)" check passes
-        TitleService service = new TitleService(plugin, ServerVersion.V_1_17);
+        TitleMicroService service = serviceFor(ServerVersion.V_1_17);
         service.sendTitle(player, null, "Subtitle only", 10, 70, 20);
 
         verify(context, times(3)).sendPacket(eq(player), any(PacketWrapper.class));
@@ -101,7 +110,7 @@ class TitleServiceTest {
 
     @Test
     void modernVersionWithNullSubtitleStillSendsThreePackets() {
-        TitleService service = new TitleService(plugin, ServerVersion.V_1_17);
+        TitleMicroService service = serviceFor(ServerVersion.V_1_17);
         service.sendTitle(player, "Title only", null, 10, 70, 20);
 
         verify(context, times(3)).sendPacket(eq(player), any(PacketWrapper.class));
@@ -109,7 +118,7 @@ class TitleServiceTest {
 
     @Test
     void modernVersionWithBothNullStillSendsThreePackets() {
-        TitleService service = new TitleService(plugin, ServerVersion.V_1_17);
+        TitleMicroService service = serviceFor(ServerVersion.V_1_17);
         service.sendTitle(player, null, null, 10, 70, 20);
 
         verify(context, times(3)).sendPacket(eq(player), any(PacketWrapper.class));
@@ -119,7 +128,7 @@ class TitleServiceTest {
 
     @Test
     void legacyVersionUsesCombinedTitlePacket() {
-        TitleService service = new TitleService(plugin, ServerVersion.V_1_8);
+        TitleMicroService service = serviceFor(ServerVersion.V_1_8);
         service.sendTitle(player, "Title", "Subtitle", 10, 70, 20);
 
         // Legacy: times + title + subtitle = 3 combined packets
@@ -134,7 +143,7 @@ class TitleServiceTest {
 
     @Test
     void legacyVersionAlsoSendsThreePacketsForNullTitle() {
-        TitleService service = new TitleService(plugin, ServerVersion.V_1_8);
+        TitleMicroService service = serviceFor(ServerVersion.V_1_8);
         service.sendTitle(player, null, "Subtitle", 10, 70, 20);
 
         // null → empty Component, so all 3 packets are sent
@@ -145,7 +154,7 @@ class TitleServiceTest {
 
     @Test
     void sendTitleToMultiplePlayers() {
-        TitleService service = new TitleService(plugin, ServerVersion.V_1_17);
+        TitleMicroService service = serviceFor(ServerVersion.V_1_17);
         Player player2 = mock(Player.class);
 
         service.sendTitle(Arrays.asList(player, player2), "Title", "Sub", 5, 40, 10);
@@ -157,7 +166,7 @@ class TitleServiceTest {
 
     @Test
     void sendTitleToEmptyCollectionSendsNothing() {
-        TitleService service = new TitleService(plugin, ServerVersion.V_1_17);
+        TitleMicroService service = serviceFor(ServerVersion.V_1_17);
 
         service.sendTitle(Collections.<Player>emptyList(), "Title", "Sub", 5, 40, 10);
 

@@ -192,10 +192,4 @@ public interface BBAINPCService {
     void setEquipment(@NonNull Collection<Player> viewers, @NonNull NPCService.NPC npc,
                       @NonNull EquipmentSlot slot, ItemStack item);
 
-    /**
-     * Cleans up resources associated with this service.
-     * Scheduled tab-removal tasks are cancelled automatically by the server
-     * when the plugin is disabled.
-     */
-    void shutdown();
 }

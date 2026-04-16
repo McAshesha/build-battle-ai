@@ -2,6 +2,7 @@ package ru.ashesha.buildBattleAI.core;
 
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.render.CpuRenderer;
 import ru.ashesha.buildBattleAI.render.data.ChunkScene;
@@ -16,31 +17,49 @@ import ru.ashesha.buildBattleAI.render.data.SceneData;
  * <p>
  * Replaces direct calls to {@code CpuRenderer.render()} and
  * {@code ChunkScene.capture()} from game logic, providing a single place
- * where the plugin instance (and therefore {@link BuildBattleAI#getServerVersion()})
+ * where the plugin instance (and therefore {@link PluginContext#getServerVersion()})
  * is wired into the rendering pipeline.
+ * <p>
+ * Implements {@link PluginService} so the renderer participates in the
+ * uniform plugin lifecycle. {@link #enable()} resolves the legacy flag from
+ * the server version (deferred from the constructor because the service is
+ * instantiated inside {@link PluginContext}'s constructor, before the plugin
+ * has published its context reference). {@link #shutdown()} tears down the
+ * dedicated {@link CpuRenderer} thread pool to release worker threads; a
+ * subsequent {@link #enable()} call (or simply the next {@link #render}
+ * invocation) transparently rebuilds the pool, so the service survives hot
+ * reloads without leaving the plugin in a broken state.
  */
-public class RenderService {
+@RequiredArgsConstructor
+public class RenderService implements PluginService {
 
-    /** The plugin instance, retained for future expansion (e.g. scheduler access). */
+    /** The plugin instance, used to reach {@link PluginContext#getServerVersion()} during {@link #enable()}. */
     @NonNull
     private final BuildBattleAI plugin;
 
     /**
      * Whether the server is running a pre-1.13 (pre-flattening) version.
-     * Resolved once at construction from {@link BuildBattleAI#getServerVersion()}
+     * Resolved in {@link #enable()} from {@link PluginContext#getServerVersion()}
      * and passed into every {@link #capture(ChunkScene.RenderRegion)} call,
      * so that {@link ChunkScene} does not need to look up the server version itself.
+     * <p>
+     * Non-final because resolution is deferred to {@link #enable()} — the
+     * service is created inside {@link PluginContext}'s constructor, at which
+     * point the plugin has not yet exposed its context reference.
      */
-    private final boolean legacy;
+    private boolean legacy;
 
     /**
-     * Creates the render service and resolves the legacy flag from the server version.
-     *
-     * @param plugin the plugin instance
+     * Resolves the server-version-dependent legacy flag. Deferred from the
+     * constructor because services are created inside {@link PluginContext}'s
+     * constructor, before the plugin publishes its context; by the time
+     * {@link PluginContext#enable()} runs, {@link BuildBattleAI#getContext()}
+     * returns a fully-initialised context and {@link PluginContext#getServerVersion()}
+     * is safe to call.
      */
-    public RenderService(@NonNull BuildBattleAI plugin) {
-        this.plugin = plugin;
-        this.legacy = !plugin.getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_13);
+    @Override
+    public void enable() {
+        this.legacy = !plugin.getContext().getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_13);
     }
 
     /**
@@ -74,10 +93,15 @@ public class RenderService {
     }
 
     /**
-     * Shuts down the renderer's thread pool. Called during plugin disable.
-     * After shutdown, subsequent {@link #render} calls will throw
-     * {@link java.util.concurrent.RejectedExecutionException}.
+     * Shuts down the renderer's dedicated thread pool to release worker threads.
+     * <p>
+     * Unlike a permanent disposal, this shutdown is fully recoverable:
+     * {@link CpuRenderer#shutdown()} nulls the pool reference, and the next
+     * {@link #render} call (or a subsequent {@link #enable()}) lazily rebuilds
+     * it. That is what lets the plugin go through a clean {@code shutdown} +
+     * {@code enable} cycle without leaving the renderer in an unusable state.
      */
+    @Override
     public void shutdown() {
         CpuRenderer.shutdown();
     }

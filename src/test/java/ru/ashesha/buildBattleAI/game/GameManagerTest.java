@@ -2,6 +2,7 @@ package ru.ashesha.buildBattleAI.game;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 
 import java.util.logging.Logger;
@@ -34,6 +35,12 @@ class GameManagerTest {
     }
 
     @Test
+    void enableLogsMessage() {
+        manager.enable();
+        verify(logger).info("GameManager enabled.");
+    }
+
+    @Test
     void shutdownLogsMessage() {
         manager.shutdown();
         verify(logger).info("GameManager shut down.");
@@ -44,5 +51,15 @@ class GameManagerTest {
         manager.shutdown();
         manager.shutdown();
         verify(logger, times(2)).info("GameManager shut down.");
+    }
+
+    @Test
+    void reloadCallsShutdownThenEnable() {
+        // Default PluginService.reload() must run shutdown before enable so
+        // the service is re-bootstrapped exactly as on a fresh server start.
+        manager.reload();
+        InOrder order = inOrder(logger);
+        order.verify(logger).info("GameManager shut down.");
+        order.verify(logger).info("GameManager enabled.");
     }
 }

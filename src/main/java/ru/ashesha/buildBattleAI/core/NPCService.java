@@ -27,6 +27,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.github.retrooper.packetevents.util.SpigotConversionUtil;
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -59,9 +60,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  *     <li>Skin metadata index — varies across major Minecraft versions (10–17)</li>
  * </ul>
  */
-public class NPCService implements BBAINPCService {
+@RequiredArgsConstructor
+public class NPCService implements BBAINPCService, PluginService {
 
     /** The plugin instance used for scheduling and packet sending. */
+    @NonNull
     private final BuildBattleAI plugin;
 
     /**
@@ -72,31 +75,33 @@ public class NPCService implements BBAINPCService {
 
     // ── version-resolved factories and constants ────────────────────────────
 
-    /** Factory for creating "add player to tab list" packets. */
-    private final PlayerInfoAddFactory playerInfoAddFactory;
+    /** Factory for creating "add player to tab list" packets. Resolved in {@link #enable()}. */
+    private PlayerInfoAddFactory playerInfoAddFactory;
 
-    /** Factory for creating "remove player from tab list" packets. */
-    private final PlayerInfoRemoveFactory playerInfoRemoveFactory;
+    /** Factory for creating "remove player from tab list" packets. Resolved in {@link #enable()}. */
+    private PlayerInfoRemoveFactory playerInfoRemoveFactory;
 
-    /** Factory for creating entity spawn packets. */
-    private final SpawnFactory spawnFactory;
+    /** Factory for creating entity spawn packets. Resolved in {@link #enable()}. */
+    private SpawnFactory spawnFactory;
 
     /**
      * Version-dependent entity metadata index for the "displayed skin parts" byte.
      * All seven skin layers (cape, jacket, left/right sleeve, left/right pants leg, hat)
-     * are encoded as bit flags in a single byte at this index.
+     * are encoded as bit flags in a single byte at this index. Resolved in {@link #enable()}.
      */
-    private final int skinLayersIndex;
+    private int skinLayersIndex;
 
     /**
-     * Creates the NPC service and resolves all version-dependent packet factories.
-     * Called once during plugin startup from {@link PluginContext#enable()}.
-     *
-     * @param plugin the plugin instance
+     * Resolves all version-dependent packet factories from
+     * {@link PluginContext#getServerVersion()}. Deferred from the constructor
+     * because services are created inside {@link PluginContext}'s constructor,
+     * before the plugin publishes its context — by the time
+     * {@link PluginContext#enable()} invokes this method, the context is
+     * available and the version lookup is safe.
      */
-    public NPCService(@NonNull BuildBattleAI plugin) {
-        this.plugin = plugin;
-        ServerVersion version = plugin.getServerVersion();
+    @Override
+    public void enable() {
+        ServerVersion version = plugin.getContext().getServerVersion();
         this.playerInfoAddFactory = resolvePlayerInfoAddFactory(version);
         this.playerInfoRemoveFactory = resolvePlayerInfoRemoveFactory(version);
         this.spawnFactory = resolveSpawnFactory(version);
@@ -286,10 +291,15 @@ public class NPCService implements BBAINPCService {
         sendEquipmentPacket(viewers, npc, slot, item);
     }
 
+    /**
+     * No explicit cleanup needed. Scheduled tab-removal tasks are bound to the
+     * plugin's BukkitScheduler and are cancelled automatically by Bukkit when
+     * the plugin transitions out of the enabled state, so the service has no
+     * resources of its own to release here.
+     */
     @Override
     public void shutdown() {
-        // Scheduled tab-removal tasks are bound to the plugin's BukkitScheduler
-        // and are canceled automatically when the plugin is disabled.
+        // Intentionally empty — BukkitScheduler handles task cancellation.
     }
 
     // ── internal helpers ────────────────────────────────────────────────────

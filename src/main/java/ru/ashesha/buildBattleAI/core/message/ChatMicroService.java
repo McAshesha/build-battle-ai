@@ -31,7 +31,7 @@ import java.util.UUID;
  * The underlying packet format is resolved once at construction based on
  * the server version.
  */
-public class ChatService {
+public class ChatMicroService {
 
     private final BuildBattleAI plugin;
 
@@ -41,14 +41,18 @@ public class ChatService {
     private final ChatPacketFactory chatPacketFactory;
 
     /**
-     * Creates the chat service and resolves the version-appropriate packet factory.
+     * Creates the chat micro-service and resolves the version-appropriate packet factory.
+     * <p>
+     * The server version is obtained from
+     * {@link ru.ashesha.buildBattleAI.core.PluginContext#getServerVersion()},
+     * so this constructor must only be invoked after the plugin context has
+     * been published — i.e. from inside a {@code PluginService.enable()} call.
      *
-     * @param plugin  the plugin instance
-     * @param version the current server version
+     * @param plugin the plugin instance
      */
-    public ChatService(@NonNull BuildBattleAI plugin, @NonNull ServerVersion version) {
+    public ChatMicroService(@NonNull BuildBattleAI plugin) {
         this.plugin = plugin;
-        this.chatPacketFactory = resolveChatFactory(version);
+        this.chatPacketFactory = resolveChatFactory(plugin.getContext().getServerVersion());
     }
 
     // ── inner types ─────────────────────────────────────────────────────────
@@ -243,12 +247,12 @@ public class ChatService {
      * Each segment carries display text and optional interactive properties
      * (click action, hover tooltip). Instances are built via the fluent
      * {@code append()} API and passed directly to
-     * {@link ChatService#sendChat(Player, ChatMessage)}.
+     * {@link ChatMicroService#sendChat(Player, ChatMessage)}.
      */
     public static class ChatMessage {
 
         /**
-         * Internal segment list. Accessible only from the enclosing {@link ChatService}.
+         * Internal segment list. Accessible only from the enclosing {@link ChatMicroService}.
          */
         @Getter(AccessLevel.PRIVATE)
         private final List<Segment> segments = new ArrayList<>();

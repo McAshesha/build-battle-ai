@@ -76,11 +76,4 @@ public interface BBAIMLService {
     @NonNull
     Map<String, float[]> centroids();
 
-    /**
-     * Releases resources held by this service.
-     * <p>
-     * For the current REST proxy implementation this is a no-op. When migrated to
-     * native Java ML, this method will release model weights and GPU resources.
-     */
-    void shutdown();
 }

@@ -46,7 +46,7 @@ import java.util.Map;
  *
  * @see BBAIMLService
  */
-public class MLService implements BBAIMLService {
+public class MLService implements BBAIMLService, PluginService {
 
     /** Default base URL for the ML microservice. */
     private static final String DEFAULT_BASE_URL = "http://localhost:8001";
@@ -123,6 +123,17 @@ public class MLService implements BBAIMLService {
         for (Map.Entry<String, JsonElement> entry : centroidsObj.entrySet())
             result.put(entry.getKey(), parseFloatArray(entry.getValue().getAsJsonArray()));
         return result;
+    }
+
+    /**
+     * No-op for the REST proxy implementation — no connection pool or cache is
+     * held between calls (each request opens its own {@link HttpURLConnection}).
+     * When ML inference is migrated to native Java this method will warm up the
+     * model, allocate inference buffers, and pin GPU resources.
+     */
+    @Override
+    public void enable() {
+        // Intentionally empty — REST proxy has nothing to initialize per-cycle.
     }
 
     @Override

@@ -59,7 +59,7 @@ public class TestNPCCommand extends PluginCommand {
     public TestNPCCommand(@NonNull BuildBattleAI plugin) {
         super(plugin, "testnpc", "Test command for NPC spawning and despawning",
                 "[skinName|remove <id>|follow <id>|stop <id>]");
-        offHandSupported = plugin.getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_9);
+        offHandSupported = plugin.getContext().getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_9);
     }
 
     @Override

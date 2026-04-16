@@ -21,7 +21,7 @@ import java.util.Collection;
  * while older versions use a combined title packet with action enum.
  * The correct format is resolved once at construction.
  */
-public class TitleService {
+public class TitleMicroService {
 
     private final BuildBattleAI plugin;
 
@@ -31,14 +31,18 @@ public class TitleService {
     private final TitleSender titleSender;
 
     /**
-     * Creates the title service and resolves the version-appropriate sender.
+     * Creates the title micro-service and resolves the version-appropriate sender.
+     * <p>
+     * The server version is obtained from
+     * {@link ru.ashesha.buildBattleAI.core.PluginContext#getServerVersion()},
+     * so this constructor must only be invoked after the plugin context has
+     * been published — i.e. from inside a {@code PluginService.enable()} call.
      *
-     * @param plugin  the plugin instance
-     * @param version the current server version
+     * @param plugin the plugin instance
      */
-    public TitleService(@NonNull BuildBattleAI plugin, @NonNull ServerVersion version) {
+    public TitleMicroService(@NonNull BuildBattleAI plugin) {
         this.plugin = plugin;
-        this.titleSender = resolveTitleSender(version);
+        this.titleSender = resolveTitleSender(plugin.getContext().getServerVersion());
     }
 
     // ── public API ──────────────────────────────────────────────────────────

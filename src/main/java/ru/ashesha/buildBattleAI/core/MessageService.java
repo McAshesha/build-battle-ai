@@ -1,7 +1,7 @@
 package ru.ashesha.buildBattleAI.core;
 
-import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import lombok.experimental.Delegate;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.core.api.BBAIMessageService;
@@ -10,65 +10,87 @@ import ru.ashesha.buildBattleAI.core.message.*;
 /**
  * PacketEvents-based implementation of {@link BBAIMessageService}.
  * <p>
- * Delegates all messaging responsibilities to specialized sub-services located
- * in the {@code core.message} package. Each sub-service handles a specific
+ * Delegates all messaging responsibilities to specialized micro-services located
+ * in the {@code core.message} package. Each micro-service handles a specific
  * category of packet-based messages:
  * <ul>
- *     <li>{@link ChatService} — chat messages (plain-text and rich)</li>
- *     <li>{@link BarService} — action bar messages</li>
- *     <li>{@link TitleService} — title and subtitle overlays</li>
- *     <li>{@link TabService} — player list header and footer</li>
- *     <li>{@link NameService} — player list display name updates</li>
+ *     <li>{@link ChatMicroService} — chat messages (plain-text and rich)</li>
+ *     <li>{@link BarMicroService} — action bar messages</li>
+ *     <li>{@link TitleMicroService} — title and subtitle overlays</li>
+ *     <li>{@link TabMicroService} — player list header and footer</li>
+ *     <li>{@link NameMicroService} — player list display name updates</li>
  * </ul>
  * <p>
  * Lombok's {@code @Delegate} generates forwarding methods so the public API
  * of {@link BBAIMessageService} remains unchanged for callers.
+ * <p>
+ * Implements {@link PluginService} independently of {@link BBAIMessageService}
+ * so lifecycle control stays internal to the plugin and never leaks to API
+ * consumers. Micro-services are instantiated inside {@link #enable()} because
+ * their version-dependent packet factories need {@link PluginContext#getServerVersion()},
+ * which each micro-service resolves for itself via the plugin context — safe
+ * only once the plugin has published its context, i.e. after this service
+ * has been constructed.
  */
-class MessageService implements BBAIMessageService {
+@RequiredArgsConstructor
+class MessageService implements BBAIMessageService, PluginService {
+
+    /** The plugin instance, forwarded to each micro-service during {@link #enable()}. */
+    @NonNull
+    private final BuildBattleAI plugin;
 
     /**
-     * Sub-service for sending chat messages.
+     * Micro-service for sending chat messages. Instantiated in {@link #enable()}.
      */
     @Delegate
-    private final ChatService chatService;
+    private ChatMicroService chatMicroService;
 
     /**
-     * Sub-service for sending action bar messages.
+     * Micro-service for sending action bar messages. Instantiated in {@link #enable()}.
      */
     @Delegate
-    private final BarService barService;
+    private BarMicroService barMicroService;
 
     /**
-     * Sub-service for sending title/subtitle overlays.
+     * Micro-service for sending title/subtitle overlays. Instantiated in {@link #enable()}.
      */
     @Delegate
-    private final TitleService titleService;
+    private TitleMicroService titleMicroService;
 
     /**
-     * Sub-service for sending player list header/footer.
+     * Micro-service for sending player list header/footer. Instantiated in {@link #enable()}.
      */
     @Delegate
-    private final TabService tabService;
+    private TabMicroService tabMicroService;
 
     /**
-     * Sub-service for updating player list display names.
+     * Micro-service for updating player list display names. Instantiated in {@link #enable()}.
      */
     @Delegate
-    private final NameService nameService;
+    private NameMicroService nameMicroService;
 
     /**
-     * Creates the message service and initializes all sub-services.
-     * Version-dependent packet factories are resolved once based on
-     * the current server version reported by PacketEvents.
-     *
-     * @param plugin the plugin instance
+     * Builds every micro-service. Each one resolves its own version-dependent
+     * packet factory by calling {@link PluginContext#getServerVersion()} in its
+     * constructor — safe at this point because the plugin has already
+     * published its context.
      */
-    MessageService(@NonNull BuildBattleAI plugin) {
-        ServerVersion version = plugin.getServerVersion();
-        this.chatService = new ChatService(plugin, version);
-        this.barService = new BarService(plugin, version);
-        this.titleService = new TitleService(plugin, version);
-        this.tabService = new TabService(plugin);
-        this.nameService = new NameService(plugin, version);
+    @Override
+    public void enable() {
+        this.chatMicroService = new ChatMicroService(plugin);
+        this.barMicroService = new BarMicroService(plugin);
+        this.titleMicroService = new TitleMicroService(plugin);
+        this.tabMicroService = new TabMicroService(plugin);
+        this.nameMicroService = new NameMicroService(plugin);
+    }
+
+    /**
+     * No-op — the message service holds no runtime resources (no threads,
+     * no scheduled tasks, no open connections). Kept for {@link PluginService}
+     * conformance so the service slots into the standard lifecycle pipeline.
+     */
+    @Override
+    public void shutdown() {
+        // Intentionally empty — no resources to release.
     }
 }

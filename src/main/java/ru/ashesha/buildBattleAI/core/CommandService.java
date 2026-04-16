@@ -1,6 +1,7 @@
 package ru.ashesha.buildBattleAI.core;
 
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandMap;
@@ -21,47 +22,55 @@ import java.util.Map;
  * Commands are represented by the nested {@link PluginCommand} abstract class.
  * Subclass it to define command logic, then pass instances to
  * {@link #register(PluginCommand)} and {@link #unregister(PluginCommand)}.
+ * <p>
+ * Implements {@link PluginService} so the command service participates in the
+ * uniform plugin lifecycle. {@link #enable()} resolves the server's
+ * {@link CommandMap} and its internal {@code knownCommands} map reflectively,
+ * so a reload produces a fresh binding even if the server swapped its command
+ * map between cycles; {@link #shutdown()} bulk-unregisters every command this
+ * service registered so no entries leak into Bukkit's command map after the
+ * plugin is disabled.
  */
-public class CommandService {
+@RequiredArgsConstructor
+public class CommandService implements PluginService {
 
     /** The plugin instance, used as the command prefix namespace. */
+    @NonNull
     private final BuildBattleAI plugin;
 
-    /** The server's command map, resolved via reflection at construction time. */
-    private final CommandMap commandMap;
+    /**
+     * The server's command map, resolved reflectively in {@link #enable()}.
+     * {@code null} before the first enable — {@link #register(PluginCommand)}
+     * must not be called in that state.
+     */
+    private CommandMap commandMap;
 
-    /** The live map of registered command names inside the {@link CommandMap}. */
-    private final Map<String, Command> knownCommands;
+    /**
+     * The live map of registered command names inside the {@link CommandMap},
+     * resolved reflectively in {@link #enable()}. Used to bulk-strip prefixed
+     * aliases (e.g. {@code "pluginname:command"}) during unregistration.
+     */
+    private Map<String, Command> knownCommands;
 
     /** All commands registered through this service, for bulk unregistration on shutdown. */
     private final List<PluginCommand> registeredCommands = new ArrayList<>();
 
     /**
-     * Creates the command service, resolving the server's {@link CommandMap}
-     * and its {@code knownCommands} map via reflection.
+     * Resolves the server's {@link CommandMap} and its internal
+     * {@code knownCommands} map via reflection.
+     * <p>
+     * Reflection is deferred from the constructor to this method so the
+     * service participates in the standard {@link PluginService} lifecycle —
+     * on reload, {@code enable()} re-runs and rebinds both references, which
+     * keeps the service correct even if something about the server's command
+     * plumbing changed between cycles.
      *
-     * @param plugin the plugin instance
      * @throws RuntimeException if the reflective lookup fails
      */
-    public CommandService(@NonNull BuildBattleAI plugin) {
-        this.plugin = plugin;
+    @Override
+    public void enable() {
         this.commandMap = ReflectionUtils.getFieldValue(Bukkit.getServer(), "commandMap");
         this.knownCommands = ReflectionUtils.getFieldValue(commandMap, "knownCommands");
-    }
-
-    /**
-     * Package-private constructor for unit testing.
-     * Accepts pre-resolved command map and known commands instead of using reflection.
-     *
-     * @param plugin        the plugin instance
-     * @param commandMap    the command map to register into
-     * @param knownCommands the live map of registered command names
-     */
-    CommandService(@NonNull BuildBattleAI plugin, CommandMap commandMap,
-                   Map<String, Command> knownCommands) {
-        this.plugin = plugin;
-        this.commandMap = commandMap;
-        this.knownCommands = knownCommands;
     }
 
     /**
@@ -92,8 +101,10 @@ public class CommandService {
 
     /**
      * Unregisters all commands that were registered through this service.
-     * Called during plugin shutdown.
+     * Called during plugin shutdown. Touches only entries that this service
+     * registered, so commands owned by other plugins remain intact.
      */
+    @Override
     public void shutdown() {
         for (PluginCommand command : registeredCommands) {
             knownCommands.values().removeIf(c -> c == command);

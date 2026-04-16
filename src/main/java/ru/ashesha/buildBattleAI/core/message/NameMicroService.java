@@ -23,7 +23,7 @@ import java.util.Collections;
  * while older versions use the legacy {@code PlayerInfo} packet.
  * The correct format is resolved once at construction.
  */
-public class NameService {
+public class NameMicroService {
 
     private final BuildBattleAI plugin;
 
@@ -33,14 +33,18 @@ public class NameService {
     private final PlayerListPacketFactory playerListPacketFactory;
 
     /**
-     * Creates the name service and resolves the version-appropriate packet factory.
+     * Creates the name micro-service and resolves the version-appropriate packet factory.
+     * <p>
+     * The server version is obtained from
+     * {@link ru.ashesha.buildBattleAI.core.PluginContext#getServerVersion()},
+     * so this constructor must only be invoked after the plugin context has
+     * been published — i.e. from inside a {@code PluginService.enable()} call.
      *
-     * @param plugin  the plugin instance
-     * @param version the current server version
+     * @param plugin the plugin instance
      */
-    public NameService(@NonNull BuildBattleAI plugin, @NonNull ServerVersion version) {
+    public NameMicroService(@NonNull BuildBattleAI plugin) {
         this.plugin = plugin;
-        this.playerListPacketFactory = resolvePlayerListFactory(version);
+        this.playerListPacketFactory = resolvePlayerListFactory(plugin.getContext().getServerVersion());
     }
 
     // ── public API ──────────────────────────────────────────────────────────

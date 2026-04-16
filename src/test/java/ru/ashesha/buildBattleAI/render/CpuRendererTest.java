@@ -619,6 +619,31 @@ class CpuRendererTest {
     }
 
     @Test
+    void shutdownDoesNotBreakSubsequentRenders() {
+        // Reload scenario: RenderService.shutdown() → CpuRenderer.shutdown()
+        // tears down the dedicated pool. The renderer must transparently
+        // rebuild the pool on the next render call so that PluginContext's
+        // shutdown/enable cycle leaves the renderer fully functional.
+        FlatScene scene = emptyScene();
+        byte[] before = CpuRenderer.render(scene, 5, 5, 5, 0, 0);
+
+        CpuRenderer.shutdown();
+
+        byte[] after = CpuRenderer.render(scene, 5, 5, 5, 0, 0);
+        assertEquals(224 * 224 * 3, after.length,
+                "Render after shutdown must still return a full-sized pixel buffer");
+        assertArrayEquals(before, after,
+                "Render output must be identical before and after a shutdown/recreate cycle");
+
+        // Verify a second shutdown/render cycle also works — the pool
+        // recreation path must be idempotent across repeated reloads.
+        CpuRenderer.shutdown();
+        byte[] afterSecondCycle = CpuRenderer.render(scene, 5, 5, 5, 0, 0);
+        assertArrayEquals(before, afterSecondCycle,
+                "Renderer must survive multiple shutdown/restart cycles");
+    }
+
+    @Test
     void translucentBlocksStillExcludedFromAo() {
         // Place glass at (5,5,8) with stone at (6,5,8).
         // Glass is translucent (alpha < 255), so AO must NOT apply.
