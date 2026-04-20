@@ -1,11 +1,11 @@
-package ru.ashesha.buildBattleAI.core.api;
+package ru.ashesha.buildBattleAI.npc.api;
 
 import com.github.retrooper.packetevents.protocol.player.EquipmentSlot;
 import lombok.NonNull;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import ru.ashesha.buildBattleAI.core.NPCService;
+import ru.ashesha.buildBattleAI.npc.NPCService;
 
 import java.util.Collection;
 

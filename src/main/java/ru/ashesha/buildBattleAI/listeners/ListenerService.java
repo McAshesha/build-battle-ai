@@ -1,4 +1,4 @@
-package ru.ashesha.buildBattleAI.core;
+package ru.ashesha.buildBattleAI.listeners;
 
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.event.PacketListener;
@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
+import ru.ashesha.buildBattleAI.core.PluginService;
 
 import java.util.ArrayList;
 import java.util.List;

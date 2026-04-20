@@ -1,4 +1,4 @@
-package ru.ashesha.buildBattleAI.core;
+package ru.ashesha.buildBattleAI.listeners;
 
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.PacketEventsAPI;
@@ -12,7 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
-import ru.ashesha.buildBattleAI.core.ListenerService.PluginListener;
+import ru.ashesha.buildBattleAI.listeners.ListenerService.PluginListener;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;

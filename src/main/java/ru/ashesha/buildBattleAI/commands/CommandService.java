@@ -1,4 +1,4 @@
-package ru.ashesha.buildBattleAI.core;
+package ru.ashesha.buildBattleAI.commands;
 
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -7,6 +7,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandMap;
 import org.bukkit.command.CommandSender;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
+import ru.ashesha.buildBattleAI.core.PluginService;
 import ru.ashesha.buildBattleAI.util.ReflectionUtils;
 
 import java.util.ArrayList;

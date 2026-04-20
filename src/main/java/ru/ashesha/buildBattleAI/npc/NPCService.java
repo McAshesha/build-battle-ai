@@ -1,4 +1,4 @@
-package ru.ashesha.buildBattleAI.core;
+package ru.ashesha.buildBattleAI.npc;
 
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
@@ -32,7 +32,8 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
-import ru.ashesha.buildBattleAI.core.api.BBAINPCService;
+import ru.ashesha.buildBattleAI.core.PluginService;
+import ru.ashesha.buildBattleAI.npc.api.BBAINPCService;
 
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;

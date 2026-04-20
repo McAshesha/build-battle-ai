@@ -105,7 +105,7 @@ public class ChunkScene implements SceneData {
      * for correct sub-type mapping (e.g., colored wool, wood variants).
      * <p>
      * The {@code legacy} flag is resolved once at plugin startup by
-     * {@link ru.ashesha.buildBattleAI.core.RenderService} to avoid repeated
+     * {@link ru.ashesha.buildBattleAI.render.RenderService} to avoid repeated
      * {@code ServerVersion} checks in this hot path.
      *
      * @param region the region to capture

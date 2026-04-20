@@ -1,7 +1,7 @@
-package ru.ashesha.buildBattleAI.core.api;
+package ru.ashesha.buildBattleAI.ml.api;
 
 import lombok.NonNull;
-import ru.ashesha.buildBattleAI.core.MLService;
+import ru.ashesha.buildBattleAI.ml.MLService;
 
 import java.util.List;
 import java.util.Map;

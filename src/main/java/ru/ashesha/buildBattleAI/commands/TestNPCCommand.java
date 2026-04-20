@@ -11,9 +11,9 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.scheduler.BukkitTask;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
-import ru.ashesha.buildBattleAI.core.CommandService.PluginCommand;
-import ru.ashesha.buildBattleAI.core.NPCService;
-import ru.ashesha.buildBattleAI.core.api.BBAINPCService;
+import ru.ashesha.buildBattleAI.commands.CommandService.PluginCommand;
+import ru.ashesha.buildBattleAI.npc.NPCService;
+import ru.ashesha.buildBattleAI.npc.api.BBAINPCService;
 
 import java.util.ArrayList;
 import java.util.Collections;

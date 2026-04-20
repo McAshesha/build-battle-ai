@@ -1,8 +1,8 @@
-package ru.ashesha.buildBattleAI.core.message;
+package ru.ashesha.buildBattleAI.message;
 
 import org.junit.jupiter.api.Test;
-import ru.ashesha.buildBattleAI.core.message.ChatMicroService.ChatMessage;
-import ru.ashesha.buildBattleAI.core.message.ChatMicroService.ClickAction;
+import ru.ashesha.buildBattleAI.message.ChatMicroService.ChatMessage;
+import ru.ashesha.buildBattleAI.message.ChatMicroService.ClickAction;
 
 import static org.junit.jupiter.api.Assertions.*;
 

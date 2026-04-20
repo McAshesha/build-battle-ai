@@ -6,10 +6,10 @@ import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
-import ru.ashesha.buildBattleAI.core.CommandService.PluginCommand;
-import ru.ashesha.buildBattleAI.core.MLService;
-import ru.ashesha.buildBattleAI.core.RenderService;
-import ru.ashesha.buildBattleAI.core.api.BBAIMLService;
+import ru.ashesha.buildBattleAI.commands.CommandService.PluginCommand;
+import ru.ashesha.buildBattleAI.ml.MLService;
+import ru.ashesha.buildBattleAI.ml.api.BBAIMLService;
+import ru.ashesha.buildBattleAI.render.RenderService;
 import ru.ashesha.buildBattleAI.render.RendererUtils;
 import ru.ashesha.buildBattleAI.render.data.ChunkScene;
 

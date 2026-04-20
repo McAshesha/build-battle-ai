@@ -1,4 +1,4 @@
-package ru.ashesha.buildBattleAI.core;
+package ru.ashesha.buildBattleAI.commands;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
@@ -9,7 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
-import ru.ashesha.buildBattleAI.core.CommandService.PluginCommand;
+import ru.ashesha.buildBattleAI.commands.CommandService.PluginCommand;
 import ru.ashesha.buildBattleAI.util.ReflectionUtils;
 
 import java.util.Collections;

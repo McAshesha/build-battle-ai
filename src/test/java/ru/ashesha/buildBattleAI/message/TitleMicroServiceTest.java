@@ -1,4 +1,4 @@
-package ru.ashesha.buildBattleAI.core.message;
+package ru.ashesha.buildBattleAI.message;
 
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.PacketEventsAPI;

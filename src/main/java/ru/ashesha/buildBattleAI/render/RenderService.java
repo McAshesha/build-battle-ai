@@ -1,11 +1,11 @@
-package ru.ashesha.buildBattleAI.core;
+package ru.ashesha.buildBattleAI.render;
 
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import lombok.experimental.Delegate;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
-import ru.ashesha.buildBattleAI.render.CpuRenderer;
+import ru.ashesha.buildBattleAI.core.PluginService;
 import ru.ashesha.buildBattleAI.render.data.ChunkScene;
 
 /**

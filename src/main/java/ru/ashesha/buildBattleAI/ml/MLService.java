@@ -1,4 +1,4 @@
-package ru.ashesha.buildBattleAI.core;
+package ru.ashesha.buildBattleAI.ml;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -8,7 +8,8 @@ import lombok.Getter;
 import lombok.NonNull;
 import lombok.experimental.Accessors;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
-import ru.ashesha.buildBattleAI.core.api.BBAIMLService;
+import ru.ashesha.buildBattleAI.core.PluginService;
+import ru.ashesha.buildBattleAI.ml.api.BBAIMLService;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;

@@ -1,4 +1,4 @@
-package ru.ashesha.buildBattleAI.core.message;
+package ru.ashesha.buildBattleAI.message;
 
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import com.github.retrooper.packetevents.protocol.chat.ChatTypes;

@@ -1,11 +1,11 @@
-package ru.ashesha.buildBattleAI.core;
+package ru.ashesha.buildBattleAI.message;
 
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.Delegate;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
-import ru.ashesha.buildBattleAI.core.api.BBAIMessageService;
-import ru.ashesha.buildBattleAI.core.message.*;
+import ru.ashesha.buildBattleAI.core.PluginService;
+import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
 
 /**
  * PacketEvents-based implementation of {@link BBAIMessageService}.
@@ -33,7 +33,7 @@ import ru.ashesha.buildBattleAI.core.message.*;
  * has been constructed.
  */
 @RequiredArgsConstructor
-class MessageService implements BBAIMessageService, PluginService {
+public class MessageService implements BBAIMessageService, PluginService {
 
     /** The plugin instance, forwarded to each micro-service during {@link #enable()}. */
     @NonNull

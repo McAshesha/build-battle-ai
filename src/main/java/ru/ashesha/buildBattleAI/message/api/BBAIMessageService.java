@@ -1,8 +1,8 @@
-package ru.ashesha.buildBattleAI.core.api;
+package ru.ashesha.buildBattleAI.message.api;
 
 import lombok.NonNull;
 import org.bukkit.entity.Player;
-import ru.ashesha.buildBattleAI.core.message.ChatMicroService;
+import ru.ashesha.buildBattleAI.message.ChatMicroService;
 
 import java.util.Collection;
 
