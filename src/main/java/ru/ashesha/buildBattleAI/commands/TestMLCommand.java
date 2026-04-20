@@ -10,7 +10,7 @@ import ru.ashesha.buildBattleAI.core.CommandService.PluginCommand;
 import ru.ashesha.buildBattleAI.core.MLService;
 import ru.ashesha.buildBattleAI.core.RenderService;
 import ru.ashesha.buildBattleAI.core.api.BBAIMLService;
-import ru.ashesha.buildBattleAI.render.CpuRenderer;
+import ru.ashesha.buildBattleAI.render.RendererUtils;
 import ru.ashesha.buildBattleAI.render.data.ChunkScene;
 
 import javax.imageio.ImageIO;
@@ -162,7 +162,7 @@ public class TestMLCommand extends PluginCommand {
         player.sendMessage("§6§l══════ Prediction ══════");
         long predictStart = System.currentTimeMillis();
         MLService.PredictionResult result = mlService.predict(
-                pixels, CpuRenderer.WIDTH, CpuRenderer.HEIGHT, TOP_K
+                pixels, RendererUtils.WIDTH, RendererUtils.HEIGHT, TOP_K
         );
         long predictMs = System.currentTimeMillis() - predictStart;
 
@@ -225,11 +225,11 @@ public class TestMLCommand extends PluginCommand {
             File file = new File(dir, timestamp + ".png");
 
             BufferedImage image = new BufferedImage(
-                    CpuRenderer.WIDTH, CpuRenderer.HEIGHT, BufferedImage.TYPE_INT_RGB
+                    RendererUtils.WIDTH, RendererUtils.HEIGHT, BufferedImage.TYPE_INT_RGB
             );
-            for (int y = 0; y < CpuRenderer.HEIGHT; y++)
-                for (int x = 0; x < CpuRenderer.WIDTH; x++) {
-                    int idx = (y * CpuRenderer.WIDTH + x) * 3;
+            for (int y = 0; y < RendererUtils.HEIGHT; y++)
+                for (int x = 0; x < RendererUtils.WIDTH; x++) {
+                    int idx = (y * RendererUtils.WIDTH + x) * 3;
                     int r = rgbPixels[idx] & 0xFF;
                     int g = rgbPixels[idx + 1] & 0xFF;
                     int b = rgbPixels[idx + 2] & 0xFF;

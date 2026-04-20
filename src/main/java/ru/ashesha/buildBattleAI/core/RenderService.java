@@ -11,24 +11,19 @@ import ru.ashesha.buildBattleAI.render.data.SceneData;
 /**
  * Centralized entry point for all rendering operations.
  * <p>
- * Owns the server-version-dependent legacy flag (1.8–1.12 servers require
- * reflection-based block lookups) and delegates the actual work to the
- * stateless {@link CpuRenderer} and {@link ChunkScene} utilities.
+ * Owns the {@link CpuRenderer} instance and its lifecycle: the renderer
+ * (along with its dedicated thread pool) is created in {@link #enable()}
+ * and destroyed in {@link #shutdown()}. This guarantees that no worker
+ * threads linger after the plugin is disabled, and that a fresh pool is
+ * available on each reload cycle.
  * <p>
- * Replaces direct calls to {@code CpuRenderer.render()} and
- * {@code ChunkScene.capture()} from game logic, providing a single place
- * where the plugin instance (and therefore {@link PluginContext#getServerVersion()})
- * is wired into the rendering pipeline.
+ * Also owns the server-version-dependent legacy flag (1.8–1.12 servers
+ * require reflection-based block lookups) and passes it into every
+ * {@link #capture(ChunkScene.RenderRegion)} call so that
+ * {@link ChunkScene} does not need to resolve the version itself.
  * <p>
- * Implements {@link PluginService} so the renderer participates in the
- * uniform plugin lifecycle. {@link #enable()} resolves the legacy flag from
- * the server version (deferred from the constructor because the service is
- * instantiated inside {@link PluginContext}'s constructor, before the plugin
- * has published its context reference). {@link #shutdown()} tears down the
- * dedicated {@link CpuRenderer} thread pool to release worker threads; a
- * subsequent {@link #enable()} call (or simply the next {@link #render}
- * invocation) transparently rebuilds the pool, so the service survives hot
- * reloads without leaving the plugin in a broken state.
+ * Game logic should always go through this service — never instantiate
+ * {@link CpuRenderer} directly outside of tests.
  */
 @RequiredArgsConstructor
 public class RenderService implements PluginService {
@@ -39,27 +34,25 @@ public class RenderService implements PluginService {
 
     /**
      * Whether the server is running a pre-1.13 (pre-flattening) version.
-     * Resolved in {@link #enable()} from {@link PluginContext#getServerVersion()}
-     * and passed into every {@link #capture(ChunkScene.RenderRegion)} call,
-     * so that {@link ChunkScene} does not need to look up the server version itself.
-     * <p>
-     * Non-final because resolution is deferred to {@link #enable()} — the
-     * service is created inside {@link PluginContext}'s constructor, at which
-     * point the plugin has not yet exposed its context reference.
+     * Resolved in {@link #enable()} and passed into every capture call.
      */
     private boolean legacy;
 
     /**
-     * Resolves the server-version-dependent legacy flag. Deferred from the
-     * constructor because services are created inside {@link PluginContext}'s
-     * constructor, before the plugin publishes its context; by the time
-     * {@link PluginContext#enable()} runs, {@link BuildBattleAI#getContext()}
-     * returns a fully-initialised context and {@link PluginContext#getServerVersion()}
-     * is safe to call.
+     * The renderer instance, created in {@link #enable()} and destroyed in {@link #shutdown()}.
+     * {@code null} while the service is not enabled.
+     */
+    private CpuRenderer renderer;
+
+    /**
+     * Resolves the server-version-dependent legacy flag and creates the renderer.
+     * Deferred from the constructor because services are created inside
+     * {@link PluginContext}'s constructor, before the plugin publishes its context.
      */
     @Override
     public void enable() {
         this.legacy = !plugin.getContext().getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_13);
+        this.renderer = new CpuRenderer();
     }
 
     /**
@@ -72,12 +65,12 @@ public class RenderService implements PluginService {
      * @param camZ  camera Z position
      * @param yaw   camera yaw (Minecraft convention: 0=south, 90=west, 180=north)
      * @param pitch camera pitch (-90=up, 0=horizontal, 90=down)
-     * @return byte array of size 224*224*3 containing RGB pixel data in row-major HWC order
+     * @return byte array of size 224×224×3 containing RGB pixel data in row-major HWC order
      */
     public byte[] render(@NonNull SceneData scene,
                          double camX, double camY, double camZ,
                          float yaw, float pitch) {
-        return CpuRenderer.render(scene, camX, camY, camZ, yaw, pitch);
+        return renderer.render(scene, camX, camY, camZ, yaw, pitch);
     }
 
     /**
@@ -93,16 +86,15 @@ public class RenderService implements PluginService {
     }
 
     /**
-     * Shuts down the renderer's dedicated thread pool to release worker threads.
-     * <p>
-     * Unlike a permanent disposal, this shutdown is fully recoverable:
-     * {@link CpuRenderer#shutdown()} nulls the pool reference, and the next
-     * {@link #render} call (or a subsequent {@link #enable()}) lazily rebuilds
-     * it. That is what lets the plugin go through a clean {@code shutdown} +
-     * {@code enable} cycle without leaving the renderer in an unusable state.
+     * Shuts down the renderer's dedicated thread pool and releases the instance.
+     * After this call, {@link #render} must not be called until the next
+     * {@link #enable()} recreates the renderer.
      */
     @Override
     public void shutdown() {
-        CpuRenderer.shutdown();
+        if (renderer != null) {
+            renderer.shutdown();
+            renderer = null;
+        }
     }
 }

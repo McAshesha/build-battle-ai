@@ -3,17 +3,19 @@ package ru.ashesha.buildBattleAI.render;
 import com.cryptomorin.xseries.XMaterial;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
-import lombok.experimental.UtilityClass;
 import ru.ashesha.buildBattleAI.render.data.SceneData;
 
-import java.awt.image.BufferedImage;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 
 /**
  * CPU-based voxel ray caster.
- * Produces a 224x224 RGB image of blocks within a {@link SceneData}.
- * Rays are parallelized across scanline stripes via {@link ForkJoinPool}.
+ * Produces a 224×224 RGB image of blocks within a {@link SceneData}.
+ * Rays are parallelized across scanline stripes via a dedicated {@link ForkJoinPool}.
+ * <p>
+ * Instance-based: each {@code CpuRenderer} owns its own thread pool.
+ * The pool is created once in the constructor and released via {@link #shutdown()}.
+ * After shutdown, the renderer must not be used — create a new instance instead.
  * <p>
  * Features:
  * <ul>
@@ -23,23 +25,10 @@ import java.util.concurrent.RecursiveAction;
  *     <li>Semi-transparency — alpha-blended color accumulation through translucent blocks (glass, water, ice)</li>
  *     <li>Sub-block shapes — ray-AABB intersection for non-full-cube blocks</li>
  * </ul>
- * All methods are thread-safe and can be called from any thread.
+ * The {@link #render} method is thread-safe: multiple concurrent calls share
+ * the pool safely because each invocation operates on independent pixel buffers.
  */
-@UtilityClass
 public class CpuRenderer {
-
-    /**
-     * Output image width in pixels (matches typical ML classifier input size).
-     */
-    public static final int WIDTH = 224;
-    /**
-     * Output image height in pixels (matches typical ML classifier input size).
-     */
-    public static final int HEIGHT = 224;
-    /**
-     * Vertical field of view in degrees (matches Minecraft's default FOV).
-     */
-    public static final double FOV = 70.0;
 
     /**
      * Default background (sky) color as packed 24-bit RGB.
@@ -61,27 +50,6 @@ public class CpuRenderer {
      */
     private static final int ROW_THRESHOLD = 16;
 
-    /**
-     * Dedicated pool for render tasks — avoids contention with the shared common pool,
-     * which is used by CompletableFuture, parallel streams, and Bukkit scheduler internals.
-     * A dedicated pool prevents unpredictable render times under server load.
-     * <p>
-     * Non-final and guarded by {@link #POOL_LOCK} so it can be torn down and
-     * rebuilt across plugin reload cycles. A {@link #shutdown()} call nulls the
-     * reference; the next {@link #render} invocation recreates the pool lazily
-     * via {@link #getPool()}, which is how the renderer supports the
-     * shutdown/enable cycle required by the plugin-wide lifecycle contract.
-     */
-    private static volatile ForkJoinPool renderPool = createPool();
-
-    /**
-     * Coordinates concurrent access to {@link #renderPool} while it is being
-     * recreated or torn down. All reads on the hot render path go through
-     * {@link #getPool()} which only enters the synchronized block when the
-     * pool is missing or shut down.
-     */
-    private static final Object POOL_LOCK = new Object();
-
     // Face brightness multipliers (Minecraft-style directional shading).
     // Raised above vanilla values (vanilla: bottom=0.5, X=0.6, Z=0.8) because the
     // flat-color renderer has no texture detail — darker multipliers make blocks
@@ -102,53 +70,33 @@ public class CpuRenderer {
     private static final double MIN_REMAINING = 0.01;
 
     /**
-     * Shuts down the dedicated render thread pool, releasing its worker
-     * threads back to the OS.
-     * <p>
-     * Unlike a hard shutdown, this method leaves the renderer re-usable:
-     * the next call to {@link #render} transparently creates a fresh pool
-     * via {@link #getPool()}. This is what makes the renderer survive a
-     * plugin reload (shutdown followed by enable) without getting stuck
-     * in a permanently unusable state.
+     * Dedicated pool for render tasks — avoids contention with the shared common pool,
+     * which is used by CompletableFuture, parallel streams, and Bukkit scheduler internals.
+     * Created once in the constructor, released in {@link #shutdown()}.
      */
-    public static void shutdown() {
-        synchronized (POOL_LOCK) {
-            ForkJoinPool pool = renderPool;
-            if (pool != null) {
-                pool.shutdownNow();
-                renderPool = null;
-            }
-        }
+    private final ForkJoinPool pool;
+
+    /**
+     * Creates a renderer with a pool sized to available processors.
+     */
+    public CpuRenderer() {
+        this(new ForkJoinPool(Runtime.getRuntime().availableProcessors()));
     }
 
     /**
-     * Creates a new dedicated render pool sized to the number of available
-     * processors. Extracted so both the static initializer and the lazy
-     * re-creation path in {@link #getPool()} use an identical construction.
+     * Creates a renderer backed by the given pool.
+     * Useful for testing with controlled parallelism.
+     *
+     * @param pool the thread pool to use for parallel rendering
      */
-    private static ForkJoinPool createPool() {
-        return new ForkJoinPool(Runtime.getRuntime().availableProcessors());
+    public CpuRenderer(@NonNull ForkJoinPool pool) {
+        this.pool = pool;
     }
 
     /**
-     * Returns a live render pool, lazily recreating it if a prior
-     * {@link #shutdown()} call tore it down. Hot path is a single volatile
-     * read; the synchronized block is only entered when re-creation is
-     * required, so steady-state render calls incur no contention.
-     */
-    private static ForkJoinPool getPool() {
-        ForkJoinPool pool = renderPool;
-        if (pool != null && !pool.isShutdown())
-            return pool;
-        synchronized (POOL_LOCK) {
-            if (renderPool == null || renderPool.isShutdown())
-                renderPool = createPool();
-            return renderPool;
-        }
-    }
-
-    /**
-     * Render the scene from the given camera position and orientation.
+     * Renders the scene from the given camera position and orientation.
+     * Safe to call from any thread concurrently — each invocation operates
+     * on its own pixel buffer and submits independent fork/join tasks.
      *
      * @param scene the captured scene data (thread-safe)
      * @param camX  camera X position
@@ -156,12 +104,12 @@ public class CpuRenderer {
      * @param camZ  camera Z position
      * @param yaw   camera yaw (Minecraft convention: 0=south, 90=west, 180=north)
      * @param pitch camera pitch (-90=up, 0=horizontal, 90=down)
-     * @return byte array of size 224*224*3 containing RGB pixel data in row-major HWC order
+     * @return byte array of size 224×224×3 containing RGB pixel data in row-major HWC order
      */
-    public static byte[] render(@NonNull SceneData scene,
-                                double camX, double camY, double camZ,
-                                float yaw, float pitch) {
-        byte[] pixels = new byte[WIDTH * HEIGHT * 3];
+    public byte[] render(@NonNull SceneData scene,
+                         double camX, double camY, double camZ,
+                         float yaw, float pitch) {
+        byte[] pixels = new byte[RendererUtils.WIDTH * RendererUtils.HEIGHT * 3];
 
         // Camera basis vectors (Minecraft coordinate system)
         double yawRad = Math.toRadians(yaw);
@@ -187,10 +135,10 @@ public class CpuRenderer {
         double upY = rgtZ * fwdX - rgtX * fwdZ;
         double upZ = rgtX * fwdY;
 
-        double halfTan = Math.tan(Math.toRadians(FOV * 0.5));
+        double halfTan = Math.tan(Math.toRadians(RendererUtils.FOV * 0.5));
 
         // Pre-compute per-column Y bounds for empty-space skipping during DDA traversal
-        int[] heightMap = buildHeightMap(scene);
+        int[] heightMap = RendererUtils.buildHeightMap(scene);
 
         RenderContext ctx = new RenderContext(
                 pixels, scene,
@@ -206,10 +154,21 @@ public class CpuRenderer {
                 heightMap
         );
 
-        getPool().invoke(new RenderTask(ctx, 0, HEIGHT));
+        pool.invoke(new RenderTask(ctx, 0, RendererUtils.HEIGHT));
 
         return pixels;
     }
+
+    /**
+     * Shuts down the dedicated thread pool, releasing worker threads back to the OS.
+     * After this call, the renderer instance is no longer usable — discard it and
+     * create a new {@code CpuRenderer} if rendering is needed again.
+     */
+    public void shutdown() {
+        pool.shutdownNow();
+    }
+
+    // ===== Ray tracing algorithm (private static — pure functions) =====
 
     /**
      * Trace a single ray through the scene using DDA voxel traversal.
@@ -730,58 +689,6 @@ public class CpuRenderer {
         return hitFace;
     }
 
-    /**
-     * Convert raw RGB byte array to a BufferedImage for saving as PNG.
-     */
-    public static BufferedImage toBufferedImage(byte @NonNull [] rgb) {
-        BufferedImage image = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
-        int[] pixels = new int[WIDTH * HEIGHT];
-        for (int i = 0; i < WIDTH * HEIGHT; i++) {
-            int r = rgb[i * 3] & 0xFF;
-            int g = rgb[i * 3 + 1] & 0xFF;
-            int b = rgb[i * 3 + 2] & 0xFF;
-            pixels[i] = (r << 16) | (g << 8) | b;
-        }
-        // Bulk transfer — single call replaces WIDTH*HEIGHT individual setRGB() calls,
-        // bypassing per-pixel ColorModel validation for 5-10x speedup
-        image.setRGB(0, 0, WIDTH, HEIGHT, pixels, 0, WIDTH);
-        return image;
-    }
-
-    /**
-     * Pre-computes per-column Y bounds for non-transparent blocks.
-     * For each (x, z) column, stores the lowest and highest Y containing a visible block.
-     * Returns {@code int[sizeX * sizeZ * 2]} where index {@code [i*2]} = minY,
-     * {@code [i*2+1]} = maxY. If a column is empty, minY > maxY.
-     * <p>
-     * This acceleration structure allows the DDA traversal to skip block lookups
-     * for voxels that are guaranteed to be empty based on their column's Y range.
-     */
-    static int[] buildHeightMap(SceneData scene) {
-        int sizeX = scene.maxX() - scene.minX() + 1;
-        int sizeZ = scene.maxZ() - scene.minZ() + 1;
-        int[] heightMap = new int[sizeX * sizeZ * 2];
-        // Initialize: minY = beyond max, maxY = below min (empty marker)
-        for (int i = 0; i < sizeX * sizeZ; i++) {
-            heightMap[i * 2] = scene.maxY() + 1;
-            heightMap[i * 2 + 1] = scene.minY() - 1;
-        }
-        for (int x = scene.minX(); x <= scene.maxX(); x++)
-            for (int z = scene.minZ(); z <= scene.maxZ(); z++) {
-                int colIdx = ((x - scene.minX()) * sizeZ + (z - scene.minZ())) * 2;
-                for (int y = scene.minY(); y <= scene.maxY(); y++) {
-                    XMaterial mat = scene.getBlockType(x, y, z);
-                    if (BlockPalette.getColor(mat) != -1) {
-                        if (y < heightMap[colIdx])
-                            heightMap[colIdx] = y;
-                        if (y > heightMap[colIdx + 1])
-                            heightMap[colIdx + 1] = y;
-                    }
-                }
-            }
-        return heightMap;
-    }
-
     // ===== Parallel rendering infrastructure =====
 
     /**
@@ -834,10 +741,10 @@ public class CpuRenderer {
          */
         private void renderRows() {
             for (int py = startRow; py < endRow; py++) {
-                double ndcY = (1.0 - 2.0 * (py + 0.5) / HEIGHT) * ctx.halfTan;
+                double ndcY = (1.0 - 2.0 * (py + 0.5) / RendererUtils.HEIGHT) * ctx.halfTan;
 
-                for (int px = 0; px < WIDTH; px++) {
-                    double ndcX = (2.0 * (px + 0.5) / WIDTH - 1.0) * ctx.halfTan;
+                for (int px = 0; px < RendererUtils.WIDTH; px++) {
+                    double ndcX = (2.0 * (px + 0.5) / RendererUtils.WIDTH - 1.0) * ctx.halfTan;
 
                     // Ray direction = forward + ndcX * right + ndcY * up
                     double rdx = ctx.fwdX + ndcX * ctx.rgtX + ndcY * ctx.upX;
@@ -857,7 +764,7 @@ public class CpuRenderer {
                             ctx.regionMaxX, ctx.regionMaxY, ctx.regionMaxZ,
                             ctx.heightMap);
 
-                    int idx = (py * WIDTH + px) * 3;
+                    int idx = (py * RendererUtils.WIDTH + px) * 3;
                     ctx.pixels[idx] = (byte) ((color >> 16) & 0xFF);
                     ctx.pixels[idx + 1] = (byte) ((color >> 8) & 0xFF);
                     ctx.pixels[idx + 2] = (byte) (color & 0xFF);
@@ -865,5 +772,4 @@ public class CpuRenderer {
             }
         }
     }
-
 }
