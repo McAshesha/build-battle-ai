@@ -1,12 +1,12 @@
 package ru.ashesha.buildBattleAI.core;
 
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
+import lombok.experimental.Delegate;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.render.CpuRenderer;
 import ru.ashesha.buildBattleAI.render.data.ChunkScene;
-import ru.ashesha.buildBattleAI.render.data.SceneData;
 
 /**
  * Centralized entry point for all rendering operations.
@@ -41,7 +41,12 @@ public class RenderService implements PluginService {
     /**
      * The renderer instance, created in {@link #enable()} and destroyed in {@link #shutdown()}.
      * {@code null} while the service is not enabled.
+     * <p>
+     * {@code @Delegate} generates the {@code render()} method automatically.
+     * {@code shutdown()} is NOT delegated because it is already declared via
+     * {@link PluginService} — Lombok skips methods that exist on the class or its interfaces.
      */
+    @Delegate
     private CpuRenderer renderer;
 
     /**
@@ -53,24 +58,6 @@ public class RenderService implements PluginService {
     public void enable() {
         this.legacy = !plugin.getContext().getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_13);
         this.renderer = new CpuRenderer();
-    }
-
-    /**
-     * Renders a captured scene from the given camera pose.
-     * Safe to call from any thread.
-     *
-     * @param scene the captured scene data (thread-safe)
-     * @param camX  camera X position
-     * @param camY  camera Y position
-     * @param camZ  camera Z position
-     * @param yaw   camera yaw (Minecraft convention: 0=south, 90=west, 180=north)
-     * @param pitch camera pitch (-90=up, 0=horizontal, 90=down)
-     * @return byte array of size 224×224×3 containing RGB pixel data in row-major HWC order
-     */
-    public byte[] render(@NonNull SceneData scene,
-                         double camX, double camY, double camZ,
-                         float yaw, float pitch) {
-        return renderer.render(scene, camX, camY, camZ, yaw, pitch);
     }
 
     /**
