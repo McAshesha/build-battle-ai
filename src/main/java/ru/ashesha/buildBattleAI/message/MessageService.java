@@ -19,6 +19,7 @@ import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
  *     <li>{@link TitleMicroService} — title and subtitle overlays</li>
  *     <li>{@link TabMicroService} — player list header and footer</li>
  *     <li>{@link NameMicroService} — player list display name updates</li>
+ *     <li>{@link BoardMicroService} — sidebar scoreboard creation and management</li>
  * </ul>
  * <p>
  * Lombok's {@code @Delegate} generates forwarding methods so the public API
@@ -70,6 +71,14 @@ public class MessageService implements BBAIMessageService, PluginService {
     private NameMicroService nameMicroService;
 
     /**
+     * Micro-service for creating and managing sidebar scoreboards. Instantiated in {@link #enable()}.
+     * Unlike other micro-services, this one holds per-player state (active boards)
+     * and requires explicit cleanup in {@link #shutdown()}.
+     */
+    @Delegate
+    private BoardMicroService boardMicroService;
+
+    /**
      * Builds every micro-service. Each one resolves its own version-dependent
      * packet factory by calling {@link PluginContext#getServerVersion()} in its
      * constructor — safe at this point because the plugin has already
@@ -82,15 +91,18 @@ public class MessageService implements BBAIMessageService, PluginService {
         this.titleMicroService = new TitleMicroService(plugin);
         this.tabMicroService = new TabMicroService(plugin);
         this.nameMicroService = new NameMicroService(plugin);
+        this.boardMicroService = new BoardMicroService(plugin);
     }
 
     /**
-     * No-op — the message service holds no runtime resources (no threads,
-     * no scheduled tasks, no open connections). Kept for {@link PluginService}
-     * conformance so the service slots into the standard lifecycle pipeline.
+     * Shuts down stateful micro-services. The {@link BoardMicroService} holds
+     * per-player board state that must be cleaned up (remove packets sent,
+     * tracking map cleared). Other micro-services are stateless and need no
+     * teardown.
      */
     @Override
     public void shutdown() {
-        // Intentionally empty — no resources to release.
+        if (boardMicroService != null)
+            boardMicroService.shutdown();
     }
 }

@@ -2,6 +2,7 @@ package ru.ashesha.buildBattleAI.message.api;
 
 import lombok.NonNull;
 import org.bukkit.entity.Player;
+import ru.ashesha.buildBattleAI.message.BoardMicroService;
 import ru.ashesha.buildBattleAI.message.ChatMicroService;
 
 import java.util.Collection;
@@ -128,5 +129,36 @@ public interface BBAIMessageService {
      * @param viewers        the players who will see the updated name
      */
     void sendPlayerListName(@NonNull Player target, String playerListName, @NonNull Collection<? extends Player> viewers);
+
+    // ── Scoreboard (Board) ─────────────────────────────────────────────
+
+    /**
+     * Creates a new sidebar scoreboard for the given player and displays it immediately.
+     * If the player already has an active board, the old one is removed first.
+     * <p>
+     * The returned {@link BoardMicroService.Board} provides methods for setting lines,
+     * updating the title, and removing the board.
+     *
+     * @param player the target player
+     * @param title  the scoreboard title (supports {@code &} color codes)
+     * @return the newly created board
+     */
+    BoardMicroService.Board createBoard(@NonNull Player player, @NonNull String title);
+
+    /**
+     * Retrieves the active board for the given player.
+     *
+     * @param player the target player
+     * @return the player's active board, or {@code null} if none exists
+     */
+    BoardMicroService.Board getBoard(@NonNull Player player);
+
+    /**
+     * Removes the active board for the given player, sending all necessary
+     * cleanup packets. Does nothing if the player has no active board.
+     *
+     * @param player the target player
+     */
+    void removeBoard(@NonNull Player player);
 
 }
