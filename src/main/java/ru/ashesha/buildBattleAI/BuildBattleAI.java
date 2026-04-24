@@ -1,6 +1,7 @@
 package ru.ashesha.buildBattleAI;
 
 import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.settings.PacketEventsSettings;
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
 import lombok.Getter;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -29,9 +30,14 @@ public final class BuildBattleAI extends JavaPlugin {
      * Called during server startup before {@link #onEnable()}.
      * Builds and loads the PacketEvents API instance for this plugin.
      */
+    @SuppressWarnings("UnstableApiUsage")
     @Override
     public void onLoad() {
-        PacketEvents.setAPI(SpigotPacketEventsBuilder.build(this));
+        PacketEventsSettings settings = new PacketEventsSettings()
+                .debug(false)
+                .fullStackTrace(false)
+                .checkForUpdates(false);
+        PacketEvents.setAPI(SpigotPacketEventsBuilder.build(this, settings));
         PacketEvents.getAPI().load();
         context = new PluginContext(this);
     }
