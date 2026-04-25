@@ -21,7 +21,7 @@ import ru.ashesha.buildBattleAI.entity.hologram.api.BBAIHologramService;
 import ru.ashesha.buildBattleAI.util.MessageUtils;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import ru.ashesha.buildBattleAI.util.EntityUtils;
 
 /**
  * PacketEvents-based implementation of {@link BBAIHologramService}.
@@ -58,13 +58,6 @@ public class HologramService implements BBAIHologramService, PluginService {
      */
     @NonNull
     private final BuildBattleAI plugin;
-
-    /**
-     * Monotonically increasing counter for synthetic entity IDs.
-     * Starts from a high range (offset from {@link ru.ashesha.buildBattleAI.entity.npc.NPCService})
-     * to minimize collision risk.
-     */
-    private final AtomicInteger entityIdCounter = new AtomicInteger(Integer.MAX_VALUE / 4);
 
     // ── version-resolved factories and constants ────────────────────────────
 
@@ -149,7 +142,7 @@ public class HologramService implements BBAIHologramService, PluginService {
 
         int[] entityIds = new int[lineCount];
         for (int i = 0; i < lineCount; i++)
-            entityIds[i] = entityIdCounter.getAndIncrement();
+            entityIds[i] = EntityUtils.nextEntityId();
 
         return new Hologram(entityIds);
     }
@@ -263,7 +256,7 @@ public class HologramService implements BBAIHologramService, PluginService {
         if (newCount > oldCount) {
             int[] newIds = Arrays.copyOf(oldIds, newCount);
             for (int i = oldCount; i < newCount; i++)
-                newIds[i] = entityIdCounter.getAndIncrement();
+                newIds[i] = EntityUtils.nextEntityId();
             hologram.entityIds = newIds;
         }
 

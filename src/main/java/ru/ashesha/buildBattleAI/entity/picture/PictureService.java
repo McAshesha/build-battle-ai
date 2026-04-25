@@ -27,6 +27,7 @@ import ru.ashesha.buildBattleAI.util.MapPalette;
 
 import java.awt.image.BufferedImage;
 import java.util.*;
+import ru.ashesha.buildBattleAI.util.EntityUtils;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -55,13 +56,6 @@ public class PictureService implements BBAIPictureService, PluginService {
      */
     @NonNull
     private final BuildBattleAI plugin;
-
-    /**
-     * Monotonically increasing counter for synthetic entity IDs.
-     * Starts from a high range (offset from NPC and Hologram services)
-     * to minimize collision risk with real server entities.
-     */
-    private final AtomicInteger entityIdCounter = new AtomicInteger(Integer.MAX_VALUE / 8);
 
     /**
      * Monotonically increasing counter for map IDs.
@@ -180,7 +174,7 @@ public class PictureService implements BBAIPictureService, PluginService {
         int[] entityIds = new int[total];
         int[] mapIds = new int[total];
         for (int i = 0; i < total; i++) {
-            entityIds[i] = entityIdCounter.getAndIncrement();
+            entityIds[i] = EntityUtils.nextEntityId();
             mapIds[i] = mapIdCounter.getAndIncrement();
         }
 

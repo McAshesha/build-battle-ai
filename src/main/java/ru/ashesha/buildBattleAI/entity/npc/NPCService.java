@@ -27,7 +27,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import ru.ashesha.buildBattleAI.util.EntityUtils;
 
 /**
  * PacketEvents-based implementation of {@link BBAINPCService}.
@@ -51,12 +51,6 @@ public class NPCService implements BBAINPCService, PluginService {
      */
     @NonNull
     private final BuildBattleAI plugin;
-
-    /**
-     * Monotonically increasing counter for synthetic entity IDs.
-     * Starts from a high range to minimize risk of collision with real server entities.
-     */
-    private final AtomicInteger entityIdCounter = new AtomicInteger(Integer.MAX_VALUE / 2);
 
     // ── version-resolved factories and constants ────────────────────────────
 
@@ -174,7 +168,7 @@ public class NPCService implements BBAINPCService, PluginService {
     @NonNull
     public NPC createNPC(@NonNull String name,
                          @NonNull String texture, @NonNull String signature) {
-        int entityId = entityIdCounter.getAndIncrement();
+        int entityId = EntityUtils.nextEntityId();
         UserProfile profile = new UserProfile(UUID.randomUUID(), name);
         profile.setTextureProperties(Collections.singletonList(
                 new TextureProperty("textures", texture, signature)
@@ -185,7 +179,7 @@ public class NPCService implements BBAINPCService, PluginService {
     @Override
     @NonNull
     public NPC createNPC(@NonNull Player skinSource, @NonNull String name) {
-        int entityId = entityIdCounter.getAndIncrement();
+        int entityId = EntityUtils.nextEntityId();
         UserProfile sourceProfile = plugin.getContext().getUserProfile(skinSource);
 
         List<TextureProperty> textures = sourceProfile.getTextureProperties();
