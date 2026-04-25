@@ -413,10 +413,10 @@ public class PictureService implements BBAIPictureService, PluginService {
      * @return the image tile column index
      */
     static int resolveImageCol(int col, int width, BlockFace face) {
-        // SOUTH-facing frames render map-left at +X, so frames placed in +X order
-        // need mirrored image columns. WEST-facing works similarly along +Z.
-        // NORTH and EAST do not need mirroring.
-        if (face == BlockFace.SOUTH || face == BlockFace.WEST)
+        // NORTH and EAST-facing frames render map content mirrored relative to the
+        // frame grid layout, so image columns need to be reversed for these faces.
+        // SOUTH and WEST display map-left aligned with the grid's column order.
+        if (face == BlockFace.NORTH || face == BlockFace.EAST)
             return width - 1 - col;
         return col;
     }
@@ -454,17 +454,20 @@ public class PictureService implements BBAIPictureService, PluginService {
     /**
      * Resolves the entity metadata index for the item displayed in an item frame.
      * <p>
-     * Item Frame extends Entity directly (not LivingEntity), so the index
-     * equals the Entity base class metadata count, which grows across versions:
+     * Item Frame extends HangingEntity extends Entity. The item index equals the
+     * sum of metadata fields in Entity + HangingEntity, which grows across versions:
      * <pre>
-     *   1.8        → index 5  (Entity: 0–4, but Silent not present, so 0–3 + ItemFrame starts at 5??)
+     *   1.8        → index 5  (Entity: 0–3)
      *   1.9        → index 5  (Entity: 0–4, Silent added)
      *   1.10–1.13  → index 6  (Entity: 0–5, NoGravity added)
      *   1.14–1.16  → index 7  (Entity: 0–6, Pose added)
-     *   1.17+      → index 8  (Entity: 0–7, FrozenTicks added)
+     *   1.17–1.21.1→ index 8  (Entity: 0–7, FrozenTicks added)
+     *   1.21.2+    → index 9  (HangingEntity adds DATA_DIRECTION at index 8)
      * </pre>
      */
     private int resolveItemFrameItemIndex(ServerVersion version) {
+        if (version.isNewerThanOrEquals(ServerVersion.V_1_21_2))
+            return 9;
         if (version.isNewerThanOrEquals(ServerVersion.V_1_17))
             return 8;
         if (version.isNewerThanOrEquals(ServerVersion.V_1_14))

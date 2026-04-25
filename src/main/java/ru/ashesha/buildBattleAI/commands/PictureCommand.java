@@ -1,12 +1,16 @@
 package ru.ashesha.buildBattleAI.commands;
 
 import lombok.NonNull;
+import org.bukkit.Location;
 import org.bukkit.block.BlockFace;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.entity.picture.PictureService;
 import ru.ashesha.buildBattleAI.entity.picture.api.BBAIPictureService;
+import ru.ashesha.buildBattleAI.render.RendererUtils;
+import ru.ashesha.buildBattleAI.render.data.ChunkScene;
+import ru.ashesha.buildBattleAI.render.data.SceneData;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -27,10 +31,12 @@ import java.util.Map;
  * <p>
  * Usage:
  * <ul>
- *     <li>{@code /picture create <file> [width] [height] [face]} — creates and displays
- *         a picture from an image file. Width/height default to 3, face defaults to
- *         the player's facing direction.</li>
- *     <li>{@code /picture update <file>} — updates the current picture with a new image</li>
+ *     <li>{@code /picture create [file] [width] [height] [face]} — creates and displays
+ *         a picture. If no file is given, renders the scene from the player's viewpoint
+ *         via the voxel renderer. Width/height default to 3, face defaults to the
+ *         player's facing direction.</li>
+ *     <li>{@code /picture update [file]} — updates the current picture with a new image,
+ *         or re-renders from the player's viewpoint if no file is given</li>
  *     <li>{@code /picture remove} — removes the current picture</li>
  * </ul>
  */
@@ -114,25 +120,21 @@ public class PictureCommand extends CommandService.PluginCommand {
 
     /**
      * Handles the {@code create} subcommand: loads an image from the plugin's
-     * data folder and displays it as a picture on the wall in front of the player.
+     * data folder or renders the scene from the player's viewpoint, then
+     * displays it as a picture on the wall in front of the player.
      *
      * @param player the player creating the picture
-     * @param args   command arguments: {@code create <file> [width] [height] [face]}
+     * @param args   command arguments: {@code create [file] [width] [height] [face]}
      */
     private void handleCreate(Player player, String[] args) {
-        if (args.length < 2) {
-            player.sendMessage("Usage: /picture create <file> [width] [height] [face]");
-            return;
-        }
-
-        // Load image file from plugin data folder
-        BufferedImage image = loadImage(player, args[1]);
-        if (image == null)
-            return;
+        // Detect whether the first argument is a file name or a dimension number.
+        // If absent or parseable as int → no file → use renderer.
+        boolean hasFile = args.length >= 2 && !isInteger(args[1]);
+        int argOffset = hasFile ? 1 : 0;
 
         // Parse grid dimensions (default 3x3)
-        int width = parseIntOrDefault(args, 2, 3);
-        int height = parseIntOrDefault(args, 3, 3);
+        int width = parseIntOrDefault(args, 1 + argOffset, 3);
+        int height = parseIntOrDefault(args, 2 + argOffset, 3);
 
         if (width < 1 || width > 20 || height < 1 || height > 20) {
             player.sendMessage("Dimensions must be between 1 and 20.");
@@ -140,7 +142,7 @@ public class PictureCommand extends CommandService.PluginCommand {
         }
 
         // Parse facing direction (default: player's facing direction)
-        BlockFace face = parseFace(args, 4, getPlayerFacing(player));
+        BlockFace face = parseFace(args, 3 + argOffset, getPlayerFacing(player));
         if (face == null) {
             player.sendMessage("Invalid face. Use: north, south, east, west");
             return;
@@ -149,47 +151,73 @@ public class PictureCommand extends CommandService.PluginCommand {
         // Remove any existing picture for this player
         removeExisting(player);
 
-        // Create and spawn the picture
+        // Create the picture handle
         BBAIPictureService pictureService = plugin.getContext().getPictureService();
         PictureService.Picture picture = pictureService.createPicture(width, height);
 
-        // Place the picture 2 blocks in front of the player at eye level
+        // Place 2 blocks in front of the player at eye level
         int anchorX = player.getLocation().getBlockX() + face.getModX() * 2;
         int anchorY = player.getLocation().getBlockY();
         int anchorZ = player.getLocation().getBlockZ() + face.getModZ() * 2;
 
-        pictureService.spawn(player, picture, anchorX, anchorY, anchorZ, face, image);
-        activePictures.put(player.getName(), picture);
+        if (hasFile) {
+            // File path provided — load image from plugin data folder
+            BufferedImage image = loadImage(player, args[1]);
+            if (image == null)
+                return;
 
+            pictureService.spawn(player, picture, anchorX, anchorY, anchorZ, face, image);
+        } else {
+            // No file — render the scene from the player's perspective
+            byte[] hwcPixels = renderFromPlayer(player);
+            if (hwcPixels == null)
+                return;
+
+            pictureService.spawn(player, picture, anchorX, anchorY, anchorZ, face,
+                    hwcPixels, RendererUtils.WIDTH, RendererUtils.HEIGHT);
+        }
+
+        activePictures.put(player.getName(), picture);
+        String source = hasFile ? args[1] : "renderer";
         player.sendMessage("Picture created (" + width + "x" + height + ") facing "
-                + face.name().toLowerCase() + ".");
+                + face.name().toLowerCase() + " from " + source + ".");
     }
 
     /**
      * Handles the {@code update} subcommand: replaces the image on the player's
-     * current picture without respawning the frames.
+     * current picture without respawning the frames. If no file is given,
+     * re-renders from the player's current viewpoint.
      *
      * @param player the player updating the picture
-     * @param args   command arguments: {@code update <file>}
+     * @param args   command arguments: {@code update [file]}
      */
     private void handleUpdate(Player player, String[] args) {
-        if (args.length < 2) {
-            player.sendMessage("Usage: /picture update <file>");
-            return;
-        }
-
         PictureService.Picture picture = activePictures.get(player.getName());
         if (picture == null) {
             player.sendMessage("No active picture. Use /picture create first.");
             return;
         }
 
-        BufferedImage image = loadImage(player, args[1]);
-        if (image == null)
-            return;
+        BBAIPictureService pictureService = plugin.getContext().getPictureService();
 
-        plugin.getContext().getPictureService().update(player, picture, image);
-        player.sendMessage("Picture updated.");
+        if (args.length >= 2) {
+            // File name provided
+            BufferedImage image = loadImage(player, args[1]);
+            if (image == null)
+                return;
+
+            pictureService.update(player, picture, image);
+            player.sendMessage("Picture updated from " + args[1] + ".");
+        } else {
+            // No file — re-render from player's viewpoint
+            byte[] hwcPixels = renderFromPlayer(player);
+            if (hwcPixels == null)
+                return;
+
+            pictureService.update(player, picture, hwcPixels,
+                    RendererUtils.WIDTH, RendererUtils.HEIGHT);
+            player.sendMessage("Picture updated from renderer.");
+        }
     }
 
     /**
@@ -220,6 +248,44 @@ public class PictureCommand extends CommandService.PluginCommand {
     }
 
     // ── utility methods ────────────────────────────────────────────────────
+
+    /**
+     * Captures the world around the player and renders it via the voxel renderer.
+     * <p>
+     * Capture runs on the main thread (required by Bukkit world access), render
+     * is synchronous here for simplicity — the renderer uses its own ForkJoinPool
+     * internally. The capture region is a 64-block cube centered on the player.
+     *
+     * @param player the player whose viewpoint to render from
+     * @return HWC byte array of rendered pixels, or {@code null} on failure
+     */
+    private byte[] renderFromPlayer(Player player) {
+        try {
+            Location loc = player.getLocation();
+            int bx = loc.getBlockX();
+            int by = loc.getBlockY();
+            int bz = loc.getBlockZ();
+            int radius = 32;
+
+            // Capture must happen on the main thread — we're already here
+            ChunkScene.RenderRegion region = new ChunkScene.RenderRegion.Cuboid(
+                    bx - radius, Math.max(0, by - radius), bz - radius,
+                    bx + radius, Math.min(255, by + radius), bz + radius,
+                    player.getWorld()
+            );
+            SceneData scene = plugin.getContext().getRenderService().capture(region);
+
+            // Render from the player's eye position
+            double eyeY = loc.getY() + player.getEyeHeight();
+            return plugin.getContext().getRenderService().render(
+                    scene, loc.getX(), eyeY, loc.getZ(),
+                    loc.getYaw(), loc.getPitch()
+            );
+        } catch (Exception e) {
+            player.sendMessage("Render failed: " + e.getMessage());
+            return null;
+        }
+    }
 
     /**
      * Loads an image from the plugin's data folder.
@@ -333,6 +399,18 @@ public class PictureCommand extends CommandService.PluginCommand {
             return Integer.parseInt(args[index]);
         } catch (NumberFormatException e) {
             return defaultValue;
+        }
+    }
+
+    /**
+     * Returns {@code true} if the string is parseable as an integer.
+     */
+    private static boolean isInteger(String s) {
+        try {
+            Integer.parseInt(s);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
         }
     }
 

@@ -121,33 +121,33 @@ class PictureServiceTest {
     // ── resolveImageCol tests ──────────────────────────────────────────────
 
     @Test
-    void imageColMirroredForSouth() {
-        // SOUTH-facing frames mirror the image horizontally
-        assertEquals(2, PictureService.resolveImageCol(0, 3, BlockFace.SOUTH));
+    void imageColNotMirroredForSouth() {
+        // SOUTH-facing frames align map-left with grid column order
+        assertEquals(0, PictureService.resolveImageCol(0, 3, BlockFace.SOUTH));
         assertEquals(1, PictureService.resolveImageCol(1, 3, BlockFace.SOUTH));
-        assertEquals(0, PictureService.resolveImageCol(2, 3, BlockFace.SOUTH));
+        assertEquals(2, PictureService.resolveImageCol(2, 3, BlockFace.SOUTH));
     }
 
     @Test
-    void imageColMirroredForWest() {
-        // WEST-facing frames also mirror the image horizontally
-        assertEquals(3, PictureService.resolveImageCol(0, 4, BlockFace.WEST));
-        assertEquals(0, PictureService.resolveImageCol(3, 4, BlockFace.WEST));
+    void imageColNotMirroredForWest() {
+        // WEST-facing frames align map-left with grid column order
+        assertEquals(0, PictureService.resolveImageCol(0, 4, BlockFace.WEST));
+        assertEquals(3, PictureService.resolveImageCol(3, 4, BlockFace.WEST));
     }
 
     @Test
-    void imageColNotMirroredForNorth() {
-        // NORTH-facing frames do not mirror
-        assertEquals(0, PictureService.resolveImageCol(0, 3, BlockFace.NORTH));
+    void imageColMirroredForNorth() {
+        // NORTH-facing frames need mirrored image columns
+        assertEquals(2, PictureService.resolveImageCol(0, 3, BlockFace.NORTH));
         assertEquals(1, PictureService.resolveImageCol(1, 3, BlockFace.NORTH));
-        assertEquals(2, PictureService.resolveImageCol(2, 3, BlockFace.NORTH));
+        assertEquals(0, PictureService.resolveImageCol(2, 3, BlockFace.NORTH));
     }
 
     @Test
-    void imageColNotMirroredForEast() {
-        // EAST-facing frames do not mirror
-        assertEquals(0, PictureService.resolveImageCol(0, 4, BlockFace.EAST));
-        assertEquals(3, PictureService.resolveImageCol(3, 4, BlockFace.EAST));
+    void imageColMirroredForEast() {
+        // EAST-facing frames need mirrored image columns
+        assertEquals(3, PictureService.resolveImageCol(0, 4, BlockFace.EAST));
+        assertEquals(0, PictureService.resolveImageCol(3, 4, BlockFace.EAST));
     }
 
     @Test
