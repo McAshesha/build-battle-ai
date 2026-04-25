@@ -12,10 +12,6 @@ import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.ArenaManager;
 import ru.ashesha.buildBattleAI.arena.api.BBAIArenaManager;
 import ru.ashesha.buildBattleAI.commands.CommandService;
-import ru.ashesha.buildBattleAI.commands.TestBoardCommand;
-import ru.ashesha.buildBattleAI.commands.TestHologramCommand;
-import ru.ashesha.buildBattleAI.commands.TestMLCommand;
-import ru.ashesha.buildBattleAI.commands.TestNPCCommand;
 import ru.ashesha.buildBattleAI.entity.hologram.HologramService;
 import ru.ashesha.buildBattleAI.entity.hologram.api.BBAIHologramService;
 import ru.ashesha.buildBattleAI.game.GameManager;
@@ -160,10 +156,6 @@ public class PluginContext {
         // belong here because they are owned by the plugin as a whole, not by
         // the command / listener services (those services only provide the
         // registration mechanism and the bulk-unregistration guarantees).
-        commandService.register(new TestNPCCommand(plugin));
-        commandService.register(new TestHologramCommand(plugin));
-        commandService.register(new TestMLCommand(plugin));
-        commandService.register(new TestBoardCommand(plugin));
     }
 
     /**
