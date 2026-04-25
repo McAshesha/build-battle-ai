@@ -1,0 +1,2 @@
+test-join-message: "Welcome to the server, %player%!"
+test-leave-message: "Goodbye, %player%! See you next time!"

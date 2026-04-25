@@ -11,6 +11,8 @@ import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.ArenaManager;
 import ru.ashesha.buildBattleAI.arena.api.BBAIArenaManager;
+import ru.ashesha.buildBattleAI.config.ConfigService;
+import ru.ashesha.buildBattleAI.config.api.BBAIConfigService;
 import ru.ashesha.buildBattleAI.commands.CommandService;
 import ru.ashesha.buildBattleAI.entity.hologram.HologramService;
 import ru.ashesha.buildBattleAI.entity.hologram.api.BBAIHologramService;
@@ -61,6 +63,8 @@ public class PluginContext {
     private final BuildBattleAI plugin;
 
     @Getter
+    private final BBAIConfigService configService;
+    @Getter
     private final BBAIArenaManager arenaManager;
     @Getter
     private final BBAIGameManager gameManager;
@@ -105,8 +109,10 @@ public class PluginContext {
         this.plugin = plugin;
 
         // Build each service — dependency order matches the enable sequence.
-        // Managers first (world / game state holders), then protocol-bound
+        // Config first (other services may read settings during their enable),
+        // then managers (world / game state holders), then protocol-bound
         // services, then command / listener / render plumbing.
+        ConfigService configServiceImpl = new ConfigService(plugin);
         ArenaManager arenaManagerImpl = new ArenaManager(plugin);
         GameManager gameManagerImpl = new GameManager(plugin);
         MessageService messageServiceImpl = new MessageService(plugin);
@@ -118,6 +124,7 @@ public class PluginContext {
         CommandService commandServiceImpl = new CommandService(plugin);
         ListenerService listenerServiceImpl = new ListenerService(plugin);
 
+        this.configService = configServiceImpl;
         this.arenaManager = arenaManagerImpl;
         this.gameManager = gameManagerImpl;
         this.messageService = messageServiceImpl;
@@ -132,6 +139,7 @@ public class PluginContext {
         // Keep the list unmodifiable — the lifecycle path must not be mutated
         // at runtime; any new service is added by editing the constructor.
         this.services = Collections.unmodifiableList(Arrays.asList(
+                configServiceImpl,
                 arenaManagerImpl,
                 gameManagerImpl,
                 messageServiceImpl,

@@ -1,0 +1,3 @@
+default-language: en
+test-setting: 42
+test-bool: true
