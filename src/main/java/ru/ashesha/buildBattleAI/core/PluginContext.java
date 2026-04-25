@@ -12,8 +12,11 @@ import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.ArenaManager;
 import ru.ashesha.buildBattleAI.arena.api.BBAIArenaManager;
 import ru.ashesha.buildBattleAI.commands.CommandService;
+import ru.ashesha.buildBattleAI.commands.PictureCommand;
 import ru.ashesha.buildBattleAI.entity.hologram.HologramService;
 import ru.ashesha.buildBattleAI.entity.hologram.api.BBAIHologramService;
+import ru.ashesha.buildBattleAI.entity.picture.PictureService;
+import ru.ashesha.buildBattleAI.entity.picture.api.BBAIPictureService;
 import ru.ashesha.buildBattleAI.game.GameManager;
 import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
 import ru.ashesha.buildBattleAI.listeners.ListenerService;
@@ -69,6 +72,8 @@ public class PluginContext {
     @Getter
     private final BBAIHologramService hologramService;
     @Getter
+    private final BBAIPictureService pictureService;
+    @Getter
     private final BBAIMLService mlService;
     @Getter
     private final CommandService commandService;
@@ -108,6 +113,7 @@ public class PluginContext {
         MessageService messageServiceImpl = new MessageService(plugin);
         NPCService npcServiceImpl = new NPCService(plugin);
         HologramService hologramServiceImpl = new HologramService(plugin);
+        PictureService pictureServiceImpl = new PictureService(plugin);
         MLService mlServiceImpl = new MLService(plugin);
         RenderService renderServiceImpl = new RenderService(plugin);
         CommandService commandServiceImpl = new CommandService(plugin);
@@ -118,6 +124,7 @@ public class PluginContext {
         this.messageService = messageServiceImpl;
         this.npcService = npcServiceImpl;
         this.hologramService = hologramServiceImpl;
+        this.pictureService = pictureServiceImpl;
         this.mlService = mlServiceImpl;
         this.renderService = renderServiceImpl;
         this.commandService = commandServiceImpl;
@@ -131,6 +138,7 @@ public class PluginContext {
                 messageServiceImpl,
                 npcServiceImpl,
                 hologramServiceImpl,
+                pictureServiceImpl,
                 mlServiceImpl,
                 renderServiceImpl,
                 commandServiceImpl,
@@ -156,6 +164,7 @@ public class PluginContext {
         // belong here because they are owned by the plugin as a whole, not by
         // the command / listener services (those services only provide the
         // registration mechanism and the bulk-unregistration guarantees).
+        commandService.register(new PictureCommand(plugin));
     }
 
     /**
