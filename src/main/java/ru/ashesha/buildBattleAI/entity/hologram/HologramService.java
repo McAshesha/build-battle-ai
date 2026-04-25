@@ -18,6 +18,7 @@ import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.core.PluginService;
 import ru.ashesha.buildBattleAI.entity.hologram.api.BBAIHologramService;
+import ru.ashesha.buildBattleAI.util.MessageUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -346,8 +347,7 @@ public class HologramService implements BBAIHologramService, PluginService {
         data.add(new EntityData<>(0, EntityDataTypes.BYTE, (byte) 0x20));
 
         // Custom name and visibility
-        String colorized = colorize(text);
-        data.add(nameFactory.create(colorized));
+        data.add(nameFactory.create(text));
         data.add(nameVisibleFactory.create(true));
 
         // Armor stand flags: small + no base plate (+ marker on 1.16.2+)
@@ -363,29 +363,7 @@ public class HologramService implements BBAIHologramService, PluginService {
      * @return the entity metadata entries for the name update
      */
     private List<EntityData<?>> buildNameMetadata(String text) {
-        String colorized = colorize(text);
-        return Collections.<EntityData<?>>singletonList(nameFactory.create(colorized));
-    }
-
-    /**
-     * Translates {@code &} color codes to section sign ({@code §}) color codes.
-     * Returns the input unchanged if it contains no {@code &} characters.
-     *
-     * @param text the input text with {@code &} codes
-     * @return the text with Minecraft-native {@code §} codes
-     */
-    static String colorize(String text) {
-        if (text == null)
-            return "";
-        if (text.indexOf('&') == -1)
-            return text;
-
-        char[] chars = text.toCharArray();
-        for (int i = 0; i < chars.length - 1; i++)
-            if (chars[i] == '&' && "0123456789abcdefklmnorABCDEFKLMNOR".indexOf(chars[i + 1]) != -1)
-                chars[i] = '§';
-
-        return new String(chars);
+        return Collections.singletonList(nameFactory.create(text));
     }
 
     // ── version-resolved factory builders ───────────────────────────────────
@@ -411,16 +389,16 @@ public class HologramService implements BBAIHologramService, PluginService {
      * Resolves the factory for creating custom name metadata entries.
      * <ul>
      *     <li>1.13+ — {@code OPTIONAL_ADV_COMPONENT} at index 2, wrapping an
-     *         Adventure {@link Component}</li>
-     *     <li>&lt;1.13 — {@code STRING} at index 2, raw text with section-sign
-     *         color codes</li>
+     *         Adventure {@link Component} via {@link MessageUtils#toColorComponent}</li>
+     *     <li>&lt;1.13 — {@code STRING} at index 2, translated via
+     *         {@link MessageUtils#translateColors}</li>
      * </ul>
      */
     private NameFactory resolveNameFactory(ServerVersion version) {
         if (version.isNewerThanOrEquals(ServerVersion.V_1_13))
             return text -> new EntityData<>(2, EntityDataTypes.OPTIONAL_ADV_COMPONENT,
-                    Optional.of(Component.text(text)));
-        return text -> new EntityData<>(2, EntityDataTypes.STRING, text);
+                    Optional.of(MessageUtils.toColorComponent(text)));
+        return text -> new EntityData<>(2, EntityDataTypes.STRING, MessageUtils.translateColors(text));
     }
 
     /**

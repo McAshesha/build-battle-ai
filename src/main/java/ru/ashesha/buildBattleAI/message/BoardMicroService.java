@@ -9,7 +9,6 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerUp
 import lombok.NonNull;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.util.MessageUtils;
@@ -66,21 +65,18 @@ public class BoardMicroService {
      * Each entry is a section-sign color code followed by a reset ({@code §X§r}),
      * which renders as invisible text in the sidebar while remaining distinct
      * as a score entry name. The array is indexed by line number.
+     * Built via {@link MessageUtils#translateColors} to centralize all section-sign usage.
      */
-    private static final String[] ENTRY_NAMES = {
-            "§0§r", "§1§r", "§2§r", "§3§r",
-            "§4§r", "§5§r", "§6§r", "§7§r",
-            "§8§r", "§9§r", "§a§r", "§b§r",
-            "§c§r", "§d§r", "§e§r"
-    };
+    private static final String[] ENTRY_NAMES;
 
-    /**
-     * Serializer for converting {@code §}-prefixed color codes into Adventure
-     * {@link Component}s. Used on pre-1.13 servers where the legacy text protocol
-     * requires section-sign formatting.
-     */
-    private static final LegacyComponentSerializer SECTION_SERIALIZER =
-            LegacyComponentSerializer.legacySection();
+    static {
+        String codes = "0123456789abcde";
+        ENTRY_NAMES = new String[MAX_LINES];
+        for (int i = 0; i < MAX_LINES; i++) {
+            String colorEmpty = "&" + codes.charAt(i) + "&r";
+            ENTRY_NAMES[i] = MessageUtils.translateColors(colorEmpty);
+        }
+    }
 
     /** The plugin instance, used for sending packets via the context. */
     private final BuildBattleAI plugin;
@@ -143,67 +139,6 @@ public class BoardMicroService {
         return board;
     }
 
-    // ── legacy text splitting ───────────────────────────────────────────
-
-    /**
-     * Splits a section-sign-coded string into prefix and suffix parts,
-     * each at most 16 characters, for use on pre-1.13 servers. Carries the
-     * last active color and formatting codes from the prefix into the suffix
-     * so that visual formatting is preserved across the split boundary.
-     *
-     * @param text the translated text with {@code §} color codes
-     * @return a two-element array: {@code [prefix, suffix]}
-     */
-    static String[] splitLegacyLine(String text) {
-        if (text.length() <= 16)
-            return new String[]{text, ""};
-
-        // Avoid splitting in the middle of a color code sequence (§X)
-        int splitAt = 16;
-        if (text.charAt(splitAt - 1) == '§')
-            splitAt--;
-
-        String prefix = text.substring(0, splitAt);
-        String carry = getLastColors(prefix);
-        String suffix = carry + text.substring(splitAt);
-
-        // Truncate suffix to fit the 16-char protocol limit
-        if (suffix.length() > 16)
-            suffix = suffix.substring(0, 16);
-
-        return new String[]{prefix, suffix};
-    }
-
-    /**
-     * Extracts the last active color and formatting codes from a legacy text string.
-     * A color code ({@code §0}–{@code §f}) resets all prior formatting; {@code §r}
-     * resets everything. Format codes ({@code §k}–{@code §o}) are cumulative until
-     * the next color code or reset.
-     *
-     * @param text the text to scan for color codes
-     * @return the cumulative color/format codes active at the end of the text
-     */
-    static String getLastColors(String text) {
-        StringBuilder color = new StringBuilder();
-        StringBuilder format = new StringBuilder();
-        for (int i = 0; i < text.length() - 1; i++) {
-            if (text.charAt(i) != '§')
-                continue;
-            char code = Character.toLowerCase(text.charAt(i + 1));
-            if (code == 'r') {
-                color.setLength(0);
-                format.setLength(0);
-            } else if ("0123456789abcdef".indexOf(code) >= 0) {
-                color.setLength(0);
-                color.append('§').append(text.charAt(i + 1));
-                format.setLength(0); // a color code resets formatting
-            } else if ("klmno".indexOf(code) >= 0)
-                format.append('§').append(text.charAt(i + 1));
-            i++; // skip the code character
-        }
-        return color.toString() + format;
-    }
-
     // ── packet builders ─────────────────────────────────────────────────
 
     /**
@@ -215,8 +150,7 @@ public class BoardMicroService {
      */
     private PacketWrapper<?> objectivePacket(
             WrapperPlayServerScoreboardObjective.ObjectiveMode mode, String title) {
-        Component displayName = title != null
-                ? MessageUtils.toComponent(title) : Component.empty();
+        Component displayName = MessageUtils.toColorComponent(title);
         return new WrapperPlayServerScoreboardObjective(
                 OBJECTIVE_NAME, mode, displayName,
                 WrapperPlayServerScoreboardObjective.RenderType.INTEGER);
@@ -323,13 +257,13 @@ public class BoardMicroService {
 
         if (legacy) {
             // Pre-1.13: translate & codes to § and split at the 16-char boundary
-            String translated = text.replace('&', '§');
-            String[] parts = splitLegacyLine(translated);
-            prefix = SECTION_SERIALIZER.deserialize(parts[0]);
-            suffix = SECTION_SERIALIZER.deserialize(parts[1]);
+            String translated = MessageUtils.translateColors(text);
+            String[] parts = MessageUtils.splitLegacyLine(translated);
+            prefix = MessageUtils.toSectionColorComponent(parts[0]);
+            suffix = MessageUtils.toSectionColorComponent(parts[1]);
         } else {
             // 1.13+: full text in prefix as a rich Component
-            prefix = MessageUtils.toComponent(text);
+            prefix = MessageUtils.toColorComponent(text);
             suffix = Component.empty();
         }
 

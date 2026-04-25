@@ -135,8 +135,8 @@ public class TitleMicroService {
     private void sendTitleSequence(Player player, String title, String subtitle, int fadeIn, int stay, int fadeOut) {
         titleSender.send(
                 player,
-                MessageUtils.toComponent(title),
-                MessageUtils.toComponent(subtitle),
+                MessageUtils.toColorComponent(title),
+                MessageUtils.toColorComponent(subtitle),
                 fadeIn, stay, fadeOut
         );
     }

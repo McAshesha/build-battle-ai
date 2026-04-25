@@ -58,7 +58,7 @@ public class NameMicroService {
      * @param viewer         the player who will see the updated name
      */
     public void sendPlayerListName(@NonNull Player target, String playerListName, @NonNull Player viewer) {
-        Component displayName = MessageUtils.toComponent(playerListName);
+        Component displayName = MessageUtils.toColorComponent(playerListName);
         plugin.getContext().sendPacket(viewer, createPlayerListNamePacket(target, displayName));
     }
 
@@ -71,7 +71,7 @@ public class NameMicroService {
      * @param viewers        the players who will see the updated name
      */
     public void sendPlayerListName(@NonNull Player target, String playerListName, @NonNull Collection<? extends Player> viewers) {
-        Component displayName = MessageUtils.toComponent(playerListName);
+        Component displayName = MessageUtils.toColorComponent(playerListName);
         PacketWrapper<?> packet = createPlayerListNamePacket(target, displayName);
         for (Player viewer : viewers)
             plugin.getContext().sendPacket(viewer, packet);

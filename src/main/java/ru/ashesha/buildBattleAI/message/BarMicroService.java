@@ -55,7 +55,7 @@ public class BarMicroService {
      * @param message   the message text (supports {@code &} color codes)
      */
     public void sendActionBar(@NonNull Player recipient, @NonNull String message) {
-        plugin.getContext().sendPacket(recipient, barPacketFactory.create(MessageUtils.toComponent(message)));
+        plugin.getContext().sendPacket(recipient, barPacketFactory.create(MessageUtils.toColorComponent(message)));
     }
 
     /**
@@ -65,7 +65,7 @@ public class BarMicroService {
      * @param message    the message text (supports {@code &} color codes)
      */
     public void sendActionBar(@NonNull Collection<? extends Player> recipients, @NonNull String message) {
-        PacketWrapper<?> packet = barPacketFactory.create(MessageUtils.toComponent(message));
+        PacketWrapper<?> packet = barPacketFactory.create(MessageUtils.toColorComponent(message));
         for (Player recipient : recipients)
             plugin.getContext().sendPacket(recipient, packet);
     }

@@ -27,8 +27,8 @@ public class TabMicroService {
      */
     public void sendTab(@NonNull Player recipient, String header, String footer) {
         plugin.getContext().sendPacket(recipient, new WrapperPlayServerPlayerListHeaderAndFooter(
-                MessageUtils.toComponent(header),
-                MessageUtils.toComponent(footer)
+                MessageUtils.toColorComponent(header),
+                MessageUtils.toColorComponent(footer)
         ));
     }
 
@@ -41,8 +41,8 @@ public class TabMicroService {
      */
     public void sendTab(@NonNull Collection<? extends Player> recipients, String header, String footer) {
         WrapperPlayServerPlayerListHeaderAndFooter packet = new WrapperPlayServerPlayerListHeaderAndFooter(
-                MessageUtils.toComponent(header),
-                MessageUtils.toComponent(footer)
+                MessageUtils.toColorComponent(header),
+                MessageUtils.toColorComponent(footer)
         );
         for (Player recipient : recipients)
             plugin.getContext().sendPacket(recipient, packet);

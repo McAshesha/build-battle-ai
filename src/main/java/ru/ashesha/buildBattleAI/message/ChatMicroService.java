@@ -64,7 +64,7 @@ public class ChatMicroService {
      * @param message   the message text (supports {@code &} color codes)
      */
     public void sendChat(@NonNull Player recipient, @NonNull String message) {
-        sendChatPacket(recipient, MessageUtils.toComponent(message));
+        sendChatPacket(recipient, MessageUtils.toColorComponent(message));
     }
 
     /**
@@ -74,7 +74,7 @@ public class ChatMicroService {
      * @param message    the message text (supports {@code &} color codes)
      */
     public void sendChat(@NonNull Collection<? extends Player> recipients, @NonNull String message) {
-        Component component = MessageUtils.toComponent(message);
+        Component component = MessageUtils.toColorComponent(message);
         for (Player recipient : recipients)
             sendChatPacket(recipient, component);
     }
@@ -147,7 +147,7 @@ public class ChatMicroService {
     private Component toComponent(ChatMessage message) {
         net.kyori.adventure.text.TextComponent.Builder builder = Component.text();
         for (Segment segment : new ArrayList<>(message.getSegments())) {
-            Component part = MessageUtils.toComponent(segment.getText());
+            Component part = MessageUtils.toColorComponent(segment.getText());
 
             if (segment.getClickAction() != null && segment.getClickValue() != null) {
                 ClickEvent click = toClickEvent(segment);
@@ -156,7 +156,7 @@ public class ChatMicroService {
             }
 
             if (segment.getHoverText() != null)
-                part = part.hoverEvent(HoverEvent.showText(MessageUtils.toComponent(segment.getHoverText())));
+                part = part.hoverEvent(HoverEvent.showText(MessageUtils.toColorComponent(segment.getHoverText())));
 
             builder.append(part);
         }

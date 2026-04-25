@@ -7,52 +7,51 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for {@link MessageUtils} — legacy {@code &}-coded text deserialization
- * into Adventure {@link Component} objects.
+ * Tests for {@link MessageUtils} — centralized legacy color code handling,
+ * component serialization, and legacy text splitting utilities.
  */
 class MessageUtilsTest {
 
-    // ===== toComponent =====
+    // ===== toColorComponent =====
 
     @Test
-    void nullInputReturnsEmptyComponent() {
-        Component result = MessageUtils.toComponent(null);
+    void toColorComponentNullReturnsEmpty() {
+        Component result = MessageUtils.toColorComponent(null);
         assertNotNull(result);
         assertEquals(Component.empty(), result);
     }
 
     @Test
-    void emptyStringReturnsEmptyComponent() {
-        Component result = MessageUtils.toComponent("");
+    void toColorComponentEmptyString() {
+        Component result = MessageUtils.toColorComponent("");
         assertNotNull(result);
         assertEquals(Component.empty(), result);
     }
 
     @Test
-    void plainTextPreservedAsIs() {
-        Component result = MessageUtils.toComponent("Hello World");
+    void toColorComponentPlainText() {
+        Component result = MessageUtils.toColorComponent("Hello World");
         String serialized = LegacyComponentSerializer.legacyAmpersand().serialize(result);
         assertEquals("Hello World", serialized);
     }
 
     @Test
-    void colorCodesParsed() {
-        Component result = MessageUtils.toComponent("&aGreen &cRed");
-        // Re-serialize to verify codes are parsed and re-emitted correctly
+    void toColorComponentColorCodes() {
+        Component result = MessageUtils.toColorComponent("&aGreen &cRed");
         String serialized = LegacyComponentSerializer.legacyAmpersand().serialize(result);
         assertEquals("&aGreen &cRed", serialized);
     }
 
     @Test
-    void formattingCodesParsed() {
-        Component result = MessageUtils.toComponent("&lBold &oItalic");
+    void toColorComponentFormattingCodes() {
+        Component result = MessageUtils.toColorComponent("&lBold &oItalic");
         String serialized = LegacyComponentSerializer.legacyAmpersand().serialize(result);
         assertEquals("&lBold &oItalic", serialized);
     }
 
     @Test
-    void resetCodeParsed() {
-        Component result = MessageUtils.toComponent("&cRed&rReset");
+    void toColorComponentResetCode() {
+        Component result = MessageUtils.toColorComponent("&cRed&rReset");
         String serialized = LegacyComponentSerializer.legacyAmpersand().serialize(result);
         assertTrue(serialized.contains("&c"));
         assertTrue(serialized.contains("Red"));
@@ -60,8 +59,8 @@ class MessageUtilsTest {
     }
 
     @Test
-    void multipleColorCodesInSequence() {
-        Component result = MessageUtils.toComponent("&a&lBoldGreen");
+    void toColorComponentMultipleCodesInSequence() {
+        Component result = MessageUtils.toColorComponent("&a&lBoldGreen");
         String serialized = LegacyComponentSerializer.legacyAmpersand().serialize(result);
         assertTrue(serialized.contains("&a"));
         assertTrue(serialized.contains("&l"));
@@ -69,33 +68,163 @@ class MessageUtilsTest {
     }
 
     @Test
-    void textWithoutColorCodesUnchanged() {
-        Component result = MessageUtils.toComponent("No colors here");
+    void toColorComponentNoColorCodes() {
+        Component result = MessageUtils.toColorComponent("No colors here");
         String serialized = LegacyComponentSerializer.legacyAmpersand().serialize(result);
         assertEquals("No colors here", serialized);
     }
 
-    // ===== LEGACY serializer field =====
+    @Test
+    void toColorComponentDoesNotInterpretSectionSign() {
+        // § should be treated as literal text by the ampersand serializer
+        Component result = MessageUtils.toColorComponent("\u00a7aNotGreen");
+        String serialized = LegacyComponentSerializer.legacyAmpersand().serialize(result);
+        assertTrue(serialized.contains("\u00a7a"));
+    }
+
+    // ===== translateColors =====
 
     @Test
-    void legacySerializerIsNotNull() {
-        assertNotNull(MessageUtils.LEGACY);
+    void translateColorsConvertsAmpersandCodes() {
+        assertEquals("\u00a7aGreen \u00a7bAqua", MessageUtils.translateColors("&aGreen &bAqua"));
     }
 
     @Test
-    void legacySerializerUsesAmpersandCharacter() {
-        // Verify round-trip: serialize → deserialize → serialize preserves & codes
-        Component original = MessageUtils.LEGACY.deserialize("&6Gold");
-        String roundTripped = MessageUtils.LEGACY.serialize(original);
-        assertEquals("&6Gold", roundTripped);
+    void translateColorsHandlesFormatCodes() {
+        assertEquals("\u00a7lBold \u00a7oItalic", MessageUtils.translateColors("&lBold &oItalic"));
     }
 
     @Test
-    void legacySerializerDoesNotUseSectionSign() {
-        // § should be treated as literal text, not a color code
-        Component result = MessageUtils.LEGACY.deserialize("§aNotGreen");
-        String serialized = MessageUtils.LEGACY.serialize(result);
-        // The § should be preserved literally, not interpreted as a color code
-        assertTrue(serialized.contains("§a"));
+    void translateColorsIgnoresInvalidCodes() {
+        assertEquals("&xInvalid &zTest", MessageUtils.translateColors("&xInvalid &zTest"));
+    }
+
+    @Test
+    void translateColorsHandlesUpperCaseCodes() {
+        assertEquals("\u00a7AGreen \u00a7BBold", MessageUtils.translateColors("&AGreen &BBold"));
+    }
+
+    @Test
+    void translateColorsEmptyString() {
+        assertEquals("", MessageUtils.translateColors(""));
+    }
+
+    @Test
+    void translateColorsNull() {
+        assertEquals("", MessageUtils.translateColors(null));
+    }
+
+    @Test
+    void translateColorsNoAmpersand() {
+        assertEquals("Plain text", MessageUtils.translateColors("Plain text"));
+    }
+
+    @Test
+    void translateColorsTrailingAmpersand() {
+        assertEquals("Text&", MessageUtils.translateColors("Text&"));
+    }
+
+    @Test
+    void translateColorsResetCode() {
+        assertEquals("\u00a7rReset", MessageUtils.translateColors("&rReset"));
+    }
+
+    @Test
+    void translateColorsFastPathReturnsOriginalInstance() {
+        String input = "No ampersands here";
+        assertSame(input, MessageUtils.translateColors(input));
+    }
+
+    // ===== toSectionColorComponent =====
+
+    @Test
+    void toSectionColorComponentNull() {
+        assertEquals(Component.empty(), MessageUtils.toSectionColorComponent(null));
+    }
+
+    @Test
+    void toSectionColorComponentDeserializesSectionCodes() {
+        Component result = MessageUtils.toSectionColorComponent("\u00a7aGreen");
+        // Re-serialize with section serializer to verify round-trip
+        String serialized = LegacyComponentSerializer.legacySection().serialize(result);
+        assertEquals("\u00a7aGreen", serialized);
+    }
+
+    // ===== splitLegacyLine =====
+
+    @Test
+    void splitLegacyLineShortTextGoesToPrefix() {
+        String[] parts = MessageUtils.splitLegacyLine("Hello");
+        assertEquals("Hello", parts[0]);
+        assertEquals("", parts[1]);
+    }
+
+    @Test
+    void splitLegacyLineExactly16Chars() {
+        String text = "1234567890123456";
+        String[] parts = MessageUtils.splitLegacyLine(text);
+        assertEquals(text, parts[0]);
+        assertEquals("", parts[1]);
+    }
+
+    @Test
+    void splitLegacyLineLongTextSplitsAtBoundary() {
+        String text = "12345678901234567890";
+        String[] parts = MessageUtils.splitLegacyLine(text);
+        assertEquals("1234567890123456", parts[0]);
+        assertEquals("7890", parts[1]);
+    }
+
+    @Test
+    void splitLegacyLineDoesNotSplitInsideColorCode() {
+        String text = "012345678901234\u00a7c_rest";
+        String[] parts = MessageUtils.splitLegacyLine(text);
+        assertEquals("012345678901234", parts[0]);
+        assertTrue(parts[1].contains("\u00a7c"));
+    }
+
+    @Test
+    void splitLegacyLineCarriesColorToSuffix() {
+        String text = "\u00a7cRed text that is quite long";
+        String[] parts = MessageUtils.splitLegacyLine(text);
+        assertTrue(parts[1].startsWith("\u00a7c"),
+                "Suffix should inherit the red color from prefix");
+    }
+
+    @Test
+    void splitLegacyLineSuffixTruncatedTo16() {
+        String text = "1234567890123456" + "abcdefghijklmnopqrstuvwxyz";
+        String[] parts = MessageUtils.splitLegacyLine(text);
+        assertTrue(parts[1].length() <= 16,
+                "Suffix must not exceed 16 characters, was: " + parts[1].length());
+    }
+
+    // ===== getLastColors =====
+
+    @Test
+    void getLastColorsReturnsEmptyForNoColors() {
+        assertEquals("", MessageUtils.getLastColors("plain text"));
+    }
+
+    @Test
+    void getLastColorsReturnsLastColor() {
+        assertEquals("\u00a7c", MessageUtils.getLastColors("\u00a7aGreen \u00a7cRed"));
+    }
+
+    @Test
+    void getLastColorsResetClearsAll() {
+        assertEquals("", MessageUtils.getLastColors("\u00a7cRed \u00a7rReset"));
+    }
+
+    @Test
+    void getLastColorsIncludesFormatAfterColor() {
+        assertEquals("\u00a7c\u00a7l",
+                MessageUtils.getLastColors("\u00a7c\u00a7lBold Red"));
+    }
+
+    @Test
+    void getLastColorsColorResetsFormat() {
+        assertEquals("\u00a7a",
+                MessageUtils.getLastColors("\u00a7lBold \u00a7aGreen"));
     }
 }
