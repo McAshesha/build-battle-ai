@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
+import ru.ashesha.buildBattleAI.core.PluginContext;
 import ru.ashesha.buildBattleAI.core.PluginService;
 
 import java.util.ArrayList;
@@ -31,11 +32,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ListenerService implements PluginService {
 
-    /** The plugin instance, used for Bukkit event registration. */
+    /**
+     * The plugin instance, used for Bukkit event registration.
+     */
     @NonNull
     private final BuildBattleAI plugin;
 
-    /** All listeners registered through this service, for bulk unregistration on shutdown. */
+    /**
+     * All listeners registered through this service, for bulk unregistration on shutdown.
+     */
     private final List<PluginListener> registeredListeners = new ArrayList<>();
 
     /**

@@ -20,6 +20,7 @@ import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.core.PluginContext;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -84,10 +85,8 @@ class BoardMicroServiceTest {
         verify(context, times(2)).sendPacket(eq(player), captor.capture());
 
         List<PacketWrapper> packets = captor.getAllValues();
-        assertTrue(packets.get(0) instanceof WrapperPlayServerScoreboardObjective,
-                "First packet should be objective creation");
-        assertTrue(packets.get(1) instanceof WrapperPlayServerDisplayScoreboard,
-                "Second packet should be display objective");
+        assertInstanceOf(WrapperPlayServerScoreboardObjective.class, packets.get(0), "First packet should be objective creation");
+        assertInstanceOf(WrapperPlayServerDisplayScoreboard.class, packets.get(1), "Second packet should be display objective");
     }
 
     @Test
@@ -123,10 +122,8 @@ class BoardMicroServiceTest {
         verify(context, times(2)).sendPacket(eq(player), captor.capture());
 
         List<PacketWrapper> packets = captor.getAllValues();
-        assertTrue(packets.get(0) instanceof WrapperPlayServerTeams,
-                "First packet should be team CREATE");
-        assertTrue(packets.get(1) instanceof WrapperPlayServerUpdateScore,
-                "Second packet should be score CREATE_OR_UPDATE");
+        assertInstanceOf(WrapperPlayServerTeams.class, packets.get(0), "First packet should be team CREATE");
+        assertInstanceOf(WrapperPlayServerUpdateScore.class, packets.get(1), "Second packet should be score CREATE_OR_UPDATE");
     }
 
     @Test
@@ -140,8 +137,7 @@ class BoardMicroServiceTest {
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
         verify(context, times(1)).sendPacket(eq(player), captor.capture());
-        assertTrue(captor.getValue() instanceof WrapperPlayServerTeams,
-                "Updating existing line should send team UPDATE only");
+        assertInstanceOf(WrapperPlayServerTeams.class, captor.getValue(), "Updating existing line should send team UPDATE only");
     }
 
     @Test
@@ -203,10 +199,8 @@ class BoardMicroServiceTest {
         verify(context, times(2)).sendPacket(eq(player), captor.capture());
 
         List<PacketWrapper> packets = captor.getAllValues();
-        assertTrue(packets.get(0) instanceof WrapperPlayServerUpdateScore,
-                "First packet should be score REMOVE");
-        assertTrue(packets.get(1) instanceof WrapperPlayServerTeams,
-                "Second packet should be team REMOVE");
+        assertInstanceOf(WrapperPlayServerUpdateScore.class, packets.get(0), "First packet should be score REMOVE");
+        assertInstanceOf(WrapperPlayServerTeams.class, packets.get(1), "Second packet should be team REMOVE");
     }
 
     @Test
@@ -258,7 +252,7 @@ class BoardMicroServiceTest {
         board.setLine(player, 5, "Old line");
         reset(context);
 
-        board.setLines(player, Arrays.asList("Only one"));
+        board.setLines(player, Collections.singletonList("Only one"));
 
         // Line 0: new → teamCreate + score = 2 packets
         // Lines 1-4, 6-14: inactive → no packets
@@ -294,7 +288,7 @@ class BoardMicroServiceTest {
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
         verify(context, times(1)).sendPacket(eq(player), captor.capture());
-        assertTrue(captor.getValue() instanceof WrapperPlayServerScoreboardObjective);
+        assertInstanceOf(WrapperPlayServerScoreboardObjective.class, captor.getValue());
     }
 
     @Test
@@ -343,14 +337,13 @@ class BoardMicroServiceTest {
         int scoreRemoves = 0;
         int teamRemoves = 0;
         int objectiveRemoves = 0;
-        for (PacketWrapper<?> pkt : captor.getAllValues()) {
+        for (PacketWrapper<?> pkt : captor.getAllValues())
             if (pkt instanceof WrapperPlayServerUpdateScore)
                 scoreRemoves++;
             else if (pkt instanceof WrapperPlayServerTeams)
                 teamRemoves++;
             else if (pkt instanceof WrapperPlayServerScoreboardObjective)
                 objectiveRemoves++;
-        }
 
         assertEquals(3, scoreRemoves, "Should remove 3 score entries");
         assertEquals(3, teamRemoves, "Should remove 3 teams");
@@ -388,10 +381,8 @@ class BoardMicroServiceTest {
         verify(context, times(2)).sendPacket(eq(player), captor.capture());
 
         List<PacketWrapper> packets = captor.getAllValues();
-        assertTrue(packets.get(0) instanceof WrapperPlayServerTeams,
-                "Should send team CREATE (not UPDATE) after remove");
-        assertTrue(packets.get(1) instanceof WrapperPlayServerUpdateScore,
-                "Should send score packet for new line");
+        assertInstanceOf(WrapperPlayServerTeams.class, packets.get(0), "Should send team CREATE (not UPDATE) after remove");
+        assertInstanceOf(WrapperPlayServerUpdateScore.class, packets.get(1), "Should send score packet for new line");
     }
 
     @Test
@@ -405,7 +396,7 @@ class BoardMicroServiceTest {
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
         verify(context, times(1)).sendPacket(eq(player), captor.capture());
-        assertTrue(captor.getValue() instanceof WrapperPlayServerScoreboardObjective);
+        assertInstanceOf(WrapperPlayServerScoreboardObjective.class, captor.getValue());
     }
 
     // ===== Line validation =====

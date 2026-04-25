@@ -53,14 +53,14 @@ public interface BBAIPictureService {
      * filled map, and sends map data packets with the image tiles. The image is
      * automatically scaled and split to fit the picture's grid dimensions.
      *
-     * @param viewer   the player who will see the picture
-     * @param picture  the picture to display
-     * @param anchorX  block X coordinate of the bottom-left corner
-     * @param anchorY  block Y coordinate of the bottom row
-     * @param anchorZ  block Z coordinate of the bottom-left corner
-     * @param face     the direction the picture faces ({@code NORTH}, {@code SOUTH},
-     *                 {@code EAST}, or {@code WEST})
-     * @param image    the image to display (any size — will be scaled to fit)
+     * @param viewer  the player who will see the picture
+     * @param picture the picture to display
+     * @param anchorX block X coordinate of the bottom-left corner
+     * @param anchorY block Y coordinate of the bottom row
+     * @param anchorZ block Z coordinate of the bottom-left corner
+     * @param face    the direction the picture faces ({@code NORTH}, {@code SOUTH},
+     *                {@code EAST}, or {@code WEST})
+     * @param image   the image to display (any size — will be scaled to fit)
      */
     void spawn(@NonNull Player viewer, @NonNull PictureService.Picture picture,
                int anchorX, int anchorY, int anchorZ,
@@ -69,13 +69,13 @@ public interface BBAIPictureService {
     /**
      * Shows the picture to the specified viewers at the given location.
      *
-     * @param viewers  the players who will see the picture
-     * @param picture  the picture to display
-     * @param anchorX  block X coordinate of the bottom-left corner
-     * @param anchorY  block Y coordinate of the bottom row
-     * @param anchorZ  block Z coordinate of the bottom-left corner
-     * @param face     the direction the picture faces
-     * @param image    the image to display
+     * @param viewers the players who will see the picture
+     * @param picture the picture to display
+     * @param anchorX block X coordinate of the bottom-left corner
+     * @param anchorY block Y coordinate of the bottom row
+     * @param anchorZ block Z coordinate of the bottom-left corner
+     * @param face    the direction the picture faces
+     * @param image   the image to display
      * @see #spawn(Player, PictureService.Picture, int, int, int, BlockFace, BufferedImage)
      */
     void spawn(@NonNull Collection<Player> viewers, @NonNull PictureService.Picture picture,
@@ -136,14 +136,14 @@ public interface BBAIPictureService {
      * The pixel data is resized via pure-Java bilinear interpolation and
      * aspect-ratio-preserving fit, then converted to map palette bytes.
      *
-     * @param viewer     the player who will see the picture
-     * @param picture    the picture to display
-     * @param anchorX    block X coordinate of the bottom-left corner
-     * @param anchorY    block Y coordinate of the bottom row
-     * @param anchorZ    block Z coordinate of the bottom-left corner
-     * @param face       the direction the picture faces
-     * @param rgbPixels  packed RGB pixel array, row-major, length ≥ {@code imageWidth × imageHeight}
-     * @param imageWidth source image width in pixels
+     * @param viewer      the player who will see the picture
+     * @param picture     the picture to display
+     * @param anchorX     block X coordinate of the bottom-left corner
+     * @param anchorY     block Y coordinate of the bottom row
+     * @param anchorZ     block Z coordinate of the bottom-left corner
+     * @param face        the direction the picture faces
+     * @param rgbPixels   packed RGB pixel array, row-major, length ≥ {@code imageWidth × imageHeight}
+     * @param imageWidth  source image width in pixels
      * @param imageHeight source image height in pixels
      */
     void spawn(@NonNull Player viewer, @NonNull PictureService.Picture picture,

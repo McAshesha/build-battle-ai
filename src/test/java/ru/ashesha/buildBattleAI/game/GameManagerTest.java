@@ -7,7 +7,7 @@ import ru.ashesha.buildBattleAI.BuildBattleAI;
 
 import java.util.logging.Logger;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 /**

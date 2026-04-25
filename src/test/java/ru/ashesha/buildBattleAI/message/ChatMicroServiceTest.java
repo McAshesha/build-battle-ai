@@ -86,8 +86,7 @@ class ChatMicroServiceTest {
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
         verify(context).sendPacket(eq(player), captor.capture());
-        assertTrue(captor.getValue() instanceof WrapperPlayServerSystemChatMessage,
-                "1.19+ should use WrapperPlayServerSystemChatMessage");
+        assertInstanceOf(WrapperPlayServerSystemChatMessage.class, captor.getValue(), "1.19+ should use WrapperPlayServerSystemChatMessage");
     }
 
     @Test
@@ -97,8 +96,7 @@ class ChatMicroServiceTest {
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
         verify(context).sendPacket(eq(player), captor.capture());
-        assertTrue(captor.getValue() instanceof WrapperPlayServerChatMessage,
-                "1.16 should use WrapperPlayServerChatMessage");
+        assertInstanceOf(WrapperPlayServerChatMessage.class, captor.getValue(), "1.16 should use WrapperPlayServerChatMessage");
     }
 
     @Test
@@ -108,8 +106,7 @@ class ChatMicroServiceTest {
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
         verify(context).sendPacket(eq(player), captor.capture());
-        assertTrue(captor.getValue() instanceof WrapperPlayServerChatMessage,
-                "1.8 should use WrapperPlayServerChatMessage");
+        assertInstanceOf(WrapperPlayServerChatMessage.class, captor.getValue(), "1.8 should use WrapperPlayServerChatMessage");
     }
 
     // ===== Single player =====
@@ -139,7 +136,7 @@ class ChatMicroServiceTest {
     void sendChatToEmptyCollectionSendsNothing() {
         ChatMicroService service = serviceFor(ServerVersion.V_1_19);
 
-        service.sendChat(Collections.<Player>emptyList(), "Nobody");
+        service.sendChat(Collections.emptyList(), "Nobody");
 
         verify(context, never()).sendPacket(any(Player.class), any(PacketWrapper.class));
     }

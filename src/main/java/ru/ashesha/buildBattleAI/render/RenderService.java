@@ -1,10 +1,11 @@
 package ru.ashesha.buildBattleAI.render;
 
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
-import lombok.experimental.Delegate;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.Delegate;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
+import ru.ashesha.buildBattleAI.core.PluginContext;
 import ru.ashesha.buildBattleAI.core.PluginService;
 import ru.ashesha.buildBattleAI.render.data.ChunkScene;
 
@@ -28,7 +29,9 @@ import ru.ashesha.buildBattleAI.render.data.ChunkScene;
 @RequiredArgsConstructor
 public class RenderService implements PluginService {
 
-    /** The plugin instance, used to reach {@link PluginContext#getServerVersion()} during {@link #enable()}. */
+    /**
+     * The plugin instance, used to reach {@link PluginContext#getServerVersion()} during {@link #enable()}.
+     */
     @NonNull
     private final BuildBattleAI plugin;
 

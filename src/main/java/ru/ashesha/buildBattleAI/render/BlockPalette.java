@@ -615,12 +615,17 @@ public class BlockPalette {
         // Froglight variants
         for (XMaterial mat : XMaterial.values()) {
             String name = mat.name();
-            if (name.equals("OCHRE_FROGLIGHT"))
-                put(mat, 0xE8D68C);
-            else if (name.equals("VERDANT_FROGLIGHT"))
-                put(mat, 0x6BBE6B);
-            else if (name.equals("PEARLESCENT_FROGLIGHT"))
-                put(mat, 0xC5A3C8);
+            switch (name) {
+                case "OCHRE_FROGLIGHT":
+                    put(mat, 0xE8D68C);
+                    break;
+                case "VERDANT_FROGLIGHT":
+                    put(mat, 0x6BBE6B);
+                    break;
+                case "PEARLESCENT_FROGLIGHT":
+                    put(mat, 0xC5A3C8);
+                    break;
+            }
         }
 
         // Mangrove extras
@@ -702,9 +707,8 @@ public class BlockPalette {
                         b = 0;
                         int g = ((color >> 8) & 0xFF) + 1;
                         color = rgb((color >> 16) & 0xFF, Math.min(g, 255), b);
-                    } else {
+                    } else
                         color = rgb((color >> 16) & 0xFF, (color >> 8) & 0xFF, b);
-                    }
                     attempts++;
                 }
                 COLORS[ord] = color;

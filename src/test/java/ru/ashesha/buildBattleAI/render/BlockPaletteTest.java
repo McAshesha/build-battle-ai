@@ -697,7 +697,7 @@ class BlockPaletteTest {
         String[] prefixes = {"RED_", "BLUE_", "GREEN_", "YELLOW_", "BLACK_", "WHITE_",
                 "ORANGE_", "MAGENTA_", "LIGHT_BLUE_", "LIME_", "PINK_", "GRAY_",
                 "LIGHT_GRAY_", "CYAN_", "PURPLE_", "BROWN_"};
-        for (String prefix : prefixes) {
+        for (String prefix : prefixes)
             try {
                 XMaterial wool = XMaterial.valueOf(prefix + "WOOL");
                 XMaterial terracotta = XMaterial.valueOf(prefix + "TERRACOTTA");
@@ -708,13 +708,12 @@ class BlockPaletteTest {
             } catch (IllegalArgumentException e) {
                 // Skip if material doesn't exist
             }
-        }
     }
 
     @Test
     void concreteColorsDifferFromWool() {
         String[] prefixes = {"RED_", "BLUE_", "WHITE_", "BLACK_"};
-        for (String prefix : prefixes) {
+        for (String prefix : prefixes)
             try {
                 XMaterial wool = XMaterial.valueOf(prefix + "WOOL");
                 XMaterial concrete = XMaterial.valueOf(prefix + "CONCRETE");
@@ -725,13 +724,12 @@ class BlockPaletteTest {
             } catch (IllegalArgumentException e) {
                 // Skip if material doesn't exist
             }
-        }
     }
 
     @Test
     void concretePowderDiffersFromConcrete() {
         String[] prefixes = {"RED_", "BLUE_", "WHITE_", "BLACK_"};
-        for (String prefix : prefixes) {
+        for (String prefix : prefixes)
             try {
                 XMaterial concrete = XMaterial.valueOf(prefix + "CONCRETE");
                 XMaterial powder = XMaterial.valueOf(prefix + "CONCRETE_POWDER");
@@ -742,7 +740,6 @@ class BlockPaletteTest {
             } catch (IllegalArgumentException e) {
                 // Skip if material doesn't exist
             }
-        }
     }
 
     @Test
@@ -765,12 +762,11 @@ class BlockPaletteTest {
 
     @Test
     void allLeafTypesHaveColors() {
-        for (XMaterial mat : XMaterial.values()) {
+        for (XMaterial mat : XMaterial.values())
             if (mat.name().endsWith("_LEAVES")) {
                 int color = BlockPalette.getColor(mat);
                 assertNotEquals(-1, color, mat.name() + " should have a color");
             }
-        }
     }
 
     // ===== Copper oxidation stages are distinct =====
@@ -809,7 +805,7 @@ class BlockPaletteTest {
 
     @Test
     void stainedGlassHasColorsAndAlpha() {
-        for (XMaterial mat : XMaterial.values()) {
+        for (XMaterial mat : XMaterial.values())
             if (mat.name().endsWith("_STAINED_GLASS")) {
                 int color = BlockPalette.getColor(mat);
                 int alpha = BlockPalette.getAlpha(mat);
@@ -817,7 +813,6 @@ class BlockPaletteTest {
                 assertTrue(alpha < 255 && alpha > 0,
                         mat.name() + " should be translucent, alpha=" + alpha);
             }
-        }
     }
 
     // ===== Deepslate family has colors =====

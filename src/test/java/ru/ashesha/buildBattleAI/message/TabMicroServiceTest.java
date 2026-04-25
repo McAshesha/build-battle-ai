@@ -74,8 +74,7 @@ class TabMicroServiceTest {
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
         verify(context, times(1)).sendPacket(eq(player), captor.capture());
-        assertTrue(captor.getValue() instanceof WrapperPlayServerPlayerListHeaderAndFooter,
-                "Should use WrapperPlayServerPlayerListHeaderAndFooter");
+        assertInstanceOf(WrapperPlayServerPlayerListHeaderAndFooter.class, captor.getValue(), "Should use WrapperPlayServerPlayerListHeaderAndFooter");
     }
 
     @Test
@@ -116,7 +115,7 @@ class TabMicroServiceTest {
     void sendTabToEmptyCollectionSendsNothing() {
         TabMicroService service = new TabMicroService(plugin);
 
-        service.sendTab(Collections.<Player>emptyList(), "Header", "Footer");
+        service.sendTab(Collections.emptyList(), "Header", "Footer");
 
         verify(context, never()).sendPacket(any(Player.class), any(PacketWrapper.class));
     }

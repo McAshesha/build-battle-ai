@@ -26,12 +26,7 @@ import ru.ashesha.buildBattleAI.entity.picture.api.BBAIPictureService;
 import ru.ashesha.buildBattleAI.util.MapPalette;
 
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -55,7 +50,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 @RequiredArgsConstructor
 public class PictureService implements BBAIPictureService, PluginService {
 
-    /** The plugin instance used for packet sending. */
+    /**
+     * The plugin instance used for packet sending.
+     */
     @NonNull
     private final BuildBattleAI plugin;
 
@@ -95,6 +92,57 @@ public class PictureService implements BBAIPictureService, PluginService {
      * Encodes the direction the item frame faces. Resolved in {@link #enable()}.
      */
     private FaceDataFactory faceDataFactory;
+
+    /**
+     * Resolves the image column index for a given frame column, accounting for
+     * horizontal mirroring based on the facing direction.
+     * <p>
+     * Minecraft renders map content on item frames such that the image left
+     * corresponds to different world directions depending on the frame's facing.
+     * For SOUTH and WEST-facing pictures, columns are mirrored so the image
+     * appears correct when viewed from the front.
+     *
+     * @param col   the frame grid column (0 = leftmost frame)
+     * @param width the total number of columns
+     * @param face  the direction the picture faces
+     * @return the image tile column index
+     */
+    static int resolveImageCol(int col, int width, BlockFace face) {
+        // NORTH and EAST-facing frames render map content mirrored relative to the
+        // frame grid layout, so image columns need to be reversed for these faces.
+        // SOUTH and WEST display map-left aligned with the grid's column order.
+        if (face == BlockFace.NORTH || face == BlockFace.EAST)
+            return width - 1 - col;
+        return col;
+    }
+
+    /**
+     * Returns the X offset per column for the given facing direction.
+     * Frames extend horizontally perpendicular to the face direction.
+     */
+    static int deltaX(BlockFace face) {
+        switch (face) {
+            case SOUTH:
+            case NORTH:
+                return 1;
+            default:
+                return 0;
+        }
+    }
+
+    /**
+     * Returns the Z offset per column for the given facing direction.
+     * Frames extend horizontally perpendicular to the face direction.
+     */
+    static int deltaZ(BlockFace face) {
+        switch (face) {
+            case EAST:
+            case WEST:
+                return 1;
+            default:
+                return 0;
+        }
+    }
 
     /**
      * Resolves all version-dependent factories from the server version.
@@ -249,8 +297,6 @@ public class PictureService implements BBAIPictureService, PluginService {
         updateWithCanvas(viewers, picture, canvas, canvasW);
     }
 
-    // ── raw byte[] HWC pixel overloads ────────────────────────────────────
-
     @Override
     public void spawn(@NonNull Player viewer, @NonNull Picture picture,
                       int anchorX, int anchorY, int anchorZ,
@@ -259,6 +305,8 @@ public class PictureService implements BBAIPictureService, PluginService {
         spawn(Collections.singletonList(viewer), picture, anchorX, anchorY, anchorZ,
                 face, hwcPixels, imageWidth, imageHeight);
     }
+
+    // ── raw byte[] HWC pixel overloads ────────────────────────────────────
 
     @Override
     public void spawn(@NonNull Collection<Player> viewers, @NonNull Picture picture,
@@ -365,8 +413,8 @@ public class PictureService implements BBAIPictureService, PluginService {
     /**
      * Sends a map data packet with the given pixel data to all viewers.
      *
-     * @param viewers  the players to send the map data to
-     * @param mapId    the map ID
+     * @param viewers   the players to send the map data to
+     * @param mapId     the map ID
      * @param mapColors the 128x128 byte array of map palette indices
      */
     private void sendMapData(Collection<Player> viewers, int mapId, byte[] mapColors) {
@@ -397,57 +445,6 @@ public class PictureService implements BBAIPictureService, PluginService {
         data.add(new EntityData<>(itemFrameItemIndex, EntityDataTypes.ITEMSTACK, mapItem));
 
         return data;
-    }
-
-    /**
-     * Resolves the image column index for a given frame column, accounting for
-     * horizontal mirroring based on the facing direction.
-     * <p>
-     * Minecraft renders map content on item frames such that the image left
-     * corresponds to different world directions depending on the frame's facing.
-     * For SOUTH and WEST-facing pictures, columns are mirrored so the image
-     * appears correct when viewed from the front.
-     *
-     * @param col   the frame grid column (0 = leftmost frame)
-     * @param width the total number of columns
-     * @param face  the direction the picture faces
-     * @return the image tile column index
-     */
-    static int resolveImageCol(int col, int width, BlockFace face) {
-        // NORTH and EAST-facing frames render map content mirrored relative to the
-        // frame grid layout, so image columns need to be reversed for these faces.
-        // SOUTH and WEST display map-left aligned with the grid's column order.
-        if (face == BlockFace.NORTH || face == BlockFace.EAST)
-            return width - 1 - col;
-        return col;
-    }
-
-    /**
-     * Returns the X offset per column for the given facing direction.
-     * Frames extend horizontally perpendicular to the face direction.
-     */
-    static int deltaX(BlockFace face) {
-        switch (face) {
-            case SOUTH:
-            case NORTH:
-                return 1;
-            default:
-                return 0;
-        }
-    }
-
-    /**
-     * Returns the Z offset per column for the given facing direction.
-     * Frames extend horizontally perpendicular to the face direction.
-     */
-    static int deltaZ(BlockFace face) {
-        switch (face) {
-            case EAST:
-            case WEST:
-                return 1;
-            default:
-                return 0;
-        }
     }
 
     // ── version-resolved factory builders ───────────────────────────────────
@@ -589,17 +586,25 @@ public class PictureService implements BBAIPictureService, PluginService {
      */
     public static final class Picture {
 
-        /** Synthetic entity IDs for each item frame, indexed column-major. */
+        /**
+         * Synthetic entity IDs for each item frame, indexed column-major.
+         */
         final int[] entityIds;
 
-        /** Map IDs for each tile's filled map, indexed column-major. */
+        /**
+         * Map IDs for each tile's filled map, indexed column-major.
+         */
         final int[] mapIds;
 
-        /** Number of tile columns in the grid. */
+        /**
+         * Number of tile columns in the grid.
+         */
         @Getter
         final int width;
 
-        /** Number of tile rows in the grid. */
+        /**
+         * Number of tile rows in the grid.
+         */
         @Getter
         final int height;
 

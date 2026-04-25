@@ -16,7 +16,9 @@ class CpuRendererTest {
 
     private static final short AIR = (short) XMaterial.AIR.ordinal();
 
-    /** Shared renderer instance for all tests — avoids pool creation per test. */
+    /**
+     * Shared renderer instance for all tests — avoids pool creation per test.
+     */
     private static CpuRenderer renderer;
 
     @BeforeAll
@@ -191,7 +193,7 @@ class CpuRendererTest {
         // Fill y=0 layer with stone
         for (int x = 0; x < size; x++)
             for (int z = 0; z < size; z++)
-                data[x * size * size + 0 + z] = (short) XMaterial.STONE.ordinal();
+                data[x * size * size + z] = (short) XMaterial.STONE.ordinal();
 
         FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
         // Camera at y=5 looking straight down (pitch=90)

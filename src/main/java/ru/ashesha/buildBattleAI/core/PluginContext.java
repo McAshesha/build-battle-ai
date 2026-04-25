@@ -12,9 +12,10 @@ import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.ArenaManager;
 import ru.ashesha.buildBattleAI.arena.api.BBAIArenaManager;
 import ru.ashesha.buildBattleAI.commands.CommandService;
-import ru.ashesha.buildBattleAI.commands.PictureCommand;
 import ru.ashesha.buildBattleAI.entity.hologram.HologramService;
 import ru.ashesha.buildBattleAI.entity.hologram.api.BBAIHologramService;
+import ru.ashesha.buildBattleAI.entity.npc.NPCService;
+import ru.ashesha.buildBattleAI.entity.npc.api.BBAINPCService;
 import ru.ashesha.buildBattleAI.entity.picture.PictureService;
 import ru.ashesha.buildBattleAI.entity.picture.api.BBAIPictureService;
 import ru.ashesha.buildBattleAI.game.GameManager;
@@ -24,8 +25,6 @@ import ru.ashesha.buildBattleAI.message.MessageService;
 import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.ml.MLService;
 import ru.ashesha.buildBattleAI.ml.api.BBAIMLService;
-import ru.ashesha.buildBattleAI.entity.npc.NPCService;
-import ru.ashesha.buildBattleAI.entity.npc.api.BBAINPCService;
 import ru.ashesha.buildBattleAI.render.RenderService;
 
 import java.util.Arrays;
@@ -164,7 +163,6 @@ public class PluginContext {
         // belong here because they are owned by the plugin as a whole, not by
         // the command / listener services (those services only provide the
         // registration mechanism and the bulk-unregistration guarantees).
-        commandService.register(new PictureCommand(plugin));
     }
 
     /**

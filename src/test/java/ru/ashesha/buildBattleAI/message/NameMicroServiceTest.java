@@ -89,8 +89,7 @@ class NameMicroServiceTest {
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
         verify(context).sendPacket(eq(viewer), captor.capture());
-        assertTrue(captor.getValue() instanceof WrapperPlayServerPlayerInfoUpdate,
-                "1.19.3+ should use WrapperPlayServerPlayerInfoUpdate");
+        assertInstanceOf(WrapperPlayServerPlayerInfoUpdate.class, captor.getValue(), "1.19.3+ should use WrapperPlayServerPlayerInfoUpdate");
     }
 
     @Test
@@ -100,8 +99,7 @@ class NameMicroServiceTest {
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
         verify(context).sendPacket(eq(viewer), captor.capture());
-        assertTrue(captor.getValue() instanceof WrapperPlayServerPlayerInfo,
-                "1.8 should use WrapperPlayServerPlayerInfo");
+        assertInstanceOf(WrapperPlayServerPlayerInfo.class, captor.getValue(), "1.8 should use WrapperPlayServerPlayerInfo");
     }
 
     // ===== Single viewer =====
@@ -138,7 +136,7 @@ class NameMicroServiceTest {
     void sendPlayerListNameToEmptyCollectionSendsNothing() {
         NameMicroService service = serviceFor(ServerVersion.V_1_19_3);
 
-        service.sendPlayerListName(target, "Name", Collections.<Player>emptyList());
+        service.sendPlayerListName(target, "Name", Collections.emptyList());
 
         verify(context, never()).sendPacket(any(Player.class), any(PacketWrapper.class));
     }

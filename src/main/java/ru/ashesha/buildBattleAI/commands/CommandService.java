@@ -35,9 +35,16 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CommandService implements PluginService {
 
-    /** The plugin instance, used as the command prefix namespace. */
+    /**
+     * The plugin instance, used as the command prefix namespace.
+     */
     @NonNull
     private final BuildBattleAI plugin;
+
+    /**
+     * All commands registered through this service, for bulk unregistration on shutdown.
+     */
+    private final List<PluginCommand> registeredCommands = new ArrayList<>();
 
     /**
      * The server's command map, resolved reflectively in {@link #enable()}.
@@ -52,9 +59,6 @@ public class CommandService implements PluginService {
      * aliases (e.g. {@code "pluginname:command"}) during unregistration.
      */
     private Map<String, Command> knownCommands;
-
-    /** All commands registered through this service, for bulk unregistration on shutdown. */
-    private final List<PluginCommand> registeredCommands = new ArrayList<>();
 
     /**
      * Resolves the server's {@link CommandMap} and its internal
@@ -167,7 +171,7 @@ public class CommandService implements PluginService {
          * to suppress Bukkit's default usage message.
          */
         @Override
-        public final boolean execute(CommandSender sender, String label, String[] args) {
+        public final boolean execute(@NonNull CommandSender sender, @NonNull String label, String[] args) {
             execute(sender, args);
             return true;
         }
@@ -176,7 +180,7 @@ public class CommandService implements PluginService {
          * Delegates to {@link #suggest(CommandSender, String[])}.
          */
         @Override
-        public final List<String> tabComplete(CommandSender sender, String alias, String[] args) {
+        public final @NonNull List<String> tabComplete(@NonNull CommandSender sender, @NonNull String alias, String[] args) {
             List<String> suggestions = suggest(sender, args);
             return suggestions == null ? Collections.emptyList() : suggestions;
         }

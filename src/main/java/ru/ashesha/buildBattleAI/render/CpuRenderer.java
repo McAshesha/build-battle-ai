@@ -94,81 +94,6 @@ public class CpuRenderer {
         this.pool = pool;
     }
 
-    /**
-     * Renders the scene from the given camera position and orientation.
-     * Safe to call from any thread concurrently — each invocation operates
-     * on its own pixel buffer and submits independent fork/join tasks.
-     *
-     * @param scene the captured scene data (thread-safe)
-     * @param camX  camera X position
-     * @param camY  camera Y position
-     * @param camZ  camera Z position
-     * @param yaw   camera yaw (Minecraft convention: 0=south, 90=west, 180=north)
-     * @param pitch camera pitch (-90=up, 0=horizontal, 90=down)
-     * @return byte array of size 224×224×3 containing RGB pixel data in row-major HWC order
-     */
-    public byte[] render(@NonNull SceneData scene,
-                         double camX, double camY, double camZ,
-                         float yaw, float pitch) {
-        byte[] pixels = new byte[RendererUtils.WIDTH * RendererUtils.HEIGHT * 3];
-
-        // Camera basis vectors (Minecraft coordinate system)
-        double yawRad = Math.toRadians(yaw);
-        double pitchRad = Math.toRadians(pitch);
-
-        double cosPitch = Math.cos(pitchRad);
-        double sinPitch = Math.sin(pitchRad);
-        double cosYaw = Math.cos(yawRad);
-        double sinYaw = Math.sin(yawRad);
-
-        // Forward: direction the player is looking
-        double fwdX = -sinYaw * cosPitch;
-        double fwdY = -sinPitch;
-        double fwdZ = cosYaw * cosPitch;
-
-        // Right: player's right-hand direction
-        double rgtX = -cosYaw;
-        double rgtZ = -sinYaw;
-        // rgtY = 0 always
-
-        // Up = right × forward
-        double upX = -rgtZ * fwdY;
-        double upY = rgtZ * fwdX - rgtX * fwdZ;
-        double upZ = rgtX * fwdY;
-
-        double halfTan = Math.tan(Math.toRadians(RendererUtils.FOV * 0.5));
-
-        // Pre-compute per-column Y bounds for empty-space skipping during DDA traversal
-        int[] heightMap = RendererUtils.buildHeightMap(scene);
-
-        RenderContext ctx = new RenderContext(
-                pixels, scene,
-                camX, camY, camZ,
-                fwdX, fwdY, fwdZ,
-                rgtX, rgtZ,
-                upX, upY, upZ,
-                halfTan,
-                scene.minX(), scene.minY(), scene.minZ(),
-                scene.maxX() + 1.0, scene.maxY() + 1.0, scene.maxZ() + 1.0,
-                scene.minX(), scene.minY(), scene.minZ(),
-                scene.maxX(), scene.maxY(), scene.maxZ(),
-                heightMap
-        );
-
-        pool.invoke(new RenderTask(ctx, 0, RendererUtils.HEIGHT));
-
-        return pixels;
-    }
-
-    /**
-     * Shuts down the dedicated thread pool, releasing worker threads back to the OS.
-     * After this call, the renderer instance is no longer usable — discard it and
-     * create a new {@code CpuRenderer} if rendering is needed again.
-     */
-    public void shutdown() {
-        pool.shutdownNow();
-    }
-
     // ===== Ray tracing algorithm (private static — pure functions) =====
 
     /**
@@ -688,6 +613,81 @@ public class CpuRenderer {
         }
 
         return hitFace;
+    }
+
+    /**
+     * Renders the scene from the given camera position and orientation.
+     * Safe to call from any thread concurrently — each invocation operates
+     * on its own pixel buffer and submits independent fork/join tasks.
+     *
+     * @param scene the captured scene data (thread-safe)
+     * @param camX  camera X position
+     * @param camY  camera Y position
+     * @param camZ  camera Z position
+     * @param yaw   camera yaw (Minecraft convention: 0=south, 90=west, 180=north)
+     * @param pitch camera pitch (-90=up, 0=horizontal, 90=down)
+     * @return byte array of size 224×224×3 containing RGB pixel data in row-major HWC order
+     */
+    public byte[] render(@NonNull SceneData scene,
+                         double camX, double camY, double camZ,
+                         float yaw, float pitch) {
+        byte[] pixels = new byte[RendererUtils.WIDTH * RendererUtils.HEIGHT * 3];
+
+        // Camera basis vectors (Minecraft coordinate system)
+        double yawRad = Math.toRadians(yaw);
+        double pitchRad = Math.toRadians(pitch);
+
+        double cosPitch = Math.cos(pitchRad);
+        double sinPitch = Math.sin(pitchRad);
+        double cosYaw = Math.cos(yawRad);
+        double sinYaw = Math.sin(yawRad);
+
+        // Forward: direction the player is looking
+        double fwdX = -sinYaw * cosPitch;
+        double fwdY = -sinPitch;
+        double fwdZ = cosYaw * cosPitch;
+
+        // Right: player's right-hand direction
+        double rgtX = -cosYaw;
+        double rgtZ = -sinYaw;
+        // rgtY = 0 always
+
+        // Up = right × forward
+        double upX = -rgtZ * fwdY;
+        double upY = rgtZ * fwdX - rgtX * fwdZ;
+        double upZ = rgtX * fwdY;
+
+        double halfTan = Math.tan(Math.toRadians(RendererUtils.FOV * 0.5));
+
+        // Pre-compute per-column Y bounds for empty-space skipping during DDA traversal
+        int[] heightMap = RendererUtils.buildHeightMap(scene);
+
+        RenderContext ctx = new RenderContext(
+                pixels, scene,
+                camX, camY, camZ,
+                fwdX, fwdY, fwdZ,
+                rgtX, rgtZ,
+                upX, upY, upZ,
+                halfTan,
+                scene.minX(), scene.minY(), scene.minZ(),
+                scene.maxX() + 1.0, scene.maxY() + 1.0, scene.maxZ() + 1.0,
+                scene.minX(), scene.minY(), scene.minZ(),
+                scene.maxX(), scene.maxY(), scene.maxZ(),
+                heightMap
+        );
+
+        pool.invoke(new RenderTask(ctx, 0, RendererUtils.HEIGHT));
+
+        return pixels;
+    }
+
+    /**
+     * Shuts down the dedicated thread pool, releasing worker threads back to the OS.
+     * After this call, the renderer instance is no longer usable — discard it and
+     * create a new {@code CpuRenderer} if rendering is needed again.
+     */
+    public void shutdown() {
+        pool.shutdownNow();
     }
 
     // ===== Parallel rendering infrastructure =====

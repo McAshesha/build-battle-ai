@@ -4,6 +4,7 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.Delegate;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
+import ru.ashesha.buildBattleAI.core.PluginContext;
 import ru.ashesha.buildBattleAI.core.PluginService;
 import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
 
@@ -36,7 +37,9 @@ import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
 @RequiredArgsConstructor
 public class MessageService implements BBAIMessageService, PluginService {
 
-    /** The plugin instance, forwarded to each micro-service during {@link #enable()}. */
+    /**
+     * The plugin instance, forwarded to each micro-service during {@link #enable()}.
+     */
     @NonNull
     private final BuildBattleAI plugin;
 

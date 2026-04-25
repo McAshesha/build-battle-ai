@@ -14,7 +14,7 @@ import java.util.Optional;
 
 /**
  * Thread-safe snapshot of block data within a render region.
- * Must be created on the main server thread via {@link #capture(RenderRegion)}.
+ * Must be created on the main server thread via {@link #capture(RenderRegion, boolean)}.
  * Once created, all methods are safe to call from any thread.
  * <p>
  * Multi-version: works on 1.8–1.21+.
@@ -381,7 +381,6 @@ public class ChunkScene implements SceneData {
      * <p>
      * Thread-safe: JVM guarantees that class initialization is synchronized.
      */
-    @SuppressWarnings("JavaReflectionMemberAccess")
     private static class Version {
 
         /**

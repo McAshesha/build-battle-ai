@@ -79,8 +79,7 @@ class BarMicroServiceTest {
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
         verify(context).sendPacket(eq(player), captor.capture());
-        assertTrue(captor.getValue() instanceof WrapperPlayServerActionBar,
-                "1.11+ should use WrapperPlayServerActionBar");
+        assertInstanceOf(WrapperPlayServerActionBar.class, captor.getValue(), "1.11+ should use WrapperPlayServerActionBar");
     }
 
     @Test
@@ -90,8 +89,7 @@ class BarMicroServiceTest {
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
         verify(context).sendPacket(eq(player), captor.capture());
-        assertTrue(captor.getValue() instanceof WrapperPlayServerChatMessage,
-                "1.8 should use WrapperPlayServerChatMessage for action bar");
+        assertInstanceOf(WrapperPlayServerChatMessage.class, captor.getValue(), "1.8 should use WrapperPlayServerChatMessage for action bar");
     }
 
     // ===== Single player =====
@@ -121,7 +119,7 @@ class BarMicroServiceTest {
     void sendActionBarToEmptyCollectionSendsNothing() {
         BarMicroService service = serviceFor(ServerVersion.V_1_19);
 
-        service.sendActionBar(Collections.<Player>emptyList(), "Nobody");
+        service.sendActionBar(Collections.emptyList(), "Nobody");
 
         verify(context, never()).sendPacket(any(Player.class), any(PacketWrapper.class));
     }

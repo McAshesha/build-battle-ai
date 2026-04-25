@@ -3,7 +3,8 @@ package ru.ashesha.buildBattleAI.entity.picture;
 import org.bukkit.block.BlockFace;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests for {@link PictureService} internals and the {@link PictureService.Picture}

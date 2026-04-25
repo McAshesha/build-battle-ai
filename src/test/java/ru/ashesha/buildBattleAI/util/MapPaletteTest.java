@@ -15,13 +15,48 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class MapPaletteTest {
 
-    // ── palette structure tests ────────────────────────────────────────────
+    // ── helpers ────────────────────────────────────────────────────────────
+
+    /**
+     * Creates a solid-color HWC byte pixel array.
+     */
+    private static byte[] solidHwcPixels(int w, int h, int r, int g, int b) {
+        byte[] pixels = new byte[w * h * 3];
+        for (int i = 0; i < w * h; i++) {
+            pixels[i * 3] = (byte) r;
+            pixels[i * 3 + 1] = (byte) g;
+            pixels[i * 3 + 2] = (byte) b;
+        }
+        return pixels;
+    }
+
+    /**
+     * Creates a solid-color packed RGB pixel array.
+     */
+    private static int[] solidPixels(int w, int h, int rgb) {
+        int[] pixels = new int[w * h];
+        java.util.Arrays.fill(pixels, rgb);
+        return pixels;
+    }
+
+    /**
+     * Creates a solid-color BufferedImage.
+     */
+    private static BufferedImage solidImage(int w, int h, int rgb) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                img.setRGB(x, y, rgb);
+        return img;
+    }
 
     @Test
     void paletteHasExpectedSize() {
         // 36 base colors × 4 shade variants = 144 entries
         assertEquals(144, MapPalette.PALETTE.length);
     }
+
+    // ── palette structure tests ────────────────────────────────────────────
 
     @Test
     void transparentIndicesAreBlack() {
@@ -54,8 +89,6 @@ class MapPaletteTest {
         int fullR = (fullGrass >> 16) & 0xFF;
         assertTrue(darkR < fullR, "Dark shade R should be less than full: " + darkR + " < " + fullR);
     }
-
-    // ── matchColor tests (lookup-table based) ──────────────────────────────
 
     @Test
     void exactColorMatchReturnsCorrectIndex() {
@@ -94,6 +127,8 @@ class MapPaletteTest {
         // Fire full = index 18 (base 4, shade 2): RGB(255, 0, 0)
         assertEquals(18, matched);
     }
+
+    // ── matchColor tests (lookup-table based) ──────────────────────────────
 
     @Test
     void matchColorNeverReturnsTransparent() {
@@ -173,8 +208,6 @@ class MapPaletteTest {
             assertEquals(redIndex, colors[i]);
     }
 
-    // ── imageToCanvasColors tests (aspect ratio) ───────────────────────────
-
     @Test
     void squareImageOnSquareCanvasHasNoPadding() {
         // 100×100 image on 128×128 canvas — fills entirely, no transparent pixels
@@ -205,6 +238,8 @@ class MapPaletteTest {
         // Bottom-left corner should be transparent (padding)
         assertEquals(MapPalette.TRANSPARENT, canvas[127 * 128]);
     }
+
+    // ── imageToCanvasColors tests (aspect ratio) ───────────────────────────
 
     @Test
     void tallImageGetsPaddingLeftAndRight() {
@@ -248,8 +283,10 @@ class MapPaletteTest {
         int centerRow = 192;
         boolean hasOpaque = false;
         for (int x = 0; x < 384; x++)
-            if (canvas[centerRow * 384 + x] != MapPalette.TRANSPARENT)
+            if (canvas[centerRow * 384 + x] != MapPalette.TRANSPARENT) {
                 hasOpaque = true;
+                break;
+            }
         assertTrue(hasOpaque, "Center row should have opaque pixels");
     }
 
@@ -302,14 +339,14 @@ class MapPaletteTest {
         assertEquals(40, br[0]);
     }
 
+    // ── resizeImage tests ──────────────────────────────────────────────────
+
     @Test
     void extractTileSize() {
         byte[] canvas = new byte[384 * 384];
         byte[] tile = MapPalette.extractTile(canvas, 384, 2, 2);
         assertEquals(128 * 128, tile.length);
     }
-
-    // ── resizeImage tests ──────────────────────────────────────────────────
 
     @Test
     void resizeImageProducesCorrectDimensions() {
@@ -331,8 +368,6 @@ class MapPaletteTest {
         assertEquals(0x336699, centerColor);
     }
 
-    // ── rgbToCanvasColors (raw pixel path) ────────────────────────────────
-
     @Test
     void rgbToCanvasColorsSameAsImagePath() {
         // A solid red 100×100 image should produce the same canvas via both paths
@@ -344,6 +379,8 @@ class MapPaletteTest {
 
         assertArrayEquals(fromImage, fromRgb);
     }
+
+    // ── rgbToCanvasColors (raw pixel path) ────────────────────────────────
 
     @Test
     void rgbToCanvasColorsPreservesAspectRatio() {
@@ -412,8 +449,6 @@ class MapPaletteTest {
             assertEquals(0xAABBCC, pixel);
     }
 
-    // ── hwcToCanvasColors (renderer byte[] path) ─────────────────────────
-
     @Test
     void hwcSolidRedMatchesIntPath() {
         // Solid red 10×10 image, compare HWC path vs int[] path
@@ -426,6 +461,8 @@ class MapPaletteTest {
 
         assertArrayEquals(fromInt, fromHwc);
     }
+
+    // ── hwcToCanvasColors (renderer byte[] path) ─────────────────────────
 
     @Test
     void hwcPreservesAspectRatio() {
@@ -454,35 +491,5 @@ class MapPaletteTest {
         byte expected = MapPalette.matchColor(0x00FF00);
         for (int i = 0; i < canvas.length; i++)
             assertEquals(expected, canvas[i], "Pixel " + i + " differs");
-    }
-
-    // ── helpers ────────────────────────────────────────────────────────────
-
-    /** Creates a solid-color HWC byte pixel array. */
-    private static byte[] solidHwcPixels(int w, int h, int r, int g, int b) {
-        byte[] pixels = new byte[w * h * 3];
-        for (int i = 0; i < w * h; i++) {
-            pixels[i * 3] = (byte) r;
-            pixels[i * 3 + 1] = (byte) g;
-            pixels[i * 3 + 2] = (byte) b;
-        }
-        return pixels;
-    }
-
-
-    /** Creates a solid-color packed RGB pixel array. */
-    private static int[] solidPixels(int w, int h, int rgb) {
-        int[] pixels = new int[w * h];
-        java.util.Arrays.fill(pixels, rgb);
-        return pixels;
-    }
-
-    /** Creates a solid-color BufferedImage. */
-    private static BufferedImage solidImage(int w, int h, int rgb) {
-        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-                img.setRGB(x, y, rgb);
-        return img;
     }
 }

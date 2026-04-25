@@ -48,16 +48,24 @@ import java.util.Optional;
  */
 public class BoardMicroService {
 
-    /** Maximum number of lines a scoreboard can display (Minecraft protocol limit). */
+    /**
+     * Maximum number of lines a scoreboard can display (Minecraft protocol limit).
+     */
     public static final int MAX_LINES = 15;
 
-    /** Sidebar display position in the {@link WrapperPlayServerDisplayScoreboard} packet. */
+    /**
+     * Sidebar display position in the {@link WrapperPlayServerDisplayScoreboard} packet.
+     */
     private static final int SIDEBAR_POSITION = 1;
 
-    /** Objective name shared by all boards created by this service. */
+    /**
+     * Objective name shared by all boards created by this service.
+     */
     private static final String OBJECTIVE_NAME = "_bbai";
 
-    /** Prefix for team names — each line uses {@code _bb_0} through {@code _bb_14}. */
+    /**
+     * Prefix for team names — each line uses {@code _bb_0} through {@code _bb_14}.
+     */
     private static final String TEAM_NAME_PREFIX = "_bb_";
 
     /**
@@ -78,10 +86,14 @@ public class BoardMicroService {
         }
     }
 
-    /** The plugin instance, used for sending packets via the context. */
+    /**
+     * The plugin instance, used for sending packets via the context.
+     */
     private final BuildBattleAI plugin;
 
-    /** Whether the server is pre-1.13 (legacy text protocol with 16-char limits). */
+    /**
+     * Whether the server is pre-1.13 (legacy text protocol with 16-char limits).
+     */
     private final boolean legacy;
 
     /**
@@ -320,7 +332,9 @@ public class BoardMicroService {
      */
     public class Board {
 
-        /** Tracks which line indices are currently active (have content on the client). */
+        /**
+         * Tracks which line indices are currently active (have content on the client).
+         */
         private final boolean[] activeLines = new boolean[MAX_LINES];
 
         /**

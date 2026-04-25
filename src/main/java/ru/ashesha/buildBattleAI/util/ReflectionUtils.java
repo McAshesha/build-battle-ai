@@ -29,7 +29,7 @@ public class ReflectionUtils {
      */
     public Field findField(Class<?> clazz, String fieldName) {
         Class<?> current = clazz;
-        while (current != null) {
+        while (current != null)
             try {
                 Field field = current.getDeclaredField(fieldName);
                 field.setAccessible(true);
@@ -37,7 +37,6 @@ public class ReflectionUtils {
             } catch (NoSuchFieldException e) {
                 current = current.getSuperclass();
             }
-        }
         throw new RuntimeException("Field '" + fieldName + "' not found in "
                 + clazz.getName() + " or its superclasses");
     }
@@ -157,7 +156,7 @@ public class ReflectionUtils {
      */
     public Method findMethod(Class<?> clazz, String methodName, Class<?>... paramTypes) {
         Class<?> current = clazz;
-        while (current != null) {
+        while (current != null)
             try {
                 Method method = current.getDeclaredMethod(methodName, paramTypes);
                 method.setAccessible(true);
@@ -165,7 +164,6 @@ public class ReflectionUtils {
             } catch (NoSuchMethodException e) {
                 current = current.getSuperclass();
             }
-        }
         throw new RuntimeException("Method '" + methodName + "' not found in "
                 + clazz.getName() + " or its superclasses");
     }

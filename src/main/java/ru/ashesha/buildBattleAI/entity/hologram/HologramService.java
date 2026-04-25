@@ -20,13 +20,7 @@ import ru.ashesha.buildBattleAI.core.PluginService;
 import ru.ashesha.buildBattleAI.entity.hologram.api.BBAIHologramService;
 import ru.ashesha.buildBattleAI.util.MessageUtils;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -54,10 +48,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 @RequiredArgsConstructor
 public class HologramService implements BBAIHologramService, PluginService {
 
-    /** Vertical distance between hologram lines in blocks. */
+    /**
+     * Vertical distance between hologram lines in blocks.
+     */
     static final double LINE_SPACING = 0.3;
 
-    /** The plugin instance used for packet sending. */
+    /**
+     * The plugin instance used for packet sending.
+     */
     @NonNull
     private final BuildBattleAI plugin;
 
@@ -70,13 +68,19 @@ public class HologramService implements BBAIHologramService, PluginService {
 
     // ── version-resolved factories and constants ────────────────────────────
 
-    /** Factory for creating armor stand spawn packets. Resolved in {@link #enable()}. */
+    /**
+     * Factory for creating armor stand spawn packets. Resolved in {@link #enable()}.
+     */
     private SpawnFactory spawnFactory;
 
-    /** Factory for creating custom name metadata entries. Resolved in {@link #enable()}. */
+    /**
+     * Factory for creating custom name metadata entries. Resolved in {@link #enable()}.
+     */
     private NameFactory nameFactory;
 
-    /** Factory for creating "custom name visible" metadata entries. Resolved in {@link #enable()}. */
+    /**
+     * Factory for creating "custom name visible" metadata entries. Resolved in {@link #enable()}.
+     */
     private NameVisibleFactory nameVisibleFactory;
 
     /**
@@ -91,6 +95,21 @@ public class HologramService implements BBAIHologramService, PluginService {
      * plus marker on 1.16.2+ for a zero-size hitbox. Resolved in {@link #enable()}.
      */
     private byte armorStandFlagsValue;
+
+    /**
+     * Computes the Y coordinate for a specific line in the hologram.
+     * Lines are stacked upward from the anchor: the topmost line (index 0)
+     * is highest, and each subsequent line is {@link #LINE_SPACING} blocks lower.
+     *
+     * @param anchorY   the anchor Y coordinate
+     * @param lineIndex the zero-based line index (0 = top)
+     * @param lineCount total number of lines
+     * @return the Y coordinate for this line's armor stand
+     */
+    static double computeLineY(double anchorY, int lineIndex, int lineCount) {
+        // Stack lines above the anchor point: top line is highest
+        return anchorY + (lineCount - 1 - lineIndex) * LINE_SPACING;
+    }
 
     /**
      * Resolves all version-dependent factories from the server version.
@@ -319,21 +338,6 @@ public class HologramService implements BBAIHologramService, PluginService {
     // ── internal helpers ────────────────────────────────────────────────────
 
     /**
-     * Computes the Y coordinate for a specific line in the hologram.
-     * Lines are stacked upward from the anchor: the topmost line (index 0)
-     * is highest, and each subsequent line is {@link #LINE_SPACING} blocks lower.
-     *
-     * @param anchorY   the anchor Y coordinate
-     * @param lineIndex the zero-based line index (0 = top)
-     * @param lineCount total number of lines
-     * @return the Y coordinate for this line's armor stand
-     */
-    static double computeLineY(double anchorY, int lineIndex, int lineCount) {
-        // Stack lines above the anchor point: top line is highest
-        return anchorY + (lineCount - 1 - lineIndex) * LINE_SPACING;
-    }
-
-    /**
      * Builds the full metadata list for spawning a hologram line.
      * Includes: invisible flag, custom name, custom name visible, armor stand flags.
      *
@@ -485,7 +489,9 @@ public class HologramService implements BBAIHologramService, PluginService {
      */
     public static final class Hologram {
 
-        /** Synthetic entity IDs for each line's armor stand, indexed top-to-bottom. */
+        /**
+         * Synthetic entity IDs for each line's armor stand, indexed top-to-bottom.
+         */
         int[] entityIds;
 
         /**

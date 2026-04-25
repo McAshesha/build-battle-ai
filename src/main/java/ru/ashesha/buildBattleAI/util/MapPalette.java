@@ -31,7 +31,9 @@ import java.awt.image.BufferedImage;
 @UtilityClass
 public class MapPalette {
 
-    /** Width and height of a single Minecraft map tile in pixels. */
+    /**
+     * Width and height of a single Minecraft map tile in pixels.
+     */
     public final int MAP_SIZE = 128;
 
     /**
@@ -40,13 +42,6 @@ public class MapPalette {
      * all transparent in Minecraft's map rendering.
      */
     public final byte TRANSPARENT = 0;
-
-    /**
-     * Shade multipliers applied to each base color to produce four brightness variants.
-     * Index 0 = darkest (180/255), index 1 = medium (220/255),
-     * index 2 = full brightness, index 3 = deep shadow (135/255).
-     */
-    private final double[] SHADE_MULTIPLIERS = {180.0 / 255, 220.0 / 255, 1.0, 135.0 / 255};
 
     /**
      * The 36 base colors available since Minecraft 1.8 (map color IDs 0–35).
@@ -100,15 +95,26 @@ public class MapPalette {
     final int[] PALETTE;
 
     /**
+     * Shade multipliers applied to each base color to produce four brightness variants.
+     * Index 0 = darkest (180/255), index 1 = medium (220/255),
+     * index 2 = full brightness, index 3 = deep shadow (135/255).
+     */
+    private final double[] SHADE_MULTIPLIERS = {180.0 / 255, 220.0 / 255, 1.0, 135.0 / 255};
+
+    /**
      * Number of bits to shift when quantizing each RGB channel for the lookup table.
      * With 5 bits kept (shift of 3), we get a 32×32×32 = 32768-entry table (32 KB).
      */
     private final int QUANTIZE_SHIFT = 3;
 
-    /** Number of buckets per channel in the quantized color space. */
+    /**
+     * Number of buckets per channel in the quantized color space.
+     */
     private final int QUANTIZE_SIZE = 256 >> QUANTIZE_SHIFT; // 32
 
-    /** Precomputed QUANTIZE_SIZE² for index arithmetic. */
+    /**
+     * Precomputed QUANTIZE_SIZE² for index arithmetic.
+     */
     private final int Q2 = QUANTIZE_SIZE * QUANTIZE_SIZE;
 
     /**
@@ -236,7 +242,7 @@ public class MapPalette {
      * @return a {@code canvasWidth × canvasHeight} byte array of palette indices
      */
     public byte[] imageToCanvasColors(BufferedImage image,
-                                             int canvasWidth, int canvasHeight) {
+                                      int canvasWidth, int canvasHeight) {
         int srcW = image.getWidth();
         int srcH = image.getHeight();
 
@@ -272,8 +278,8 @@ public class MapPalette {
             int rgb = pixels[i];
             colors[i] = COLOR_LOOKUP[
                     (((rgb >> 16) & 0xFF) >> QUANTIZE_SHIFT) * Q2
-                    + (((rgb >> 8) & 0xFF) >> QUANTIZE_SHIFT) * QUANTIZE_SIZE
-                    + ((rgb & 0xFF) >> QUANTIZE_SHIFT)];
+                            + (((rgb >> 8) & 0xFF) >> QUANTIZE_SHIFT) * QUANTIZE_SIZE
+                            + ((rgb & 0xFF) >> QUANTIZE_SHIFT)];
         }
 
         return colors;
@@ -295,7 +301,7 @@ public class MapPalette {
      * @return a {@code canvasWidth × canvasHeight} byte array of palette indices
      */
     public byte[] rgbToCanvasColors(int[] pixels, int srcW, int srcH,
-                                           int canvasWidth, int canvasHeight) {
+                                    int canvasWidth, int canvasHeight) {
         double scale = Math.min((double) canvasWidth / srcW, (double) canvasHeight / srcH);
         int scaledW = Math.max(1, (int) (srcW * scale));
         int scaledH = Math.max(1, (int) (srcH * scale));
@@ -330,7 +336,7 @@ public class MapPalette {
      * @return a {@code canvasWidth × canvasHeight} byte array of palette indices
      */
     public byte[] hwcToCanvasColors(byte[] hwcPixels, int srcW, int srcH,
-                                           int canvasWidth, int canvasHeight) {
+                                    int canvasWidth, int canvasHeight) {
         double scale = Math.min((double) canvasWidth / srcW, (double) canvasHeight / srcH);
         int scaledW = Math.max(1, (int) (srcW * scale));
         int scaledH = Math.max(1, (int) (srcH * scale));
@@ -384,8 +390,8 @@ public class MapPalette {
                 // Straight to palette lookup — no intermediate int[] or byte[]
                 canvas[canvasRowStart + x] = COLOR_LOOKUP[
                         (r >> QUANTIZE_SHIFT) * Q2
-                        + (g >> QUANTIZE_SHIFT) * QUANTIZE_SIZE
-                        + (b >> QUANTIZE_SHIFT)];
+                                + (g >> QUANTIZE_SHIFT) * QUANTIZE_SIZE
+                                + (b >> QUANTIZE_SHIFT)];
             }
         }
 
@@ -413,7 +419,7 @@ public class MapPalette {
      * @return the canvas byte array
      */
     private byte[] buildCanvas(int[] scaledPixels, int scaledW, int scaledH,
-                                      int canvasW, int canvasH, int offsetX, int offsetY) {
+                               int canvasW, int canvasH, int offsetX, int offsetY) {
         byte[] canvas = new byte[canvasW * canvasH];
 
         for (int y = 0; y < scaledH; y++) {
@@ -424,8 +430,8 @@ public class MapPalette {
                 int rgb = scaledPixels[srcRowStart + x];
                 canvas[canvasRowStart + x] = COLOR_LOOKUP[
                         (((rgb >> 16) & 0xFF) >> QUANTIZE_SHIFT) * Q2
-                        + (((rgb >> 8) & 0xFF) >> QUANTIZE_SHIFT) * QUANTIZE_SIZE
-                        + ((rgb & 0xFF) >> QUANTIZE_SHIFT)];
+                                + (((rgb >> 8) & 0xFF) >> QUANTIZE_SHIFT) * QUANTIZE_SIZE
+                                + ((rgb & 0xFF) >> QUANTIZE_SHIFT)];
             }
         }
 
@@ -443,7 +449,7 @@ public class MapPalette {
      * @return a 128×128 byte array for this tile
      */
     public byte[] extractTile(byte[] canvas, int canvasWidth,
-                                     int tileX, int tileY) {
+                              int tileX, int tileY) {
         byte[] tile = new byte[MAP_SIZE * MAP_SIZE];
         int srcX = tileX * MAP_SIZE;
         int srcY = tileY * MAP_SIZE;
@@ -462,11 +468,11 @@ public class MapPalette {
      * producing smooth scaling without any AWT dependency. For map art where the
      * palette is only 140 colors, the quality is indistinguishable from Graphics2D.
      *
-     * @param src    source pixels (packed RGB, row-major)
-     * @param srcW   source width
-     * @param srcH   source height
-     * @param dstW   target width
-     * @param dstH   target height
+     * @param src  source pixels (packed RGB, row-major)
+     * @param srcW source width
+     * @param srcH source height
+     * @param dstW target width
+     * @param dstH target height
      * @return resized packed RGB array of size {@code dstW × dstH}
      */
     int[] bilinearResize(int[] src, int srcW, int srcH, int dstW, int dstH) {

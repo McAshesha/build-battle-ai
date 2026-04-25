@@ -28,16 +28,24 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 @UtilityClass
 public class MessageUtils {
 
-    /** The Minecraft section sign character used for native color codes. */
+    /**
+     * The Minecraft section sign character used for native color codes.
+     */
     private final char SECTION_SIGN = '\u00a7';
 
-    /** Valid characters that follow a color prefix ({@code &} or {@code §}) to form a code. */
+    /**
+     * Valid characters that follow a color prefix ({@code &} or {@code §}) to form a code.
+     */
     private final String VALID_CODES = "0123456789abcdefklmnorABCDEFKLMNOR";
 
-    /** Serializer for converting {@code &}-prefixed color codes into Adventure components. */
+    /**
+     * Serializer for converting {@code &}-prefixed color codes into Adventure components.
+     */
     private final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacyAmpersand();
 
-    /** Serializer for converting {@code §}-prefixed color codes into Adventure components. */
+    /**
+     * Serializer for converting {@code §}-prefixed color codes into Adventure components.
+     */
     private final LegacyComponentSerializer SECTION = LegacyComponentSerializer.legacySection();
 
     /**

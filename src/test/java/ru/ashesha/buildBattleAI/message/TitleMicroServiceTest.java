@@ -23,7 +23,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 /**
@@ -90,12 +91,9 @@ class TitleMicroServiceTest {
         verify(context, times(3)).sendPacket(eq(player), captor.capture());
 
         List<PacketWrapper> packets = captor.getAllValues();
-        assertTrue(packets.get(0) instanceof WrapperPlayServerSetTitleTimes,
-                "First packet should be title times");
-        assertTrue(packets.get(1) instanceof WrapperPlayServerSetTitleText,
-                "Second packet should be title text");
-        assertTrue(packets.get(2) instanceof WrapperPlayServerSetTitleSubtitle,
-                "Third packet should be subtitle text");
+        assertInstanceOf(WrapperPlayServerSetTitleTimes.class, packets.get(0), "First packet should be title times");
+        assertInstanceOf(WrapperPlayServerSetTitleText.class, packets.get(1), "Second packet should be title text");
+        assertInstanceOf(WrapperPlayServerSetTitleSubtitle.class, packets.get(2), "Third packet should be subtitle text");
     }
 
     @Test
@@ -135,10 +133,8 @@ class TitleMicroServiceTest {
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
         verify(context, times(3)).sendPacket(eq(player), captor.capture());
 
-        for (PacketWrapper packet : captor.getAllValues()) {
-            assertTrue(packet instanceof WrapperPlayServerTitle,
-                    "Legacy version should use WrapperPlayServerTitle");
-        }
+        for (PacketWrapper packet : captor.getAllValues())
+            assertInstanceOf(WrapperPlayServerTitle.class, packet, "Legacy version should use WrapperPlayServerTitle");
     }
 
     @Test
@@ -168,7 +164,7 @@ class TitleMicroServiceTest {
     void sendTitleToEmptyCollectionSendsNothing() {
         TitleMicroService service = serviceFor(ServerVersion.V_1_17);
 
-        service.sendTitle(Collections.<Player>emptyList(), "Title", "Sub", 5, 40, 10);
+        service.sendTitle(Collections.emptyList(), "Title", "Sub", 5, 40, 10);
 
         verify(context, never()).sendPacket(any(Player.class), any(PacketWrapper.class));
     }

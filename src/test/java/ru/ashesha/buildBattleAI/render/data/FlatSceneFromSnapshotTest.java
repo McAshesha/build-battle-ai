@@ -15,7 +15,36 @@ import static org.mockito.Mockito.*;
  */
 class FlatSceneFromSnapshotTest {
 
-    // ===== Basic conversion =====
+    // ===== Helper =====
+
+    /**
+     * Creates a mocked ChunkScene with the given bounds.
+     * All blocks default to {@link XMaterial#AIR} and all block states to {@code null}.
+     *
+     * @param minX      inclusive min X
+     * @param minY      inclusive min Y
+     * @param minZ      inclusive min Z
+     * @param maxX      inclusive max X
+     * @param maxY      inclusive max Y
+     * @param maxZ      inclusive max Z
+     * @param hasLegacy whether the scene should report legacy block data
+     */
+    private static ChunkScene createMockScene(int minX, int minY, int minZ,
+                                              int maxX, int maxY, int maxZ,
+                                              boolean hasLegacy) {
+        ChunkScene scene = mock(ChunkScene.class);
+        when(scene.minX()).thenReturn(minX);
+        when(scene.minY()).thenReturn(minY);
+        when(scene.minZ()).thenReturn(minZ);
+        when(scene.maxX()).thenReturn(maxX);
+        when(scene.maxY()).thenReturn(maxY);
+        when(scene.maxZ()).thenReturn(maxZ);
+        when(scene.hasLegacyBlockData()).thenReturn(hasLegacy);
+        when(scene.getBlockType(anyInt(), anyInt(), anyInt())).thenReturn(XMaterial.AIR);
+        when(scene.getBlockState(anyInt(), anyInt(), anyInt())).thenReturn(null);
+        when(scene.getLegacyBlockData(anyInt(), anyInt(), anyInt())).thenReturn((byte) 0);
+        return scene;
+    }
 
     @Test
     void fromSnapshotPreservesBlockTypes() {
@@ -52,6 +81,8 @@ class FlatSceneFromSnapshotTest {
         assertEquals(6, flat.sizeZ());
     }
 
+    // ===== Basic conversion =====
+
     @Test
     void fromSnapshotSetsRuntimeFormat() {
         ChunkScene mockScene = createMockScene(0, 0, 0, 0, 0, 0, false);
@@ -78,8 +109,6 @@ class FlatSceneFromSnapshotTest {
         assertTrue(flat.hasBlockStates());
     }
 
-    // ===== Legacy block data =====
-
     @Test
     void fromSnapshotPreservesLegacyData() {
         ChunkScene mockScene = createMockScene(0, 0, 0, 0, 0, 0, true);
@@ -92,6 +121,8 @@ class FlatSceneFromSnapshotTest {
         assertTrue(flat.hasLegacyBlockData());
     }
 
+    // ===== Legacy block data =====
+
     @Test
     void fromSnapshotWithoutLegacyDataHasNoLegacyArray() {
         ChunkScene mockScene = createMockScene(0, 0, 0, 0, 0, 0, false);
@@ -101,8 +132,6 @@ class FlatSceneFromSnapshotTest {
         assertFalse(flat.hasLegacyBlockData());
         assertEquals(0, flat.getLegacyBlockData(0, 0, 0));
     }
-
-    // ===== Multi-block scene =====
 
     @Test
     void fromSnapshotCopiesMultipleBlocks() {
@@ -117,6 +146,8 @@ class FlatSceneFromSnapshotTest {
         assertEquals(XMaterial.DIRT, flat.getBlockType(1, 1, 1));
         assertEquals(XMaterial.SAND, flat.getBlockType(2, 2, 2));
     }
+
+    // ===== Multi-block scene =====
 
     @Test
     void fromSnapshotDefaultsAirForUnsetBlocks() {
@@ -142,36 +173,5 @@ class FlatSceneFromSnapshotTest {
 
         assertEquals(XMaterial.DIAMOND_BLOCK, flat.getBlockType(-10, 50, 100));
         assertEquals(XMaterial.EMERALD_BLOCK, flat.getBlockType(-8, 52, 102));
-    }
-
-    // ===== Helper =====
-
-    /**
-     * Creates a mocked ChunkScene with the given bounds.
-     * All blocks default to {@link XMaterial#AIR} and all block states to {@code null}.
-     *
-     * @param minX      inclusive min X
-     * @param minY      inclusive min Y
-     * @param minZ      inclusive min Z
-     * @param maxX      inclusive max X
-     * @param maxY      inclusive max Y
-     * @param maxZ      inclusive max Z
-     * @param hasLegacy whether the scene should report legacy block data
-     */
-    private static ChunkScene createMockScene(int minX, int minY, int minZ,
-                                               int maxX, int maxY, int maxZ,
-                                               boolean hasLegacy) {
-        ChunkScene scene = mock(ChunkScene.class);
-        when(scene.minX()).thenReturn(minX);
-        when(scene.minY()).thenReturn(minY);
-        when(scene.minZ()).thenReturn(minZ);
-        when(scene.maxX()).thenReturn(maxX);
-        when(scene.maxY()).thenReturn(maxY);
-        when(scene.maxZ()).thenReturn(maxZ);
-        when(scene.hasLegacyBlockData()).thenReturn(hasLegacy);
-        when(scene.getBlockType(anyInt(), anyInt(), anyInt())).thenReturn(XMaterial.AIR);
-        when(scene.getBlockState(anyInt(), anyInt(), anyInt())).thenReturn(null);
-        when(scene.getLegacyBlockData(anyInt(), anyInt(), anyInt())).thenReturn((byte) 0);
-        return scene;
     }
 }

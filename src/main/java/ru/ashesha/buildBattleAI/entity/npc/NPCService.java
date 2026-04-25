@@ -4,24 +4,10 @@ import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
-import com.github.retrooper.packetevents.protocol.player.Equipment;
-import com.github.retrooper.packetevents.protocol.player.EquipmentSlot;
-import com.github.retrooper.packetevents.protocol.player.GameMode;
-import com.github.retrooper.packetevents.protocol.player.TextureProperty;
-import com.github.retrooper.packetevents.protocol.player.UserProfile;
+import com.github.retrooper.packetevents.protocol.player.*;
 import com.github.retrooper.packetevents.util.Vector3d;
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityEquipment;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityHeadLook;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityRelativeMoveAndRotation;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerInfo;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerInfoRemove;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerInfoUpdate;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnPlayer;
+import com.github.retrooper.packetevents.wrapper.play.server.*;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -32,6 +18,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
+import ru.ashesha.buildBattleAI.core.PluginContext;
 import ru.ashesha.buildBattleAI.core.PluginService;
 import ru.ashesha.buildBattleAI.entity.npc.api.BBAINPCService;
 
@@ -39,12 +26,7 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -64,7 +46,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 @RequiredArgsConstructor
 public class NPCService implements BBAINPCService, PluginService {
 
-    /** The plugin instance used for scheduling and packet sending. */
+    /**
+     * The plugin instance used for scheduling and packet sending.
+     */
     @NonNull
     private final BuildBattleAI plugin;
 
@@ -76,13 +60,19 @@ public class NPCService implements BBAINPCService, PluginService {
 
     // ── version-resolved factories and constants ────────────────────────────
 
-    /** Factory for creating "add player to tab list" packets. Resolved in {@link #enable()}. */
+    /**
+     * Factory for creating "add player to tab list" packets. Resolved in {@link #enable()}.
+     */
     private PlayerInfoAddFactory playerInfoAddFactory;
 
-    /** Factory for creating "remove player from tab list" packets. Resolved in {@link #enable()}. */
+    /**
+     * Factory for creating "remove player from tab list" packets. Resolved in {@link #enable()}.
+     */
     private PlayerInfoRemoveFactory playerInfoRemoveFactory;
 
-    /** Factory for creating entity spawn packets. Resolved in {@link #enable()}. */
+    /**
+     * Factory for creating entity spawn packets. Resolved in {@link #enable()}.
+     */
     private SpawnFactory spawnFactory;
 
     /**
@@ -91,6 +81,75 @@ public class NPCService implements BBAINPCService, PluginService {
      * are encoded as bit flags in a single byte at this index. Resolved in {@link #enable()}.
      */
     private int skinLayersIndex;
+
+    /**
+     * Fetches skin texture and signature from the Mojang API for the given player name.
+     * <p>
+     * Performs two sequential HTTP requests:
+     * <ol>
+     *     <li>Resolves the player name to a UUID via the Mojang username API</li>
+     *     <li>Fetches the signed profile (with skin textures) via the session server</li>
+     * </ol>
+     * <b>This method is blocking</b> — call from an async context.
+     *
+     * @param name the Minecraft player name to look up
+     * @return a two-element array: {@code [texture, signature]}
+     * @throws IllegalArgumentException if the player name is not found
+     * @throws RuntimeException         if the Mojang API request fails
+     */
+    private static String[] fetchSkinByName(String name) {
+        try {
+            // Step 1: Resolve player name to UUID
+            HttpURLConnection conn = (HttpURLConnection) new URL(
+                    "https://api.mojang.com/users/profiles/minecraft/" + name
+            ).openConnection();
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+
+            if (conn.getResponseCode() != 200)
+                throw new IllegalArgumentException("Player not found: " + name);
+
+            //noinspection deprecation — instance parse() is required for Gson 2.2.4 (Spigot 1.8)
+            JsonObject nameResponse = new JsonParser()
+                    .parse(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))
+                    .getAsJsonObject();
+            String uuid = nameResponse.get("id").getAsString();
+            conn.disconnect();
+
+            // Step 2: Fetch signed profile with skin textures
+            conn = (HttpURLConnection) new URL(
+                    "https://sessionserver.mojang.com/session/minecraft/profile/" + uuid + "?unsigned=false"
+            ).openConnection();
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+
+            if (conn.getResponseCode() != 200)
+                throw new RuntimeException("Failed to fetch profile for UUID: " + uuid);
+
+            //noinspection deprecation
+            JsonObject profileResponse = new JsonParser()
+                    .parse(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))
+                    .getAsJsonObject();
+            JsonArray properties = profileResponse.getAsJsonArray("properties");
+            conn.disconnect();
+
+            // Find the "textures" property containing the skin data
+            for (int i = 0; i < properties.size(); i++) {
+                JsonObject prop = properties.get(i).getAsJsonObject();
+                if ("textures".equals(prop.get("name").getAsString()))
+                    return new String[]{
+                            prop.get("value").getAsString(),
+                            prop.get("signature").getAsString()
+                    };
+            }
+
+            throw new RuntimeException("No textures property found for player: " + name);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to fetch skin for player: " + name, e);
+        }
+    }
 
     /**
      * Resolves all version-dependent packet factories from
@@ -160,7 +219,8 @@ public class NPCService implements BBAINPCService, PluginService {
     @SuppressWarnings({"rawtypes", "unchecked"})
     @Override
     public void spawn(@NonNull Collection<Player> viewers, @NonNull NPC npc, @NonNull Location location) {
-        if (viewers.isEmpty()) return;
+        if (viewers.isEmpty())
+            return;
 
         UserProfile profile = npc.profile;
         int entityId = npc.entityId;
@@ -206,7 +266,8 @@ public class NPCService implements BBAINPCService, PluginService {
 
     @Override
     public void despawn(@NonNull Collection<Player> viewers, @NonNull NPC npc) {
-        if (viewers.isEmpty()) return;
+        if (viewers.isEmpty())
+            return;
 
         WrapperPlayServerDestroyEntities destroy = new WrapperPlayServerDestroyEntities(npc.entityId);
         for (Player viewer : viewers)
@@ -221,7 +282,8 @@ public class NPCService implements BBAINPCService, PluginService {
     @Override
     public void teleport(@NonNull Collection<Player> viewers, @NonNull NPC npc,
                          @NonNull Location destination) {
-        if (viewers.isEmpty()) return;
+        if (viewers.isEmpty())
+            return;
 
         int entityId = npc.entityId;
 
@@ -250,7 +312,8 @@ public class NPCService implements BBAINPCService, PluginService {
     @Override
     public void move(@NonNull Collection<Player> viewers, @NonNull NPC npc,
                      @NonNull Location from, @NonNull Location to) {
-        if (viewers.isEmpty()) return;
+        if (viewers.isEmpty())
+            return;
 
         double dx = to.getX() - from.getX();
         double dy = to.getY() - from.getY();
@@ -288,13 +351,14 @@ public class NPCService implements BBAINPCService, PluginService {
     @Override
     public void setEquipment(@NonNull Collection<Player> viewers, @NonNull NPC npc,
                              @NonNull EquipmentSlot slot, ItemStack item) {
-        if (viewers.isEmpty()) return;
+        if (viewers.isEmpty())
+            return;
         sendEquipmentPacket(viewers, npc, slot, item);
     }
 
     /**
      * No explicit cleanup needed. Scheduled tab-removal tasks are bound to the
-     * plugin's BukkitScheduler and are cancelled automatically by Bukkit when
+     * plugin's BukkitScheduler and are canceled automatically by Bukkit when
      * the plugin transitions out of the enabled state, so the service has no
      * resources of its own to release here.
      */
@@ -325,75 +389,6 @@ public class NPCService implements BBAINPCService, PluginService {
         );
         for (Player viewer : viewers)
             plugin.getContext().sendPacket(viewer, packet);
-    }
-
-    /**
-     * Fetches skin texture and signature from the Mojang API for the given player name.
-     * <p>
-     * Performs two sequential HTTP requests:
-     * <ol>
-     *     <li>Resolves the player name to a UUID via the Mojang username API</li>
-     *     <li>Fetches the signed profile (with skin textures) via the session server</li>
-     * </ol>
-     * <b>This method is blocking</b> — call from an async context.
-     *
-     * @param name the Minecraft player name to look up
-     * @return a two-element array: {@code [texture, signature]}
-     * @throws IllegalArgumentException if the player name is not found
-     * @throws RuntimeException         if the Mojang API request fails
-     */
-    private static String[] fetchSkinByName(String name) {
-        try {
-            // Step 1: Resolve player name to UUID
-            HttpURLConnection conn = (HttpURLConnection) new URL(
-                    "https://api.mojang.com/users/profiles/minecraft/" + name
-            ).openConnection();
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
-
-            if (conn.getResponseCode() != 200)
-                throw new IllegalArgumentException("Player not found: " + name);
-
-            //noinspection deprecation — instance parse() is required for Gson 2.2.4 (Spigot 1.8)
-            JsonObject nameResponse = new JsonParser()
-                    .parse(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))
-                    .getAsJsonObject();
-            String uuid = nameResponse.get("id").getAsString();
-            conn.disconnect();
-
-            // Step 2: Fetch signed profile with skin textures
-            conn = (HttpURLConnection) new URL(
-                    "https://sessionserver.mojang.com/session/minecraft/profile/" + uuid + "?unsigned=false"
-            ).openConnection();
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
-
-            if (conn.getResponseCode() != 200)
-                throw new RuntimeException("Failed to fetch profile for UUID: " + uuid);
-
-            //noinspection deprecation
-            JsonObject profileResponse = new JsonParser()
-                    .parse(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))
-                    .getAsJsonObject();
-            JsonArray properties = profileResponse.getAsJsonArray("properties");
-            conn.disconnect();
-
-            // Find the "textures" property containing the skin data
-            for (int i = 0; i < properties.size(); i++) {
-                JsonObject prop = properties.get(i).getAsJsonObject();
-                if ("textures".equals(prop.get("name").getAsString()))
-                    return new String[]{
-                            prop.get("value").getAsString(),
-                            prop.get("signature").getAsString()
-                    };
-            }
-
-            throw new RuntimeException("No textures property found for player: " + name);
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to fetch skin for player: " + name, e);
-        }
     }
 
     // ── version-resolved factory builders ───────────────────────────────────
@@ -553,7 +548,9 @@ public class NPCService implements BBAINPCService, PluginService {
      */
     public static final class NPC {
 
-        /** Synthetic entity ID used in all packets referencing this NPC. */
+        /**
+         * Synthetic entity ID used in all packets referencing this NPC.
+         */
         private final int entityId;
 
         /**
