@@ -71,9 +71,7 @@ public class MessageService implements BBAIMessageService, PluginService {
     private NameMicroService nameMicroService;
 
     /**
-     * Micro-service for creating and managing sidebar scoreboards. Instantiated in {@link #enable()}.
-     * Unlike other micro-services, this one holds per-player state (active boards)
-     * and requires explicit cleanup in {@link #shutdown()}.
+     * Micro-service for creating sidebar scoreboards. Instantiated in {@link #enable()}.
      */
     @Delegate
     private BoardMicroService boardMicroService;
@@ -95,14 +93,9 @@ public class MessageService implements BBAIMessageService, PluginService {
     }
 
     /**
-     * Shuts down stateful micro-services. The {@link BoardMicroService} holds
-     * per-player board state that must be cleaned up (remove packets sent,
-     * tracking map cleared). Other micro-services are stateless and need no
-     * teardown.
+     * No-op — all micro-services are stateless and need no teardown.
      */
     @Override
     public void shutdown() {
-        if (boardMicroService != null)
-            boardMicroService.shutdown();
     }
 }

@@ -1,11 +1,11 @@
 package ru.ashesha.buildBattleAI.message;
 
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
+import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDisplayScoreboard;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerScoreboardObjective;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTeams;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerUpdateScore;
-import lombok.Getter;
 import lombok.NonNull;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -14,21 +14,23 @@ import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.util.MessageUtils;
 
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
- * Sub-service responsible for creating and managing packet-based scoreboards (sidebars).
+ * Sub-service responsible for creating packet-based scoreboards (sidebars).
  * <p>
  * Scoreboards are displayed on the right side of the player's screen using Minecraft's
- * sidebar objective system. Each player can have at most one active board at a time.
- * The board supports up to {@value #MAX_LINES} lines of text, each controlled by a
- * team packet whose prefix (and suffix on pre-1.13) determines the displayed content.
+ * sidebar objective system. Each {@link Board} supports up to {@value #MAX_LINES} lines
+ * of text, each controlled by a team packet whose prefix (and suffix on pre-1.13)
+ * determines the displayed content.
+ * <p>
+ * <b>Stateless service:</b> This service does not track active boards or player
+ * associations. The caller is responsible for storing {@link Board} references,
+ * passing the target player(s) to every operation, and calling {@link Board#remove}
+ * when the board is no longer needed.
  * <p>
  * <b>Multi-version support:</b> Uses PacketEvents wrappers for all scoreboard packets.
  * On 1.13+ servers, line text is placed entirely in the team prefix as a rich
@@ -86,9 +88,6 @@ public class BoardMicroService {
     /** Whether the server is pre-1.13 (legacy text protocol with 16-char limits). */
     private final boolean legacy;
 
-    /** Active boards keyed by player UUID. */
-    private final Map<UUID, Board> boards = new HashMap<>();
-
     /**
      * Creates the board micro-service and resolves the server version for
      * legacy text detection.
@@ -107,54 +106,41 @@ public class BoardMicroService {
     // ── public API ──────────────────────────────────────────────────────
 
     /**
-     * Creates a new scoreboard for the given player and displays it immediately
-     * on the sidebar. If the player already has an active board, the old one is
-     * removed first.
+     * Creates a new scoreboard and displays it immediately on the sidebar
+     * for the given player. The returned {@link Board} is not tracked by
+     * this service — the caller must store and manage its lifecycle.
      *
      * @param player the target player
      * @param title  the scoreboard title (supports {@code &} color codes)
      * @return the newly created board
      */
     public Board createBoard(@NonNull Player player, @NonNull String title) {
-        Board existing = boards.remove(player.getUniqueId());
-        if (existing != null)
-            existing.remove();
-
-        Board board = new Board(player, title);
-        boards.put(player.getUniqueId(), board);
+        Board board = new Board();
+        send(player, objectivePacket(
+                WrapperPlayServerScoreboardObjective.ObjectiveMode.CREATE, title));
+        send(player, displayPacket());
         return board;
     }
 
     /**
-     * Retrieves the active board for the given player.
+     * Creates a new scoreboard and displays it immediately on the sidebar
+     * for all given players. The returned {@link Board} is not tracked by
+     * this service — the caller must store and manage its lifecycle.
      *
-     * @param player the target player
-     * @return the player's active board, or {@code null} if none exists
+     * @param players the target players
+     * @param title   the scoreboard title (supports {@code &} color codes)
+     * @return the newly created board
      */
-    public Board getBoard(@NonNull Player player) {
-        return boards.get(player.getUniqueId());
-    }
-
-    /**
-     * Removes the active board for the given player, sending all necessary
-     * cleanup packets. Does nothing if the player has no active board.
-     *
-     * @param player the target player
-     */
-    public void removeBoard(@NonNull Player player) {
-        Board board = boards.remove(player.getUniqueId());
-        if (board != null)
-            board.remove();
-    }
-
-    /**
-     * Removes all active boards and clears the internal tracking map.
-     * Called during plugin shutdown to release resources cleanly.
-     */
-    void shutdown() {
-        for (Board board : new ArrayList<>(boards.values()))
-            board.remove();
-        boards.clear();
+    public Board createBoard(@NonNull Collection<? extends Player> players, @NonNull String title) {
+        Board board = new Board();
+        PacketWrapper<?> objective = objectivePacket(
+                WrapperPlayServerScoreboardObjective.ObjectiveMode.CREATE, title);
+        PacketWrapper<?> display = displayPacket();
+        for (Player player : players) {
+            send(player, objective);
+            send(player, display);
+        }
+        return board;
     }
 
     // ── legacy text splitting ───────────────────────────────────────────
@@ -211,318 +197,376 @@ public class BoardMicroService {
                 color.setLength(0);
                 color.append('§').append(text.charAt(i + 1));
                 format.setLength(0); // a color code resets formatting
-            } else if ("klmno".indexOf(code) >= 0) 
+            } else if ("klmno".indexOf(code) >= 0)
                 format.append('§').append(text.charAt(i + 1));
             i++; // skip the code character
         }
         return color.toString() + format;
     }
 
+    // ── packet builders ─────────────────────────────────────────────────
+
+    /**
+     * Builds a scoreboard objective packet (create, update, or remove).
+     *
+     * @param mode  the objective mode
+     * @param title the display title, or {@code null} for removal
+     * @return the assembled packet wrapper
+     */
+    private PacketWrapper<?> objectivePacket(
+            WrapperPlayServerScoreboardObjective.ObjectiveMode mode, String title) {
+        Component displayName = title != null
+                ? MessageUtils.toComponent(title) : Component.empty();
+        return new WrapperPlayServerScoreboardObjective(
+                OBJECTIVE_NAME, mode, displayName,
+                WrapperPlayServerScoreboardObjective.RenderType.INTEGER);
+    }
+
+    /**
+     * Builds the display objective packet to show the scoreboard on the sidebar.
+     *
+     * @return the assembled packet wrapper
+     */
+    private PacketWrapper<?> displayPacket() {
+        return new WrapperPlayServerDisplayScoreboard(SIDEBAR_POSITION, OBJECTIVE_NAME);
+    }
+
+    /**
+     * Builds a team creation packet for the given line with the display text
+     * and the line's invisible entry as a member.
+     *
+     * @param line the line index
+     * @param text the display text (supports {@code &} color codes)
+     * @return the assembled packet wrapper
+     */
+    private PacketWrapper<?> teamCreatePacket(int line, String text) {
+        return new WrapperPlayServerTeams(
+                TEAM_NAME_PREFIX + line,
+                WrapperPlayServerTeams.TeamMode.CREATE,
+                buildTeamInfo(text),
+                Collections.singletonList(ENTRY_NAMES[line]));
+    }
+
+    /**
+     * Builds a team update packet for the given line with the new display text.
+     *
+     * @param line the line index
+     * @param text the new display text (supports {@code &} color codes)
+     * @return the assembled packet wrapper
+     */
+    private PacketWrapper<?> teamUpdatePacket(int line, String text) {
+        return new WrapperPlayServerTeams(
+                TEAM_NAME_PREFIX + line,
+                WrapperPlayServerTeams.TeamMode.UPDATE,
+                buildTeamInfo(text),
+                Collections.emptyList());
+    }
+
+    /**
+     * Builds a team removal packet for the given line.
+     *
+     * @param line the line index
+     * @return the assembled packet wrapper
+     */
+    private PacketWrapper<?> teamRemovePacket(int line) {
+        return new WrapperPlayServerTeams(
+                TEAM_NAME_PREFIX + line,
+                WrapperPlayServerTeams.TeamMode.REMOVE,
+                (WrapperPlayServerTeams.ScoreBoardTeamInfo) null,
+                Collections.emptyList());
+    }
+
+    /**
+     * Builds a score entry packet for the given line (makes it appear on the sidebar).
+     * The score value equals the line index, so higher indices appear higher.
+     *
+     * @param line the line index (also used as the score value)
+     * @return the assembled packet wrapper
+     */
+    private PacketWrapper<?> scorePacket(int line) {
+        return new WrapperPlayServerUpdateScore(
+                ENTRY_NAMES[line],
+                WrapperPlayServerUpdateScore.Action.CREATE_OR_UPDATE_ITEM,
+                OBJECTIVE_NAME,
+                Optional.of(line));
+    }
+
+    /**
+     * Builds a score removal packet for the given line.
+     *
+     * @param line the line index
+     * @return the assembled packet wrapper
+     */
+    private PacketWrapper<?> scoreRemovePacket(int line) {
+        return new WrapperPlayServerUpdateScore(
+                ENTRY_NAMES[line],
+                WrapperPlayServerUpdateScore.Action.REMOVE_ITEM,
+                OBJECTIVE_NAME,
+                Optional.empty());
+    }
+
+    /**
+     * Builds the {@link WrapperPlayServerTeams.ScoreBoardTeamInfo} for a line
+     * with the given display text.
+     * <p>
+     * On 1.13+ servers, the full text is placed in the team prefix as an
+     * Adventure {@link Component}. On pre-1.13 servers, the text is translated
+     * to section-sign codes and split between prefix (16 chars) and suffix
+     * (16 chars) with color-code carry-over.
+     *
+     * @param text the display text (supports {@code &} color codes)
+     * @return the assembled team info
+     */
+    private WrapperPlayServerTeams.ScoreBoardTeamInfo buildTeamInfo(String text) {
+        Component prefix;
+        Component suffix;
+
+        if (legacy) {
+            // Pre-1.13: translate & codes to § and split at the 16-char boundary
+            String translated = text.replace('&', '§');
+            String[] parts = splitLegacyLine(translated);
+            prefix = SECTION_SERIALIZER.deserialize(parts[0]);
+            suffix = SECTION_SERIALIZER.deserialize(parts[1]);
+        } else {
+            // 1.13+: full text in prefix as a rich Component
+            prefix = MessageUtils.toComponent(text);
+            suffix = Component.empty();
+        }
+
+        return new WrapperPlayServerTeams.ScoreBoardTeamInfo(
+                Component.empty(),
+                prefix,
+                suffix,
+                WrapperPlayServerTeams.NameTagVisibility.NEVER,
+                WrapperPlayServerTeams.CollisionRule.NEVER,
+                NamedTextColor.WHITE,
+                WrapperPlayServerTeams.OptionData.NONE);
+    }
+
+    // ── send helpers ────────────────────────────────────────────────────
+
+    /**
+     * Sends a packet to a single player via the plugin context.
+     *
+     * @param player the target player
+     * @param packet the packet to send
+     */
+    private void send(Player player, PacketWrapper<?> packet) {
+        plugin.getContext().sendPacket(player, packet);
+    }
+
+    /**
+     * Sends a packet to multiple players via the plugin context.
+     * The packet object is built once and reused for all recipients.
+     *
+     * @param players the target players
+     * @param packet  the packet to send
+     */
+    private void send(Collection<? extends Player> players, PacketWrapper<?> packet) {
+        for (Player player : players)
+            plugin.getContext().sendPacket(player, packet);
+    }
+
     // ── Board inner class ───────────────────────────────────────────────
 
     /**
-     * Represents a single player's sidebar scoreboard.
+     * Represents a sidebar scoreboard whose packets can be sent to any player(s).
+     * <p>
+     * The board tracks only which line indices are currently active (have been
+     * created on the client via team/score packets). It does not store player
+     * references, titles, or line texts — the caller is responsible for passing
+     * the target player(s) to every method and for managing the board's lifecycle.
      * <p>
      * Supports up to {@value #MAX_LINES} lines indexed from 0 (bottom of sidebar)
-     * to 14 (top of sidebar). Each line is backed by a team packet whose prefix
-     * (and suffix on pre-1.13) controls the displayed text, and an invisible score
-     * entry name ensures uniqueness.
+     * to 14 (top of sidebar). Each line is backed by a team packet whose prefix/suffix
+     * controls the displayed text, and an invisible score entry ensures uniqueness.
      * <p>
-     * Changes are sent immediately as packets — there is no batching or deferred
-     * flush. Call {@link #remove()} to tear down the board and release all
-     * protocol-level resources (objective, teams, score entries).
+     * All methods have single-player and collection overloads. The collection
+     * variants build each packet once and reuse it across all recipients.
      */
     public class Board {
 
-        /** The player this board belongs to.
-         * -- GETTER --
-         *  Returns the player this board belongs to.
-         */
-        @Getter
-        private final Player player;
-
-        /** Current title of the board (raw text with {@code &} color codes).
-         * -- GETTER --
-         *  Returns the current title.
-         */
-        @Getter
-        private String title;
-
-        /** Tracks which line indices are currently active (have content). */
+        /** Tracks which line indices are currently active (have content on the client). */
         private final boolean[] activeLines = new boolean[MAX_LINES];
 
-        /** Current text for each line (raw text with {@code &} codes), or {@code null}. */
-        private final String[] lineTexts = new String[MAX_LINES];
+        /**
+         * Creates an empty board. Initial objective and display packets are
+         * sent by {@link BoardMicroService#createBoard}, not by this constructor.
+         */
+        private Board() {
+        }
 
-        /** Whether this board has already been removed. */
-        private boolean removed;
+        // ── single-player methods ──────────────────────────────────────
 
         /**
-         * Creates the board, sending the objective creation and sidebar display packets.
+         * Updates the board title for a single player.
          *
-         * @param player the owner player
-         * @param title  the board title (supports {@code &} color codes)
+         * @param player the target player
+         * @param title  the new title (supports {@code &} color codes)
          */
-        private Board(@NonNull Player player, @NonNull String title) {
-            this.player = player;
-            this.title = title;
-            sendObjective(WrapperPlayServerScoreboardObjective.ObjectiveMode.CREATE, title);
-            sendDisplayObjective();
+        public void setTitle(@NonNull Player player, @NonNull String title) {
+            send(player, objectivePacket(
+                    WrapperPlayServerScoreboardObjective.ObjectiveMode.UPDATE, title));
         }
 
         /**
-         * Updates the board title. Does nothing if the title hasn't changed
-         * or the board has been removed.
+         * Sets the text for a specific line for a single player. Creates the line
+         * if it does not exist, or updates it if it is already active.
          *
-         * @param title the new title (supports {@code &} color codes)
-         */
-        public void setTitle(@NonNull String title) {
-            if (removed || this.title.equals(title))
-                return;
-            this.title = title;
-            sendObjective(WrapperPlayServerScoreboardObjective.ObjectiveMode.UPDATE, title);
-        }
-
-        /**
-         * Sets the text for a specific line. Creates the line if it does not exist,
-         * or updates it if the text has changed. Does nothing if the board has been
-         * removed or the text is identical to the current value.
-         *
-         * @param line the line index (0 = bottom, 14 = top)
-         * @param text the line text (supports {@code &} color codes)
+         * @param player the target player
+         * @param line   the line index (0 = bottom, 14 = top)
+         * @param text   the line text (supports {@code &} color codes)
          * @throws IllegalArgumentException if line is outside [0, {@value #MAX_LINES})
          */
-        public void setLine(int line, @NonNull String text) {
+        public void setLine(@NonNull Player player, int line, @NonNull String text) {
             validateLine(line);
-            if (removed)
-                return;
-
-            // Skip update if text hasn't changed
-            if (activeLines[line] && text.equals(lineTexts[line]))
-                return;
-
-            lineTexts[line] = text;
-
-            if (activeLines[line]) 
-                // Line exists — update team info only
-                sendTeamUpdate(line, text);
+            if (activeLines[line])
+                send(player, teamUpdatePacket(line, text));
             else {
-                // New line — create team, add entry, set score
                 activeLines[line] = true;
-                sendTeamCreate(line, text);
-                sendScore(line);
+                send(player, teamCreatePacket(line, text));
+                send(player, scorePacket(line));
             }
         }
 
         /**
-         * Bulk-sets multiple lines starting from index 0. Lines beyond the list
-         * size are removed. List index 0 maps to score 0 (bottom of sidebar).
+         * Bulk-sets multiple lines starting from index 0 for a single player.
+         * Lines beyond the list size are removed.
          *
-         * @param lines the line texts (supports {@code &} color codes)
+         * @param player the target player
+         * @param lines  the line texts (supports {@code &} color codes)
          */
-        public void setLines(@NonNull List<String> lines) {
+        public void setLines(@NonNull Player player, @NonNull List<String> lines) {
             int count = Math.min(lines.size(), MAX_LINES);
             for (int i = 0; i < count; i++)
-                setLine(i, lines.get(i));
+                setLine(player, i, lines.get(i));
             for (int i = count; i < MAX_LINES; i++)
-                removeLine(i);
+                removeLine(player, i);
         }
 
         /**
-         * Removes a specific line from the board. Does nothing if the line
-         * is not active or the board has been removed.
+         * Removes a specific line for a single player. Does nothing if the line
+         * is not active.
          *
-         * @param line the line index (0–14)
+         * @param player the target player
+         * @param line   the line index (0–14)
          * @throws IllegalArgumentException if line is outside [0, {@value #MAX_LINES})
          */
-        public void removeLine(int line) {
+        public void removeLine(@NonNull Player player, int line) {
             validateLine(line);
-            if (removed || !activeLines[line])
+            if (!activeLines[line])
                 return;
-
             activeLines[line] = false;
-            lineTexts[line] = null;
-            sendScoreRemove(line);
-            sendTeamRemove(line);
+            send(player, scoreRemovePacket(line));
+            send(player, teamRemovePacket(line));
         }
 
         /**
-         * Returns the current text of a line, or {@code null} if the line is not set.
+         * Removes the entire board for a single player by sending cleanup packets
+         * for all active lines and the objective itself. Resets all internal line
+         * state so the board can be safely discarded.
          *
-         * @param line the line index (0–14)
-         * @return the line text, or {@code null}
+         * @param player the target player
+         */
+        public void remove(@NonNull Player player) {
+            for (int i = 0; i < MAX_LINES; i++)
+                if (activeLines[i]) {
+                    activeLines[i] = false;
+                    send(player, scoreRemovePacket(i));
+                    send(player, teamRemovePacket(i));
+                }
+            send(player, objectivePacket(
+                    WrapperPlayServerScoreboardObjective.ObjectiveMode.REMOVE, null));
+        }
+
+        // ── collection methods ─────────────────────────────────────────
+
+        /**
+         * Updates the board title for multiple players. The packet is built once
+         * and reused across all recipients.
+         *
+         * @param players the target players
+         * @param title   the new title (supports {@code &} color codes)
+         */
+        public void setTitle(@NonNull Collection<? extends Player> players, @NonNull String title) {
+            send(players, objectivePacket(
+                    WrapperPlayServerScoreboardObjective.ObjectiveMode.UPDATE, title));
+        }
+
+        /**
+         * Sets the text for a specific line for multiple players. Creates the line
+         * if it does not exist, or updates it if it is already active. Packets are
+         * built once and reused across all recipients.
+         *
+         * @param players the target players
+         * @param line    the line index (0 = bottom, 14 = top)
+         * @param text    the line text (supports {@code &} color codes)
          * @throws IllegalArgumentException if line is outside [0, {@value #MAX_LINES})
          */
-        public String getLine(int line) {
+        public void setLine(@NonNull Collection<? extends Player> players, int line,
+                            @NonNull String text) {
             validateLine(line);
-            return lineTexts[line];
+            if (activeLines[line])
+                send(players, teamUpdatePacket(line, text));
+            else {
+                activeLines[line] = true;
+                send(players, teamCreatePacket(line, text));
+                send(players, scorePacket(line));
+            }
         }
 
         /**
-         * Removes the board from the player's screen by sending objective removal
-         * and team cleanup packets. Also removes the board from the service's
-         * internal tracking map. Safe to call multiple times (idempotent).
-         * <p>
-         * If the player is no longer online, only the internal state is cleaned
-         * up — no packets are sent (the client-side scoreboard is already gone).
+         * Bulk-sets multiple lines starting from index 0 for multiple players.
+         * Lines beyond the list size are removed.
+         *
+         * @param players the target players
+         * @param lines   the line texts (supports {@code &} color codes)
          */
-        public void remove() {
-            if (removed)
+        public void setLines(@NonNull Collection<? extends Player> players,
+                             @NonNull List<String> lines) {
+            int count = Math.min(lines.size(), MAX_LINES);
+            for (int i = 0; i < count; i++)
+                setLine(players, i, lines.get(i));
+            for (int i = count; i < MAX_LINES; i++)
+                removeLine(players, i);
+        }
+
+        /**
+         * Removes a specific line for multiple players. Does nothing if the line
+         * is not active. Packets are built once and reused across all recipients.
+         *
+         * @param players the target players
+         * @param line    the line index (0–14)
+         * @throws IllegalArgumentException if line is outside [0, {@value #MAX_LINES})
+         */
+        public void removeLine(@NonNull Collection<? extends Player> players, int line) {
+            validateLine(line);
+            if (!activeLines[line])
                 return;
-            removed = true;
-
-            // Only send cleanup packets if the player is still connected;
-            // otherwise the PacketEvents user channel is already gone and
-            // sending would just spam warnings in the console.
-            if (player.isOnline()) {
-                for (int i = 0; i < MAX_LINES; i++)
-                    if (activeLines[i]) {
-                        sendScoreRemove(i);
-                        sendTeamRemove(i);
-                    }
-                sendObjective(WrapperPlayServerScoreboardObjective.ObjectiveMode.REMOVE, null);
-            }
-
-            boards.remove(player.getUniqueId());
+            activeLines[line] = false;
+            send(players, scoreRemovePacket(line));
+            send(players, teamRemovePacket(line));
         }
 
-        // ── packet helpers ──────────────────────────────────────────────
-
         /**
-         * Sends a scoreboard objective packet (create, update, or remove).
+         * Removes the entire board for multiple players by sending cleanup packets
+         * for all active lines and the objective itself. Packets for each line are
+         * built once and reused across all recipients. Resets all internal line state.
          *
-         * @param mode  the objective mode
-         * @param title the display title, or {@code null} for removal
+         * @param players the target players
          */
-        private void sendObjective(WrapperPlayServerScoreboardObjective.ObjectiveMode mode,
-                                   String title) {
-            Component displayName = title != null
-                    ? MessageUtils.toComponent(title) : Component.empty();
-            plugin.getContext().sendPacket(player,
-                    new WrapperPlayServerScoreboardObjective(
-                            OBJECTIVE_NAME, mode, displayName,
-                            WrapperPlayServerScoreboardObjective.RenderType.INTEGER));
+        public void remove(@NonNull Collection<? extends Player> players) {
+            for (int i = 0; i < MAX_LINES; i++)
+                if (activeLines[i]) {
+                    activeLines[i] = false;
+                    send(players, scoreRemovePacket(i));
+                    send(players, teamRemovePacket(i));
+                }
+            send(players, objectivePacket(
+                    WrapperPlayServerScoreboardObjective.ObjectiveMode.REMOVE, null));
         }
 
-        /**
-         * Sends the display objective packet to show the scoreboard on the sidebar.
-         */
-        private void sendDisplayObjective() {
-            plugin.getContext().sendPacket(player,
-                    new WrapperPlayServerDisplayScoreboard(SIDEBAR_POSITION, OBJECTIVE_NAME));
-        }
-
-        /**
-         * Creates a new team for the given line with the display text and adds
-         * the line's invisible entry as a team member.
-         *
-         * @param line the line index
-         * @param text the display text (supports {@code &} color codes)
-         */
-        private void sendTeamCreate(int line, String text) {
-            WrapperPlayServerTeams.ScoreBoardTeamInfo info = buildTeamInfo(text);
-            plugin.getContext().sendPacket(player, new WrapperPlayServerTeams(
-                    TEAM_NAME_PREFIX + line,
-                    WrapperPlayServerTeams.TeamMode.CREATE,
-                    info,
-                    Collections.singletonList(ENTRY_NAMES[line])));
-        }
-
-        /**
-         * Updates the team info (prefix/suffix) for an existing line without
-         * changing team membership.
-         *
-         * @param line the line index
-         * @param text the new display text (supports {@code &} color codes)
-         */
-        private void sendTeamUpdate(int line, String text) {
-            WrapperPlayServerTeams.ScoreBoardTeamInfo info = buildTeamInfo(text);
-            plugin.getContext().sendPacket(player, new WrapperPlayServerTeams(
-                    TEAM_NAME_PREFIX + line,
-                    WrapperPlayServerTeams.TeamMode.UPDATE,
-                    info,
-                    Collections.emptyList()));
-        }
-
-        /**
-         * Removes the team for the given line.
-         *
-         * @param line the line index
-         */
-        private void sendTeamRemove(int line) {
-            plugin.getContext().sendPacket(player, new WrapperPlayServerTeams(
-                    TEAM_NAME_PREFIX + line,
-                    WrapperPlayServerTeams.TeamMode.REMOVE,
-                    (WrapperPlayServerTeams.ScoreBoardTeamInfo) null,
-                    Collections.emptyList()));
-        }
-
-        /**
-         * Sends a score entry for the given line (makes it appear on the sidebar).
-         * The score value equals the line index, so higher indices appear higher.
-         *
-         * @param line the line index (also used as the score value)
-         */
-        private void sendScore(int line) {
-            plugin.getContext().sendPacket(player,
-                    new WrapperPlayServerUpdateScore(
-                            ENTRY_NAMES[line],
-                            WrapperPlayServerUpdateScore.Action.CREATE_OR_UPDATE_ITEM,
-                            OBJECTIVE_NAME,
-                            Optional.of(line)));
-        }
-
-        /**
-         * Removes the score entry for the given line from the sidebar.
-         *
-         * @param line the line index
-         */
-        private void sendScoreRemove(int line) {
-            plugin.getContext().sendPacket(player,
-                    new WrapperPlayServerUpdateScore(
-                            ENTRY_NAMES[line],
-                            WrapperPlayServerUpdateScore.Action.REMOVE_ITEM,
-                            OBJECTIVE_NAME,
-                            Optional.empty()));
-        }
-
-        /**
-         * Builds the {@link WrapperPlayServerTeams.ScoreBoardTeamInfo} for a line
-         * with the given display text.
-         * <p>
-         * On 1.13+ servers, the full text is placed in the team prefix as an
-         * Adventure {@link Component}. On pre-1.13 servers, the text is translated
-         * to section-sign codes and split between prefix (16 chars) and suffix
-         * (16 chars) with color-code carry-over.
-         *
-         * @param text the display text (supports {@code &} color codes)
-         * @return the assembled team info
-         */
-        private WrapperPlayServerTeams.ScoreBoardTeamInfo buildTeamInfo(String text) {
-            Component prefix;
-            Component suffix;
-
-            if (legacy) {
-                // Pre-1.13: translate & codes to § and split at the 16-char boundary
-                String translated = text.replace('&', '§');
-                String[] parts = splitLegacyLine(translated);
-                prefix = SECTION_SERIALIZER.deserialize(parts[0]);
-                suffix = SECTION_SERIALIZER.deserialize(parts[1]);
-            } else {
-                // 1.13+: full text in prefix as a rich Component
-                prefix = MessageUtils.toComponent(text);
-                suffix = Component.empty();
-            }
-
-            return new WrapperPlayServerTeams.ScoreBoardTeamInfo(
-                    Component.empty(),
-                    prefix,
-                    suffix,
-                    WrapperPlayServerTeams.NameTagVisibility.NEVER,
-                    WrapperPlayServerTeams.CollisionRule.NEVER,
-                    NamedTextColor.WHITE,
-                    WrapperPlayServerTeams.OptionData.NONE);
-        }
+        // ── validation ─────────────────────────────────────────────────
 
         /**
          * Validates that a line index is within the allowed range [0, {@value #MAX_LINES}).

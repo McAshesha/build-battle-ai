@@ -11,7 +11,10 @@ import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * Test command for creating, editing, and removing packet-based sidebar scoreboards.
@@ -24,6 +27,9 @@ import java.util.List;
  *     <li>{@code /testboard removeline <line>} — removes a specific line</li>
  *     <li>{@code /testboard remove} — removes the entire scoreboard</li>
  * </ul>
+ * <p>
+ * Manages board references locally per player since {@link BoardMicroService}
+ * is stateless and does not track active boards.
  */
 public class TestBoardCommand extends PluginCommand {
 
@@ -31,6 +37,9 @@ public class TestBoardCommand extends PluginCommand {
     private static final List<String> SUBCOMMANDS = Arrays.asList(
             "title", "set", "removeline", "remove"
     );
+
+    /** Active boards keyed by player UUID, managed by this command. */
+    private final Map<UUID, BoardMicroService.Board> boards = new HashMap<>();
 
     /**
      * Creates the test board command.
@@ -49,11 +58,10 @@ public class TestBoardCommand extends PluginCommand {
             return;
         }
         Player player = (Player) sender;
-        BBAIMessageService messageService = plugin.getContext().getMessageService();
 
         // /testboard — create a demo board
         if (args.length == 0) {
-            handleCreate(player, messageService);
+            handleCreate(player);
             return;
         }
 
@@ -61,25 +69,25 @@ public class TestBoardCommand extends PluginCommand {
 
         // /testboard title <text...>
         if ("title".equals(sub)) {
-            handleTitle(player, messageService, args);
+            handleTitle(player, args);
             return;
         }
 
         // /testboard set <line> <text...>
         if ("set".equals(sub)) {
-            handleSet(player, messageService, args);
+            handleSet(player, args);
             return;
         }
 
         // /testboard removeline <line>
         if ("removeline".equals(sub)) {
-            handleRemoveLine(player, messageService, args);
+            handleRemoveLine(player, args);
             return;
         }
 
         // /testboard remove
         if ("remove".equals(sub)) {
-            handleRemove(player, messageService);
+            handleRemove(player);
             return;
         }
 
@@ -91,21 +99,28 @@ public class TestBoardCommand extends PluginCommand {
      * Creates a demo scoreboard with sample lines to showcase the board functionality.
      * Lines are set with explicit indices so they appear in a natural top-to-bottom layout.
      */
-    private void handleCreate(Player player, BBAIMessageService messageService) {
+    private void handleCreate(Player player) {
+        // Remove existing board if present
+        BoardMicroService.Board existing = boards.remove(player.getUniqueId());
+        if (existing != null)
+            existing.remove(player);
+
+        BBAIMessageService messageService = plugin.getContext().getMessageService();
         BoardMicroService.Board board = messageService.createBoard(player, "&e&lBuildBattle AI");
+        boards.put(player.getUniqueId(), board);
 
         // Build lines from top (14) to bottom (0) for natural visual layout
         int line = 14;
-        board.setLine(line--, "&7&m                    ");
-        board.setLine(line--, " ");
-        board.setLine(line--, "&fPlayer: &a" + player.getName());
-        board.setLine(line--, "&fWorld: &a" + player.getWorld().getName());
-        board.setLine(line--, "  ");
-        board.setLine(line--, "&fScore: &e100");
-        board.setLine(line--, "   ");
-        board.setLine(line--, "&7&m                    ");
-        board.setLine(line--, "    ");
-        board.setLine(line, "&eplay.example.com");
+        board.setLine(player, line--, "&7&m                    ");
+        board.setLine(player, line--, " ");
+        board.setLine(player, line--, "&fPlayer: &a" + player.getName());
+        board.setLine(player, line--, "&fWorld: &a" + player.getWorld().getName());
+        board.setLine(player, line--, "  ");
+        board.setLine(player, line--, "&fScore: &e100");
+        board.setLine(player, line--, "   ");
+        board.setLine(player, line--, "&7&m                    ");
+        board.setLine(player, line--, "    ");
+        board.setLine(player, line, "&eplay.example.com");
 
         player.sendMessage("\u00a7aScoreboard created! Use \u00a7e/testboard remove\u00a7a to remove it.");
     }
@@ -113,8 +128,8 @@ public class TestBoardCommand extends PluginCommand {
     /**
      * Handles the {@code /testboard title <text...>} subcommand.
      */
-    private void handleTitle(Player player, BBAIMessageService messageService, String[] args) {
-        BoardMicroService.Board board = messageService.getBoard(player);
+    private void handleTitle(Player player, String[] args) {
+        BoardMicroService.Board board = boards.get(player.getUniqueId());
         if (board == null) {
             player.sendMessage("\u00a7cYou don't have an active scoreboard. Use \u00a7e/testboard\u00a7c to create one.");
             return;
@@ -124,15 +139,15 @@ public class TestBoardCommand extends PluginCommand {
             return;
         }
         String title = joinArgs(args, 1);
-        board.setTitle(title);
+        board.setTitle(player, title);
         player.sendMessage("\u00a7aTitle updated to: " + title);
     }
 
     /**
      * Handles the {@code /testboard set <line> <text...>} subcommand.
      */
-    private void handleSet(Player player, BBAIMessageService messageService, String[] args) {
-        BoardMicroService.Board board = messageService.getBoard(player);
+    private void handleSet(Player player, String[] args) {
+        BoardMicroService.Board board = boards.get(player.getUniqueId());
         if (board == null) {
             player.sendMessage("\u00a7cYou don't have an active scoreboard. Use \u00a7e/testboard\u00a7c to create one.");
             return;
@@ -145,15 +160,15 @@ public class TestBoardCommand extends PluginCommand {
         if (line < 0)
             return;
         String text = joinArgs(args, 2);
-        board.setLine(line, text);
+        board.setLine(player, line, text);
         player.sendMessage("\u00a7aLine " + line + " set to: " + text);
     }
 
     /**
      * Handles the {@code /testboard removeline <line>} subcommand.
      */
-    private void handleRemoveLine(Player player, BBAIMessageService messageService, String[] args) {
-        BoardMicroService.Board board = messageService.getBoard(player);
+    private void handleRemoveLine(Player player, String[] args) {
+        BoardMicroService.Board board = boards.get(player.getUniqueId());
         if (board == null) {
             player.sendMessage("\u00a7cYou don't have an active scoreboard. Use \u00a7e/testboard\u00a7c to create one.");
             return;
@@ -165,20 +180,20 @@ public class TestBoardCommand extends PluginCommand {
         int line = parseLine(player, args[1]);
         if (line < 0)
             return;
-        board.removeLine(line);
+        board.removeLine(player, line);
         player.sendMessage("\u00a7aLine " + line + " removed.");
     }
 
     /**
      * Handles the {@code /testboard remove} subcommand.
      */
-    private void handleRemove(Player player, BBAIMessageService messageService) {
-        BoardMicroService.Board board = messageService.getBoard(player);
+    private void handleRemove(Player player) {
+        BoardMicroService.Board board = boards.remove(player.getUniqueId());
         if (board == null) {
             player.sendMessage("\u00a7cYou don't have an active scoreboard.");
             return;
         }
-        messageService.removeBoard(player);
+        board.remove(player);
         player.sendMessage("\u00a7aScoreboard removed.");
     }
 

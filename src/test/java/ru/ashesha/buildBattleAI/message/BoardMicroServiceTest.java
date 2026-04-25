@@ -10,7 +10,6 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDi
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerScoreboardObjective;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTeams;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerUpdateScore;
-import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,17 +21,17 @@ import ru.ashesha.buildBattleAI.core.PluginContext;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Tests for {@link BoardMicroService} — sidebar scoreboard creation and management
- * via PacketEvents wrappers.
+ * Tests for {@link BoardMicroService} — stateless sidebar scoreboard creation
+ * and management via PacketEvents wrappers.
  * <p>
  * Verifies packet sequences for board creation, line operations, title updates,
- * board removal, and the legacy text splitting logic for pre-1.13 servers.
+ * board removal, collection overloads, and the legacy text splitting logic
+ * for pre-1.13 servers.
  */
 class BoardMicroServiceTest {
 
@@ -46,8 +45,6 @@ class BoardMicroServiceTest {
         plugin = mock(BuildBattleAI.class);
         context = mock(PluginContext.class);
         player = mock(Player.class);
-        when(player.getUniqueId()).thenReturn(UUID.randomUUID());
-        when(player.isOnline()).thenReturn(true);
         when(plugin.getContext()).thenReturn(context);
 
         packetEventsMock = mockStatic(PacketEvents.class);
@@ -98,86 +95,18 @@ class BoardMicroServiceTest {
         BoardMicroService service = serviceFor(ServerVersion.V_1_21);
         BoardMicroService.Board board = service.createBoard(player, "Title");
         assertNotNull(board);
-        assertEquals("Title", board.getTitle());
-        assertSame(player, board.getPlayer());
     }
 
     @Test
-    void createBoardReplacesExistingBoard() {
+    void createBoardCollectionSendsToAllPlayers() {
         BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        BoardMicroService.Board first = service.createBoard(player, "First");
-        BoardMicroService.Board second = service.createBoard(player, "Second");
+        Player player2 = mock(Player.class);
 
-        // Old board should have been removed, new board should be active
-        assertNotSame(first, second);
-        assertSame(second, service.getBoard(player));
-    }
+        service.createBoard(Arrays.asList(player, player2), "&aTitle");
 
-    // ===== Board retrieval =====
-
-    @Test
-    void getBoardReturnsNullWhenNoBoardExists() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        assertNull(service.getBoard(player));
-    }
-
-    @Test
-    void getBoardReturnsActiveBoard() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        BoardMicroService.Board board = service.createBoard(player, "Title");
-        assertSame(board, service.getBoard(player));
-    }
-
-    // ===== Board removal =====
-
-    @Test
-    void removeBoardSendsObjectiveRemovePacket() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        service.createBoard(player, "Title");
-        reset(context); // clear creation packets
-
-        service.removeBoard(player);
-
-        ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
-        verify(context, atLeastOnce()).sendPacket(eq(player), captor.capture());
-
-        boolean hasObjectiveRemove = false;
-        for (PacketWrapper<?> pkt : captor.getAllValues())
-            if (pkt instanceof WrapperPlayServerScoreboardObjective)
-                hasObjectiveRemove = true;
-        assertTrue(hasObjectiveRemove, "Should send objective REMOVE packet");
-    }
-
-    @Test
-    void removeBoardClearsFromMap() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        service.createBoard(player, "Title");
-        service.removeBoard(player);
-        assertNull(service.getBoard(player));
-    }
-
-    @Test
-    void removeBoardSkipsPacketsWhenPlayerOffline() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        BoardMicroService.Board board = service.createBoard(player, "Title");
-        board.setLine(0, "Content");
-        reset(context);
-
-        // Player disconnected before shutdown
-        when(player.isOnline()).thenReturn(false);
-        service.removeBoard(player);
-
-        // Internal state cleaned up, but no packets sent
-        assertNull(service.getBoard(player));
-        verify(context, never()).sendPacket(any(Player.class), any(PacketWrapper.class));
-    }
-
-    @Test
-    void removeBoardDoesNothingWhenNoBoardExists() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        // Should not throw
-        service.removeBoard(player);
-        verify(context, never()).sendPacket(any(Player.class), any(PacketWrapper.class));
+        // Each player should receive objective + display = 2 packets each
+        verify(context, times(2)).sendPacket(eq(player), any(PacketWrapper.class));
+        verify(context, times(2)).sendPacket(eq(player2), any(PacketWrapper.class));
     }
 
     // ===== Line operations =====
@@ -186,9 +115,9 @@ class BoardMicroServiceTest {
     void setLineSendsTeamCreateAndScorePackets() {
         BoardMicroService service = serviceFor(ServerVersion.V_1_21);
         BoardMicroService.Board board = service.createBoard(player, "Title");
-        reset(context); // clear creation packets
+        reset(context);
 
-        board.setLine(5, "&cHello World");
+        board.setLine(player, 5, "&cHello World");
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
         verify(context, times(2)).sendPacket(eq(player), captor.capture());
@@ -204,10 +133,10 @@ class BoardMicroServiceTest {
     void setLineUpdatesTeamWhenLineAlreadyExists() {
         BoardMicroService service = serviceFor(ServerVersion.V_1_21);
         BoardMicroService.Board board = service.createBoard(player, "Title");
-        board.setLine(3, "Initial");
+        board.setLine(player, 3, "Initial");
         reset(context);
 
-        board.setLine(3, "Updated");
+        board.setLine(player, 3, "Updated");
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
         verify(context, times(1)).sendPacket(eq(player), captor.capture());
@@ -216,30 +145,47 @@ class BoardMicroServiceTest {
     }
 
     @Test
-    void setLineSkipsUpdateWhenTextUnchanged() {
+    void setLineSendsPacketEvenWhenTextIsTheSame() {
         BoardMicroService service = serviceFor(ServerVersion.V_1_21);
         BoardMicroService.Board board = service.createBoard(player, "Title");
-        board.setLine(7, "Same text");
+        board.setLine(player, 7, "Same text");
         reset(context);
 
-        board.setLine(7, "Same text");
+        // No equality check — packet is always sent, caller's responsibility
+        board.setLine(player, 7, "Same text");
 
-        verify(context, never()).sendPacket(any(Player.class), any(PacketWrapper.class));
+        verify(context, times(1)).sendPacket(eq(player), any(PacketWrapper.class));
     }
 
     @Test
-    void getLineReturnsSetText() {
+    void setLineCollectionSendsToAllPlayers() {
         BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        BoardMicroService.Board board = service.createBoard(player, "Title");
-        board.setLine(10, "&bTest Line");
-        assertEquals("&bTest Line", board.getLine(10));
+        Player player2 = mock(Player.class);
+        List<Player> players = Arrays.asList(player, player2);
+        BoardMicroService.Board board = service.createBoard(players, "Title");
+        reset(context);
+
+        board.setLine(players, 0, "&aTest");
+
+        // New line: team CREATE + score = 2 packets per player
+        verify(context, times(2)).sendPacket(eq(player), any(PacketWrapper.class));
+        verify(context, times(2)).sendPacket(eq(player2), any(PacketWrapper.class));
     }
 
     @Test
-    void getLineReturnsNullForUnsetLine() {
+    void setLineCollectionSendsUpdateWhenLineActive() {
         BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        BoardMicroService.Board board = service.createBoard(player, "Title");
-        assertNull(board.getLine(0));
+        Player player2 = mock(Player.class);
+        List<Player> players = Arrays.asList(player, player2);
+        BoardMicroService.Board board = service.createBoard(players, "Title");
+        board.setLine(players, 0, "Initial");
+        reset(context);
+
+        board.setLine(players, 0, "Updated");
+
+        // Existing line: team UPDATE only = 1 packet per player
+        verify(context, times(1)).sendPacket(eq(player), any(PacketWrapper.class));
+        verify(context, times(1)).sendPacket(eq(player2), any(PacketWrapper.class));
     }
 
     // ===== removeLine =====
@@ -248,10 +194,10 @@ class BoardMicroServiceTest {
     void removeLineSendsScoreRemoveAndTeamRemovePackets() {
         BoardMicroService service = serviceFor(ServerVersion.V_1_21);
         BoardMicroService.Board board = service.createBoard(player, "Title");
-        board.setLine(4, "To remove");
+        board.setLine(player, 4, "To remove");
         reset(context);
 
-        board.removeLine(4);
+        board.removeLine(player, 4);
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
         verify(context, times(2)).sendPacket(eq(player), captor.capture());
@@ -269,44 +215,71 @@ class BoardMicroServiceTest {
         BoardMicroService.Board board = service.createBoard(player, "Title");
         reset(context);
 
-        board.removeLine(0);
+        board.removeLine(player, 0);
 
         verify(context, never()).sendPacket(any(Player.class), any(PacketWrapper.class));
     }
 
     @Test
-    void removeLineClearsLineText() {
+    void removeLineCollectionSendsToAllPlayers() {
         BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        BoardMicroService.Board board = service.createBoard(player, "Title");
-        board.setLine(2, "Content");
-        board.removeLine(2);
-        assertNull(board.getLine(2));
+        Player player2 = mock(Player.class);
+        List<Player> players = Arrays.asList(player, player2);
+        BoardMicroService.Board board = service.createBoard(players, "Title");
+        board.setLine(players, 2, "Content");
+        reset(context);
+
+        board.removeLine(players, 2);
+
+        // scoreRemove + teamRemove = 2 packets per player
+        verify(context, times(2)).sendPacket(eq(player), any(PacketWrapper.class));
+        verify(context, times(2)).sendPacket(eq(player2), any(PacketWrapper.class));
     }
 
     // ===== setLines (bulk) =====
 
     @Test
-    void setLinesBulkSetsMultipleLines() {
+    void setLinesBulkCreatesMultipleLines() {
         BoardMicroService service = serviceFor(ServerVersion.V_1_21);
         BoardMicroService.Board board = service.createBoard(player, "Title");
-        board.setLines(Arrays.asList("Line0", "Line1", "Line2"));
+        reset(context);
 
-        assertEquals("Line0", board.getLine(0));
-        assertEquals("Line1", board.getLine(1));
-        assertEquals("Line2", board.getLine(2));
-        assertNull(board.getLine(3));
+        board.setLines(player, Arrays.asList("Line0", "Line1", "Line2"));
+
+        // 3 new lines × (teamCreate + score) = 6 packets
+        // 12 inactive lines × 0 = 0 packets (removeLine on inactive is no-op)
+        verify(context, times(6)).sendPacket(eq(player), any(PacketWrapper.class));
     }
 
     @Test
-    void setLinesRemovesExtraLines() {
+    void setLinesBulkRemovesExtraLines() {
         BoardMicroService service = serviceFor(ServerVersion.V_1_21);
         BoardMicroService.Board board = service.createBoard(player, "Title");
-        board.setLine(5, "Old line");
+        board.setLine(player, 5, "Old line");
+        reset(context);
 
-        board.setLines(Arrays.asList("Only one"));
+        board.setLines(player, Arrays.asList("Only one"));
 
-        assertEquals("Only one", board.getLine(0));
-        assertNull(board.getLine(5), "Lines beyond list size should be removed");
+        // Line 0: new → teamCreate + score = 2 packets
+        // Lines 1-4, 6-14: inactive → no packets
+        // Line 5: active → scoreRemove + teamRemove = 2 packets
+        // Total: 4 packets
+        verify(context, times(4)).sendPacket(eq(player), any(PacketWrapper.class));
+    }
+
+    @Test
+    void setLinesCollectionSendsToAllPlayers() {
+        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
+        Player player2 = mock(Player.class);
+        List<Player> players = Arrays.asList(player, player2);
+        BoardMicroService.Board board = service.createBoard(players, "Title");
+        reset(context);
+
+        board.setLines(players, Arrays.asList("A", "B"));
+
+        // 2 new lines × (teamCreate + score) = 4 packets per player
+        verify(context, times(4)).sendPacket(eq(player), any(PacketWrapper.class));
+        verify(context, times(4)).sendPacket(eq(player2), any(PacketWrapper.class));
     }
 
     // ===== Title updates =====
@@ -317,7 +290,7 @@ class BoardMicroServiceTest {
         BoardMicroService.Board board = service.createBoard(player, "Old Title");
         reset(context);
 
-        board.setTitle("New Title");
+        board.setTitle(player, "New Title");
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
         verify(context, times(1)).sendPacket(eq(player), captor.capture());
@@ -325,136 +298,43 @@ class BoardMicroServiceTest {
     }
 
     @Test
-    void setTitleSkipsWhenUnchanged() {
+    void setTitleSendsPacketEvenWhenUnchanged() {
         BoardMicroService service = serviceFor(ServerVersion.V_1_21);
         BoardMicroService.Board board = service.createBoard(player, "Same");
         reset(context);
 
-        board.setTitle("Same");
+        // No equality check — always sends
+        board.setTitle(player, "Same");
 
-        verify(context, never()).sendPacket(any(Player.class), any(PacketWrapper.class));
+        verify(context, times(1)).sendPacket(eq(player), any(PacketWrapper.class));
     }
 
     @Test
-    void getTitleReturnsUpdatedValue() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        BoardMicroService.Board board = service.createBoard(player, "Initial");
-        board.setTitle("Changed");
-        assertEquals("Changed", board.getTitle());
-    }
-
-    // ===== Board.remove() idempotence =====
-
-    @Test
-    void boardRemoveIsIdempotent() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        BoardMicroService.Board board = service.createBoard(player, "Title");
-        board.setLine(0, "Content");
-        reset(context);
-
-        board.remove();
-        int firstCallCount = mockingDetails(context).getInvocations().size();
-
-        board.remove(); // second call should be no-op
-        int secondCallCount = mockingDetails(context).getInvocations().size();
-
-        assertEquals(firstCallCount, secondCallCount,
-                "Second remove() should not send additional packets");
-    }
-
-    @Test
-    void boardRemoveCleansUpFromServiceMap() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        BoardMicroService.Board board = service.createBoard(player, "Title");
-        board.remove();
-        assertNull(service.getBoard(player));
-    }
-
-    // ===== Operations on removed board are no-ops =====
-
-    @Test
-    void setLineOnRemovedBoardDoesNothing() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        BoardMicroService.Board board = service.createBoard(player, "Title");
-        board.remove();
-        reset(context);
-
-        board.setLine(0, "Should not send");
-
-        verify(context, never()).sendPacket(any(Player.class), any(PacketWrapper.class));
-    }
-
-    @Test
-    void setTitleOnRemovedBoardDoesNothing() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        BoardMicroService.Board board = service.createBoard(player, "Title");
-        board.remove();
-        reset(context);
-
-        board.setTitle("Should not send");
-
-        verify(context, never()).sendPacket(any(Player.class), any(PacketWrapper.class));
-    }
-
-    // ===== Line validation =====
-
-    @Test
-    void setLineThrowsOnNegativeIndex() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        BoardMicroService.Board board = service.createBoard(player, "Title");
-        assertThrows(IllegalArgumentException.class, () -> board.setLine(-1, "Bad"));
-    }
-
-    @Test
-    void setLineThrowsOnIndexTooHigh() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        BoardMicroService.Board board = service.createBoard(player, "Title");
-        assertThrows(IllegalArgumentException.class, () -> board.setLine(15, "Bad"));
-    }
-
-    @Test
-    void removeLineThrowsOnInvalidIndex() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        BoardMicroService.Board board = service.createBoard(player, "Title");
-        assertThrows(IllegalArgumentException.class, () -> board.removeLine(15));
-    }
-
-    @Test
-    void getLineThrowsOnInvalidIndex() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
-        BoardMicroService.Board board = service.createBoard(player, "Title");
-        assertThrows(IllegalArgumentException.class, () -> board.getLine(-1));
-    }
-
-    // ===== shutdown =====
-
-    @Test
-    void shutdownRemovesAllBoards() {
+    void setTitleCollectionSendsToAllPlayers() {
         BoardMicroService service = serviceFor(ServerVersion.V_1_21);
         Player player2 = mock(Player.class);
-        when(player2.getUniqueId()).thenReturn(UUID.randomUUID());
+        List<Player> players = Arrays.asList(player, player2);
+        BoardMicroService.Board board = service.createBoard(players, "Title");
+        reset(context);
 
-        service.createBoard(player, "Board 1");
-        service.createBoard(player2, "Board 2");
+        board.setTitle(players, "New Title");
 
-        service.shutdown();
-
-        assertNull(service.getBoard(player));
-        assertNull(service.getBoard(player2));
+        verify(context, times(1)).sendPacket(eq(player), any(PacketWrapper.class));
+        verify(context, times(1)).sendPacket(eq(player2), any(PacketWrapper.class));
     }
 
-    // ===== Board removal with active lines =====
+    // ===== Board removal =====
 
     @Test
     void boardRemovalCleansUpActiveLines() {
         BoardMicroService service = serviceFor(ServerVersion.V_1_21);
         BoardMicroService.Board board = service.createBoard(player, "Title");
-        board.setLine(0, "Line A");
-        board.setLine(5, "Line B");
-        board.setLine(14, "Line C");
+        board.setLine(player, 0, "Line A");
+        board.setLine(player, 5, "Line B");
+        board.setLine(player, 14, "Line C");
         reset(context);
 
-        board.remove();
+        board.remove(player);
 
         ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
         verify(context, atLeast(1)).sendPacket(eq(player), captor.capture());
@@ -475,6 +355,108 @@ class BoardMicroServiceTest {
         assertEquals(3, scoreRemoves, "Should remove 3 score entries");
         assertEquals(3, teamRemoves, "Should remove 3 teams");
         assertEquals(1, objectiveRemoves, "Should remove 1 objective");
+    }
+
+    @Test
+    void removeCollectionSendsToAllPlayers() {
+        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
+        Player player2 = mock(Player.class);
+        List<Player> players = Arrays.asList(player, player2);
+        BoardMicroService.Board board = service.createBoard(players, "Title");
+        board.setLine(players, 0, "Content");
+        reset(context);
+
+        board.remove(players);
+
+        // 1 active line: scoreRemove + teamRemove + objectiveRemove = 3 packets per player
+        verify(context, times(3)).sendPacket(eq(player), any(PacketWrapper.class));
+        verify(context, times(3)).sendPacket(eq(player2), any(PacketWrapper.class));
+    }
+
+    @Test
+    void setLineAfterRemoveResetsActiveState() {
+        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
+        BoardMicroService.Board board = service.createBoard(player, "Title");
+        board.setLine(player, 3, "Before");
+        board.remove(player);
+        reset(context);
+
+        // After remove, activeLines should be cleared — setLine sends CREATE, not UPDATE
+        board.setLine(player, 3, "After");
+
+        ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
+        verify(context, times(2)).sendPacket(eq(player), captor.capture());
+
+        List<PacketWrapper> packets = captor.getAllValues();
+        assertTrue(packets.get(0) instanceof WrapperPlayServerTeams,
+                "Should send team CREATE (not UPDATE) after remove");
+        assertTrue(packets.get(1) instanceof WrapperPlayServerUpdateScore,
+                "Should send score packet for new line");
+    }
+
+    @Test
+    void removeWithNoActiveLinesStillSendsObjectiveRemove() {
+        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
+        BoardMicroService.Board board = service.createBoard(player, "Title");
+        reset(context);
+
+        // No lines set — remove should still send objective REMOVE
+        board.remove(player);
+
+        ArgumentCaptor<PacketWrapper> captor = ArgumentCaptor.forClass(PacketWrapper.class);
+        verify(context, times(1)).sendPacket(eq(player), captor.capture());
+        assertTrue(captor.getValue() instanceof WrapperPlayServerScoreboardObjective);
+    }
+
+    // ===== Line validation =====
+
+    @Test
+    void setLineThrowsOnNegativeIndex() {
+        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
+        BoardMicroService.Board board = service.createBoard(player, "Title");
+        assertThrows(IllegalArgumentException.class, () -> board.setLine(player, -1, "Bad"));
+    }
+
+    @Test
+    void setLineThrowsOnIndexTooHigh() {
+        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
+        BoardMicroService.Board board = service.createBoard(player, "Title");
+        assertThrows(IllegalArgumentException.class, () -> board.setLine(player, 15, "Bad"));
+    }
+
+    @Test
+    void removeLineThrowsOnInvalidIndex() {
+        BoardMicroService service = serviceFor(ServerVersion.V_1_21);
+        BoardMicroService.Board board = service.createBoard(player, "Title");
+        assertThrows(IllegalArgumentException.class, () -> board.removeLine(player, 15));
+    }
+
+    // ===== Version branching =====
+
+    @Test
+    void legacyServerDetected() {
+        BoardMicroService service = serviceFor(ServerVersion.V_1_8);
+        BoardMicroService.Board board = service.createBoard(player, "Legacy Board");
+        assertNotNull(board);
+    }
+
+    @Test
+    void modernServerDetected() {
+        BoardMicroService service = serviceFor(ServerVersion.V_1_13);
+        BoardMicroService.Board board = service.createBoard(player, "Modern Board");
+        assertNotNull(board);
+    }
+
+    @Test
+    void setLineOnLegacyServerSendsPackets() {
+        BoardMicroService service = serviceFor(ServerVersion.V_1_8);
+        BoardMicroService.Board board = service.createBoard(player, "Title");
+        reset(context);
+
+        board.setLine(player, 0, "&cLegacy line with color");
+
+        // Should still send team + score packets
+        verify(context, atLeast(2)).sendPacket(eq(player), any(PacketWrapper.class));
     }
 
     // ===== Legacy text splitting (static utility) =====
@@ -560,34 +542,5 @@ class BoardMicroServiceTest {
         // §l (bold) then §a (green) — the bold should be reset by the color
         assertEquals("\u00a7a",
                 BoardMicroService.getLastColors("\u00a7lBold \u00a7aGreen"));
-    }
-
-    // ===== Version branching =====
-
-    @Test
-    void legacyServerDetected() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_8);
-        // Just verify it can create a board without errors on legacy
-        BoardMicroService.Board board = service.createBoard(player, "Legacy Board");
-        assertNotNull(board);
-    }
-
-    @Test
-    void modernServerDetected() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_13);
-        BoardMicroService.Board board = service.createBoard(player, "Modern Board");
-        assertNotNull(board);
-    }
-
-    @Test
-    void setLineOnLegacyServerSendsPackets() {
-        BoardMicroService service = serviceFor(ServerVersion.V_1_8);
-        BoardMicroService.Board board = service.createBoard(player, "Title");
-        reset(context);
-
-        board.setLine(0, "&cLegacy line with color");
-
-        // Should still send team + score packets
-        verify(context, atLeast(2)).sendPacket(eq(player), any(PacketWrapper.class));
     }
 }

@@ -133,11 +133,10 @@ public interface BBAIMessageService {
     // ── Scoreboard (Board) ─────────────────────────────────────────────
 
     /**
-     * Creates a new sidebar scoreboard for the given player and displays it immediately.
-     * If the player already has an active board, the old one is removed first.
-     * <p>
-     * The returned {@link BoardMicroService.Board} provides methods for setting lines,
-     * updating the title, and removing the board.
+     * Creates a new sidebar scoreboard for the given player and displays it
+     * immediately. The returned {@link BoardMicroService.Board} is not tracked
+     * by this service — the caller must store the reference and manage its
+     * lifecycle (including calling {@link BoardMicroService.Board#remove} when done).
      *
      * @param player the target player
      * @param title  the scoreboard title (supports {@code &} color codes)
@@ -146,19 +145,14 @@ public interface BBAIMessageService {
     BoardMicroService.Board createBoard(@NonNull Player player, @NonNull String title);
 
     /**
-     * Retrieves the active board for the given player.
+     * Creates a new sidebar scoreboard for multiple players and displays it
+     * immediately. The returned {@link BoardMicroService.Board} is shared across
+     * all recipients — the caller must store the reference and manage its lifecycle.
      *
-     * @param player the target player
-     * @return the player's active board, or {@code null} if none exists
+     * @param players the target players
+     * @param title   the scoreboard title (supports {@code &} color codes)
+     * @return the newly created board
      */
-    BoardMicroService.Board getBoard(@NonNull Player player);
-
-    /**
-     * Removes the active board for the given player, sending all necessary
-     * cleanup packets. Does nothing if the player has no active board.
-     *
-     * @param player the target player
-     */
-    void removeBoard(@NonNull Player player);
+    BoardMicroService.Board createBoard(@NonNull Collection<? extends Player> players, @NonNull String title);
 
 }
