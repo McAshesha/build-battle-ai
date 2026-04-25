@@ -13,8 +13,11 @@ import ru.ashesha.buildBattleAI.arena.ArenaManager;
 import ru.ashesha.buildBattleAI.arena.api.BBAIArenaManager;
 import ru.ashesha.buildBattleAI.commands.CommandService;
 import ru.ashesha.buildBattleAI.commands.TestBoardCommand;
+import ru.ashesha.buildBattleAI.commands.TestHologramCommand;
 import ru.ashesha.buildBattleAI.commands.TestMLCommand;
 import ru.ashesha.buildBattleAI.commands.TestNPCCommand;
+import ru.ashesha.buildBattleAI.entity.hologram.HologramService;
+import ru.ashesha.buildBattleAI.entity.hologram.api.BBAIHologramService;
 import ru.ashesha.buildBattleAI.game.GameManager;
 import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
 import ru.ashesha.buildBattleAI.listeners.ListenerService;
@@ -22,8 +25,8 @@ import ru.ashesha.buildBattleAI.message.MessageService;
 import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.ml.MLService;
 import ru.ashesha.buildBattleAI.ml.api.BBAIMLService;
-import ru.ashesha.buildBattleAI.npc.NPCService;
-import ru.ashesha.buildBattleAI.npc.api.BBAINPCService;
+import ru.ashesha.buildBattleAI.entity.npc.NPCService;
+import ru.ashesha.buildBattleAI.entity.npc.api.BBAINPCService;
 import ru.ashesha.buildBattleAI.render.RenderService;
 
 import java.util.Arrays;
@@ -68,6 +71,8 @@ public class PluginContext {
     @Getter
     private final BBAINPCService npcService;
     @Getter
+    private final BBAIHologramService hologramService;
+    @Getter
     private final BBAIMLService mlService;
     @Getter
     private final CommandService commandService;
@@ -106,6 +111,7 @@ public class PluginContext {
         GameManager gameManagerImpl = new GameManager(plugin);
         MessageService messageServiceImpl = new MessageService(plugin);
         NPCService npcServiceImpl = new NPCService(plugin);
+        HologramService hologramServiceImpl = new HologramService(plugin);
         MLService mlServiceImpl = new MLService(plugin);
         RenderService renderServiceImpl = new RenderService(plugin);
         CommandService commandServiceImpl = new CommandService(plugin);
@@ -115,6 +121,7 @@ public class PluginContext {
         this.gameManager = gameManagerImpl;
         this.messageService = messageServiceImpl;
         this.npcService = npcServiceImpl;
+        this.hologramService = hologramServiceImpl;
         this.mlService = mlServiceImpl;
         this.renderService = renderServiceImpl;
         this.commandService = commandServiceImpl;
@@ -127,6 +134,7 @@ public class PluginContext {
                 gameManagerImpl,
                 messageServiceImpl,
                 npcServiceImpl,
+                hologramServiceImpl,
                 mlServiceImpl,
                 renderServiceImpl,
                 commandServiceImpl,
@@ -153,6 +161,7 @@ public class PluginContext {
         // the command / listener services (those services only provide the
         // registration mechanism and the bulk-unregistration guarantees).
         commandService.register(new TestNPCCommand(plugin));
+        commandService.register(new TestHologramCommand(plugin));
         commandService.register(new TestMLCommand(plugin));
         commandService.register(new TestBoardCommand(plugin));
     }
