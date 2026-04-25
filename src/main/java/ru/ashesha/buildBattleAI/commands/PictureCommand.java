@@ -8,7 +8,7 @@ import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.entity.picture.PictureService;
 import ru.ashesha.buildBattleAI.entity.picture.api.BBAIPictureService;
-import ru.ashesha.buildBattleAI.render.RendererUtils;
+import ru.ashesha.buildBattleAI.util.RendererUtils;
 import ru.ashesha.buildBattleAI.render.data.ChunkScene;
 import ru.ashesha.buildBattleAI.render.data.SceneData;
 

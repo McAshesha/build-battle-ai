@@ -1,8 +1,9 @@
-package ru.ashesha.buildBattleAI.render;
+package ru.ashesha.buildBattleAI.util;
 
 import com.cryptomorin.xseries.XMaterial;
 import lombok.NonNull;
 import lombok.experimental.UtilityClass;
+import ru.ashesha.buildBattleAI.render.BlockPalette;
 import ru.ashesha.buildBattleAI.render.data.SceneData;
 
 import java.awt.image.BufferedImage;
@@ -12,7 +13,7 @@ import java.awt.image.BufferedImage;
  * and acceleration structures.
  * <p>
  * These helpers are pure functions with no mutable state and no dependency
- * on the {@link CpuRenderer} instance or its thread pool. They are safe to
+ * on the {@link ru.ashesha.buildBattleAI.render.CpuRenderer} instance or its thread pool. They are safe to
  * call from any thread at any time, including tests that run without a
  * server or a live plugin.
  */
@@ -22,17 +23,17 @@ public class RendererUtils {
     /**
      * Output image width in pixels (matches typical ML classifier input size).
      */
-    public static final int WIDTH = 224;
+    public final int WIDTH = 224;
 
     /**
      * Output image height in pixels (matches typical ML classifier input size).
      */
-    public static final int HEIGHT = 224;
+    public final int HEIGHT = 224;
 
     /**
      * Vertical field of view in degrees (matches Minecraft's default FOV).
      */
-    public static final double FOV = 70.0;
+    public final double FOV = 70.0;
 
     /**
      * Converts a raw RGB byte array (row-major HWC layout) to a {@link BufferedImage}
@@ -44,7 +45,7 @@ public class RendererUtils {
      * @param rgb byte array of size {@link #WIDTH}×{@link #HEIGHT}×3
      * @return a TYPE_INT_RGB image with the same pixel data
      */
-    public static BufferedImage toBufferedImage(byte @NonNull [] rgb) {
+    public BufferedImage toBufferedImage(byte @NonNull [] rgb) {
         BufferedImage image = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
         int[] pixels = new int[WIDTH * HEIGHT];
         for (int i = 0; i < WIDTH * HEIGHT; i++) {
@@ -69,7 +70,7 @@ public class RendererUtils {
      * @param scene the scene to analyze
      * @return flat array of (minY, maxY) pairs per column
      */
-    public static int[] buildHeightMap(@NonNull SceneData scene) {
+    public int[] buildHeightMap(@NonNull SceneData scene) {
         int sizeX = scene.maxX() - scene.minX() + 1;
         int sizeZ = scene.maxZ() - scene.minZ() + 1;
         int[] heightMap = new int[sizeX * sizeZ * 2];

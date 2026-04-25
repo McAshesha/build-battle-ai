@@ -1,4 +1,4 @@
-package ru.ashesha.buildBattleAI.entity.picture;
+package ru.ashesha.buildBattleAI.util;
 
 import lombok.experimental.UtilityClass;
 
@@ -32,28 +32,28 @@ import java.awt.image.BufferedImage;
 public class MapPalette {
 
     /** Width and height of a single Minecraft map tile in pixels. */
-    public static final int MAP_SIZE = 128;
+    public final int MAP_SIZE = 128;
 
     /**
      * Transparent map color index. Used for padding areas when the source image
      * does not fill the entire tile (aspect ratio preservation). Indices 0–3 are
      * all transparent in Minecraft's map rendering.
      */
-    public static final byte TRANSPARENT = 0;
+    public final byte TRANSPARENT = 0;
 
     /**
      * Shade multipliers applied to each base color to produce four brightness variants.
      * Index 0 = darkest (180/255), index 1 = medium (220/255),
      * index 2 = full brightness, index 3 = deep shadow (135/255).
      */
-    private static final double[] SHADE_MULTIPLIERS = {180.0 / 255, 220.0 / 255, 1.0, 135.0 / 255};
+    private final double[] SHADE_MULTIPLIERS = {180.0 / 255, 220.0 / 255, 1.0, 135.0 / 255};
 
     /**
      * The 36 base colors available since Minecraft 1.8 (map color IDs 0–35).
      * Each entry is an RGB triplet {@code {R, G, B}}. Base color 0 is transparent
      * and excluded from opaque matching — only opaque pixels use indices 4+.
      */
-    static final int[][] BASE_COLORS = {
+    final int[][] BASE_COLORS = {
             {0, 0, 0},         //  0: NONE (transparent, never matched)
             {127, 178, 56},    //  1: GRASS
             {247, 233, 163},   //  2: SAND
@@ -97,19 +97,19 @@ public class MapPalette {
      * map color index. Indices 0–3 are transparent (unused for opaque matching);
      * indices 4–143 are the four shade variants of base colors 1–35.
      */
-    static final int[] PALETTE;
+    final int[] PALETTE;
 
     /**
      * Number of bits to shift when quantizing each RGB channel for the lookup table.
      * With 5 bits kept (shift of 3), we get a 32×32×32 = 32768-entry table (32 KB).
      */
-    private static final int QUANTIZE_SHIFT = 3;
+    private final int QUANTIZE_SHIFT = 3;
 
     /** Number of buckets per channel in the quantized color space. */
-    private static final int QUANTIZE_SIZE = 256 >> QUANTIZE_SHIFT; // 32
+    private final int QUANTIZE_SIZE = 256 >> QUANTIZE_SHIFT; // 32
 
     /** Precomputed QUANTIZE_SIZE² for index arithmetic. */
-    private static final int Q2 = QUANTIZE_SIZE * QUANTIZE_SIZE;
+    private final int Q2 = QUANTIZE_SIZE * QUANTIZE_SIZE;
 
     /**
      * Pre-computed lookup table for O(1) color matching. Maps a quantized RGB
@@ -118,7 +118,7 @@ public class MapPalette {
      * Indexed by: {@code (r >> 3) * 1024 + (g >> 3) * 32 + (b >> 3)}.
      * Size: 32 × 32 × 32 = 32 KB.
      */
-    private static final byte[] COLOR_LOOKUP;
+    private final byte[] COLOR_LOOKUP;
 
     static {
         int totalColors = BASE_COLORS.length * 4;
@@ -144,7 +144,7 @@ public class MapPalette {
      * 32×32×32 RGB grid and finding the nearest opaque palette color via
      * Euclidean distance. Called once during class initialization.
      */
-    private static void buildLookupTable() {
+    private void buildLookupTable() {
         int half = 1 << (QUANTIZE_SHIFT - 1);
 
         for (int ri = 0; ri < QUANTIZE_SIZE; ri++) {
@@ -163,7 +163,7 @@ public class MapPalette {
      * Linear-scan nearest-color match against the palette. Used only during
      * lookup table construction — never at runtime.
      */
-    private static byte matchColorLinear(int r, int g, int b) {
+    private byte matchColorLinear(int r, int g, int b) {
         int bestIndex = 4;
         int bestDist = Integer.MAX_VALUE;
 
@@ -195,7 +195,7 @@ public class MapPalette {
      * @param rgb packed RGB color ({@code 0xRRGGBB})
      * @return the closest map palette index (4–143)
      */
-    public static byte matchColor(int rgb) {
+    public byte matchColor(int rgb) {
         int r = (rgb >> 16) & 0xFF;
         int g = (rgb >> 8) & 0xFF;
         int b = rgb & 0xFF;
@@ -216,7 +216,7 @@ public class MapPalette {
      * @param image the source image (any size)
      * @return a 128×128 byte array of palette indices
      */
-    public static byte[] imageToMapColors(BufferedImage image) {
+    public byte[] imageToMapColors(BufferedImage image) {
         BufferedImage scaled = resizeImage(image, MAP_SIZE, MAP_SIZE);
         int[] pixels = scaled.getRGB(0, 0, MAP_SIZE, MAP_SIZE, null, 0, MAP_SIZE);
         return rgbToMapColors(pixels);
@@ -235,7 +235,7 @@ public class MapPalette {
      * @param canvasHeight total canvas height in pixels (typically gridHeight × 128)
      * @return a {@code canvasWidth × canvasHeight} byte array of palette indices
      */
-    public static byte[] imageToCanvasColors(BufferedImage image,
+    public byte[] imageToCanvasColors(BufferedImage image,
                                              int canvasWidth, int canvasHeight) {
         int srcW = image.getWidth();
         int srcH = image.getHeight();
@@ -264,7 +264,7 @@ public class MapPalette {
      *               128×128
      * @return a 128×128 byte array of palette indices
      */
-    public static byte[] rgbToMapColors(int[] pixels) {
+    public byte[] rgbToMapColors(int[] pixels) {
         int total = MAP_SIZE * MAP_SIZE;
         byte[] colors = new byte[total];
 
@@ -294,7 +294,7 @@ public class MapPalette {
      * @param canvasHeight total canvas height in pixels
      * @return a {@code canvasWidth × canvasHeight} byte array of palette indices
      */
-    public static byte[] rgbToCanvasColors(int[] pixels, int srcW, int srcH,
+    public byte[] rgbToCanvasColors(int[] pixels, int srcW, int srcH,
                                            int canvasWidth, int canvasHeight) {
         double scale = Math.min((double) canvasWidth / srcW, (double) canvasHeight / srcH);
         int scaledW = Math.max(1, (int) (srcW * scale));
@@ -329,7 +329,7 @@ public class MapPalette {
      * @param canvasHeight total canvas height in pixels
      * @return a {@code canvasWidth × canvasHeight} byte array of palette indices
      */
-    public static byte[] hwcToCanvasColors(byte[] hwcPixels, int srcW, int srcH,
+    public byte[] hwcToCanvasColors(byte[] hwcPixels, int srcW, int srcH,
                                            int canvasWidth, int canvasHeight) {
         double scale = Math.min((double) canvasWidth / srcW, (double) canvasHeight / srcH);
         int scaledW = Math.max(1, (int) (srcW * scale));
@@ -412,7 +412,7 @@ public class MapPalette {
      * @param offsetY      vertical offset to center the image
      * @return the canvas byte array
      */
-    private static byte[] buildCanvas(int[] scaledPixels, int scaledW, int scaledH,
+    private byte[] buildCanvas(int[] scaledPixels, int scaledW, int scaledH,
                                       int canvasW, int canvasH, int offsetX, int offsetY) {
         byte[] canvas = new byte[canvasW * canvasH];
 
@@ -442,7 +442,7 @@ public class MapPalette {
      * @param tileY       zero-based row index of the tile
      * @return a 128×128 byte array for this tile
      */
-    public static byte[] extractTile(byte[] canvas, int canvasWidth,
+    public byte[] extractTile(byte[] canvas, int canvasWidth,
                                      int tileX, int tileY) {
         byte[] tile = new byte[MAP_SIZE * MAP_SIZE];
         int srcX = tileX * MAP_SIZE;
@@ -469,7 +469,7 @@ public class MapPalette {
      * @param dstH   target height
      * @return resized packed RGB array of size {@code dstW × dstH}
      */
-    static int[] bilinearResize(int[] src, int srcW, int srcH, int dstW, int dstH) {
+    int[] bilinearResize(int[] src, int srcW, int srcH, int dstW, int dstH) {
         int[] dst = new int[dstW * dstH];
 
         // Precompute scale factors. We map the center of each output pixel to
@@ -529,7 +529,7 @@ public class MapPalette {
      * @param height target height
      * @return a new image of the target size
      */
-    public static BufferedImage resizeImage(BufferedImage source, int width, int height) {
+    public BufferedImage resizeImage(BufferedImage source, int width, int height) {
         BufferedImage result = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         java.awt.Graphics2D g = result.createGraphics();
         g.setRenderingHint(
@@ -544,7 +544,7 @@ public class MapPalette {
     /**
      * Clamps a value to the [0, 255] range.
      */
-    private static int clamp(int value) {
+    private int clamp(int value) {
         if (value < 0)
             return 0;
         return Math.min(value, 255);

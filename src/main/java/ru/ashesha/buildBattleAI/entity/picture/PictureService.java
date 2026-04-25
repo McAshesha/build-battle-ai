@@ -23,6 +23,7 @@ import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.core.PluginService;
 import ru.ashesha.buildBattleAI.entity.picture.api.BBAIPictureService;
+import ru.ashesha.buildBattleAI.util.MapPalette;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;

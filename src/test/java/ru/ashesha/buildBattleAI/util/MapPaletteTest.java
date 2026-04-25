@@ -1,4 +1,4 @@
-package ru.ashesha.buildBattleAI.entity.picture;
+package ru.ashesha.buildBattleAI.util;
 
 import org.junit.jupiter.api.Test;
 

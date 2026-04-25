@@ -5,6 +5,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import ru.ashesha.buildBattleAI.render.data.FlatScene;
+import ru.ashesha.buildBattleAI.util.RendererUtils;
 
 import java.awt.image.BufferedImage;
 import java.util.Arrays;
