@@ -313,7 +313,7 @@ public class ConfigService implements BBAIConfigService, PluginService {
             YamlConfiguration config = new YamlConfiguration();
             config.loadFromString(content);
             return config;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             plugin.getLogger().warning("Failed to load resource " + path + ": " + e.getMessage());
             return null;
         }
@@ -335,7 +335,7 @@ public class ConfigService implements BBAIConfigService, PluginService {
         try {
             String content = readStream(new FileInputStream(file));
             config.loadFromString(content);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             plugin.getLogger().warning("Failed to load " + file.getName() + ": " + e.getMessage());
         }
         return config;

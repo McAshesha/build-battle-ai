@@ -138,9 +138,7 @@ public class NPCService implements BBAINPCService, PluginService {
             }
 
             throw new RuntimeException("No textures property found for player: " + name);
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             throw new RuntimeException("Failed to fetch skin for player: " + name, e);
         }
     }

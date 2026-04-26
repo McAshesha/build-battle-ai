@@ -13,6 +13,8 @@ import ru.ashesha.buildBattleAI.arena.ArenaManager;
 import ru.ashesha.buildBattleAI.arena.api.BBAIArenaManager;
 import ru.ashesha.buildBattleAI.config.ConfigService;
 import ru.ashesha.buildBattleAI.config.api.BBAIConfigService;
+import ru.ashesha.buildBattleAI.data.DataService;
+import ru.ashesha.buildBattleAI.data.api.BBAIDataService;
 import ru.ashesha.buildBattleAI.commands.CommandService;
 import ru.ashesha.buildBattleAI.entity.hologram.HologramService;
 import ru.ashesha.buildBattleAI.entity.hologram.api.BBAIHologramService;
@@ -65,6 +67,8 @@ public class PluginContext {
     @Getter
     private final BBAIConfigService configService;
     @Getter
+    private final BBAIDataService dataService;
+    @Getter
     private final BBAIArenaManager arenaManager;
     @Getter
     private final BBAIGameManager gameManager;
@@ -113,6 +117,7 @@ public class PluginContext {
         // then managers (world / game state holders), then protocol-bound
         // services, then command / listener / render plumbing.
         ConfigService configServiceImpl = new ConfigService(plugin);
+        DataService dataServiceImpl = new DataService(plugin);
         ArenaManager arenaManagerImpl = new ArenaManager(plugin);
         GameManager gameManagerImpl = new GameManager(plugin);
         MessageService messageServiceImpl = new MessageService(plugin);
@@ -125,6 +130,7 @@ public class PluginContext {
         ListenerService listenerServiceImpl = new ListenerService(plugin);
 
         this.configService = configServiceImpl;
+        this.dataService = dataServiceImpl;
         this.arenaManager = arenaManagerImpl;
         this.gameManager = gameManagerImpl;
         this.messageService = messageServiceImpl;
@@ -140,6 +146,7 @@ public class PluginContext {
         // at runtime; any new service is added by editing the constructor.
         this.services = Collections.unmodifiableList(Arrays.asList(
                 configServiceImpl,
+                dataServiceImpl,
                 arenaManagerImpl,
                 gameManagerImpl,
                 messageServiceImpl,

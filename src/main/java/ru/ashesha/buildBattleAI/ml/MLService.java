@@ -144,7 +144,7 @@ public class MLService implements BBAIMLService, PluginService {
                 sb.append(buf, 0, n);
             reader.close();
             return sb.toString();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             return "(failed to read error body: " + e.getMessage() + ")";
         }
     }
@@ -316,9 +316,7 @@ public class MLService implements BBAIMLService, PluginService {
                     .getAsJsonObject();
             conn.disconnect();
             return result;
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             throw new RuntimeException("ML service GET " + url + " failed: " + e.getMessage(), e);
         }
     }
@@ -362,9 +360,7 @@ public class MLService implements BBAIMLService, PluginService {
                     .getAsJsonObject();
             conn.disconnect();
             return result;
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             throw new RuntimeException("ML service POST " + url + " failed: " + e.getMessage(), e);
         }
     }
