@@ -19,6 +19,11 @@
         <plugin.main>ru.ashesha.buildBattleAI.BuildBattleAI</plugin.main>
         <plugin.authors>[ McAshesha ]</plugin.authors>
         <plugin.prefix>BBAI</plugin.prefix>
+        <!-- JAR signing — skipped by default; activate with -Psign -->
+        <jarsigner.skip>true</jarsigner.skip>
+        <!-- ProGuard obfuscation — skipped by default; activate with -Pobfuscate-light / -Pobfuscate / -Pobfuscate-heavy -->
+        <proguard.skip>true</proguard.skip>
+        <proguard.config.level>${project.basedir}/proguard/light.pro</proguard.config.level>
     </properties>
 
     <build>
@@ -130,6 +135,82 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- ProGuard obfuscation — placed between shade and jarsigner so
+                 the signed/copied JARs are already obfuscated.
+                 Skipped by default; use -Pobfuscate-light / -Pobfuscate / -Pobfuscate-heavy. -->
+            <plugin>
+                <groupId>com.github.wvengen</groupId>
+                <artifactId>proguard-maven-plugin</artifactId>
+                <version>2.6.1</version>
+                <executions>
+                    <execution>
+                        <id>proguard</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>proguard</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <skip>${proguard.skip}</skip>
+                    <obfuscate>true</obfuscate>
+                    <!-- Process the shaded main JAR in-place -->
+                    <injar>${project.build.finalName}.jar</injar>
+                    <outjar>${project.build.finalName}.jar</outjar>
+                    <outputDirectory>${project.build.directory}</outputDirectory>
+                    <!-- Dependencies are already inside the shaded JAR -->
+                    <includeDependency>false</includeDependency>
+                    <!-- Mapping file for stack trace deobfuscation -->
+                    <mappingFileName>proguard-mapping.txt</mappingFileName>
+                    <!-- Base keep rules (shared by all levels) -->
+                    <proguardInclude>${project.basedir}/proguard/base.pro</proguardInclude>
+                    <!-- Level-specific config, selected via profile property -->
+                    <options>
+                        <option>@${proguard.config.level}</option>
+                    </options>
+                    <!-- JDK 21 base module for core types (java.lang.Object, etc.).
+                         JDK 25 jmods use class version 69 which ProGuard
+                         cannot read, so we reference JDK 21 instead. -->
+                    <libs>
+                        <lib>${user.home}/Library/Java/JavaVirtualMachines/ms-21.0.10/Contents/Home/jmods/java.base.jmod</lib>
+                    </libs>
+                </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.guardsquare</groupId>
+                        <artifactId>proguard-base</artifactId>
+                        <version>7.9.1</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>com.guardsquare</groupId>
+                        <artifactId>proguard-core</artifactId>
+                        <version>9.3.2</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+            <!-- JAR signing — placed between proguard and antrun so the copied
+                 JARs are already signed. Skipped by default; use -Psign to activate. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jarsigner-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>sign-jars</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <skip>${jarsigner.skip}</skip>
+                    <keystore>${jarsigner.keystore}</keystore>
+                    <alias>${jarsigner.alias}</alias>
+                    <storepass>${jarsigner.storepass}</storepass>
+                    <keypass>${jarsigner.keypass}</keypass>
+                </configuration>
+            </plugin>
             <plugin>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <version>3.1.0</version>
@@ -171,6 +252,44 @@
             <url>https://repo.codemc.io/repository/maven-releases/</url>
         </repository>
     </repositories>
+
+    <profiles>
+        <!-- Activate with: mvn clean package -Psign -Djarsigner.keystore=/path/to/keystore.jks
+                                                      -Djarsigner.alias=bbai
+                                                      -Djarsigner.storepass=<pass>
+                                                      -Djarsigner.keypass=<pass>
+             Generate a keystore once:
+               keytool -genkeypair -alias bbai -keyalg RSA -keysize 2048 \
+                       -validity 3650 -keystore keystore.jks -->
+        <profile>
+            <id>sign</id>
+            <properties>
+                <jarsigner.skip>false</jarsigner.skip>
+            </properties>
+        </profile>
+        <!-- Obfuscation profiles — rename only / rename+shrink+optimize / maximum -->
+        <profile>
+            <id>obfuscate-light</id>
+            <properties>
+                <proguard.skip>false</proguard.skip>
+                <proguard.config.level>${project.basedir}/proguard/light.pro</proguard.config.level>
+            </properties>
+        </profile>
+        <profile>
+            <id>obfuscate</id>
+            <properties>
+                <proguard.skip>false</proguard.skip>
+                <proguard.config.level>${project.basedir}/proguard/standard.pro</proguard.config.level>
+            </properties>
+        </profile>
+        <profile>
+            <id>obfuscate-heavy</id>
+            <properties>
+                <proguard.skip>false</proguard.skip>
+                <proguard.config.level>${project.basedir}/proguard/heavy.pro</proguard.config.level>
+            </properties>
+        </profile>
+    </profiles>
 
     <dependencies>
         <dependency>

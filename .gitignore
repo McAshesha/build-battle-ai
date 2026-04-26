@@ -16,3 +16,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Keystores (JAR signing)
+*.jks
+*.p12

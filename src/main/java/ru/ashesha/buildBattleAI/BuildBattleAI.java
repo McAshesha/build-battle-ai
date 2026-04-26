@@ -6,6 +6,7 @@ import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder
 import lombok.Getter;
 import org.bukkit.plugin.java.JavaPlugin;
 import ru.ashesha.buildBattleAI.core.PluginContext;
+import ru.ashesha.buildBattleAI.util.JarIntegrityVerifier;
 
 /**
  * Main plugin class for BuildBattleAI — a Minecraft Build Battle variant
@@ -27,12 +28,28 @@ public final class BuildBattleAI extends JavaPlugin {
     private PluginContext context;
 
     /**
+     * Set to {@code false} in {@link #onLoad()} when the JAR's digital
+     * signature is broken — the plugin refuses to enable in that case.
+     */
+    private boolean integrityVerified = true;
+
+    /**
      * Called during server startup before {@link #onEnable()}.
-     * Builds and loads the PacketEvents API instance for this plugin.
+     * <p>
+     * First verifies the JAR's digital signature (if present) — a broken
+     * signature aborts early and the plugin will disable itself in
+     * {@link #onEnable()}. If the JAR is unsigned (development build) or
+     * intact, PacketEvents is loaded and the {@link PluginContext} is created.
      */
     @SuppressWarnings("UnstableApiUsage")
     @Override
     public void onLoad() {
+        // Integrity gate — must run before any other initialisation.
+        if (!JarIntegrityVerifier.verify(getClass(), getLogger())) {
+            integrityVerified = false;
+            return;
+        }
+
         PacketEventsSettings settings = new PacketEventsSettings()
                 .debug(false)
                 .fullStackTrace(false)
@@ -43,11 +60,23 @@ public final class BuildBattleAI extends JavaPlugin {
     }
 
     /**
-     * Called when the plugin is enabled. Initializes the PacketEvents event loop,
-     * creates the plugin context, and registers all commands and listeners.
+     * Called when the plugin is enabled. If the JAR integrity check failed
+     * during {@link #onLoad()}, the plugin logs a prominent warning and
+     * disables itself immediately. Otherwise initialises PacketEvents,
+     * enables the plugin context, and registers commands and listeners.
      */
     @Override
     public void onEnable() {
+        if (!integrityVerified) {
+            getLogger().severe("=============================================");
+            getLogger().severe(" JAR INTEGRITY CHECK FAILED!");
+            getLogger().severe(" The plugin JAR has been tampered with.");
+            getLogger().severe(" Please download an official build.");
+            getLogger().severe("=============================================");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+
         PacketEvents.getAPI().init();
         context.enable();
         getLogger().info("BuildBattleAI v" + getDescription().getVersion() + " has been enabled!");
@@ -57,9 +86,14 @@ public final class BuildBattleAI extends JavaPlugin {
      * Called when the plugin is disabled (server shutdown or plugin reload).
      * Gracefully shuts down every plugin service through the uniform
      * {@link PluginContext#shutdown()} pipeline, then terminates PacketEvents.
+     * <p>
+     * If the plugin was never fully initialised (integrity check failure),
+     * the method returns immediately — there is nothing to tear down.
      */
     @Override
     public void onDisable() {
+        if (!integrityVerified || context == null)
+            return;
         context.shutdown();
         PacketEvents.getAPI().terminate();
         getLogger().info("BuildBattleAI has been disabled.");
