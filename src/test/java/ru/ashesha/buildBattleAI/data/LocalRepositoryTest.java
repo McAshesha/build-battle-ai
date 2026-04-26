@@ -39,13 +39,13 @@ class LocalRepositoryTest {
 
     @Test
     void putAndGetReturnsValue() {
-        LocalRepository<String, PlayerData> repo = playerRepo("players.json");
+        LocalRepository<UUID, PlayerData> repo = playerRepo("players.json");
 
         UUID uuid = UUID.randomUUID();
         PlayerData data = new PlayerData(uuid, "Steve");
-        repo.put(uuid.toString(), data);
+        repo.put(uuid, data);
 
-        PlayerData retrieved = repo.get(uuid.toString());
+        PlayerData retrieved = repo.get(uuid);
         assertNotNull(retrieved);
         assertEquals("Steve", retrieved.name());
         assertEquals(uuid, retrieved.uuid());
@@ -53,43 +53,46 @@ class LocalRepositoryTest {
 
     @Test
     void getReturnsNullForMissingKey() {
-        LocalRepository<String, PlayerData> repo = playerRepo("players.json");
-        assertNull(repo.get("nonexistent"));
+        LocalRepository<UUID, PlayerData> repo = playerRepo("players.json");
+        assertNull(repo.get(UUID.randomUUID()));
     }
 
     @Test
     void containsKeyReturnsTrueAfterPut() {
-        LocalRepository<String, PlayerData> repo = playerRepo("players.json");
-        repo.put("key", new PlayerData(UUID.randomUUID(), "Test"));
-        assertTrue(repo.containsKey("key"));
+        LocalRepository<UUID, PlayerData> repo = playerRepo("players.json");
+        UUID key = UUID.randomUUID();
+        repo.put(key, new PlayerData(key, "Test"));
+        assertTrue(repo.containsKey(key));
     }
 
     @Test
     void containsKeyReturnsFalseForMissing() {
-        LocalRepository<String, PlayerData> repo = playerRepo("players.json");
-        assertFalse(repo.containsKey("key"));
+        LocalRepository<UUID, PlayerData> repo = playerRepo("players.json");
+        assertFalse(repo.containsKey(UUID.randomUUID()));
     }
 
     @Test
     void removeDeletesEntry() {
-        LocalRepository<String, PlayerData> repo = playerRepo("players.json");
-        repo.put("key", new PlayerData(UUID.randomUUID(), "Test"));
-        repo.remove("key");
-        assertNull(repo.get("key"));
-        assertFalse(repo.containsKey("key"));
+        LocalRepository<UUID, PlayerData> repo = playerRepo("players.json");
+        UUID key = UUID.randomUUID();
+        repo.put(key, new PlayerData(key, "Test"));
+        repo.remove(key);
+        assertNull(repo.get(key));
+        assertFalse(repo.containsKey(key));
     }
 
     @Test
     void removeNonexistentIsNoOp() {
-        LocalRepository<String, PlayerData> repo = playerRepo("players.json");
-        repo.remove("nonexistent"); // should not throw
+        LocalRepository<UUID, PlayerData> repo = playerRepo("players.json");
+        repo.remove(UUID.randomUUID()); // should not throw
     }
 
     @Test
     void getAllReturnsAllValues() {
-        LocalRepository<String, PlayerData> repo = playerRepo("players.json");
-        repo.put("a", new PlayerData(UUID.randomUUID(), "Alice"));
-        repo.put("b", new PlayerData(UUID.randomUUID(), "Bob"));
+        LocalRepository<UUID, PlayerData> repo = playerRepo("players.json");
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID();
+        repo.put(a, new PlayerData(a, "Alice"));
+        repo.put(b, new PlayerData(b, "Bob"));
 
         Collection<PlayerData> all = repo.getAll();
         assertEquals(2, all.size());
@@ -97,12 +100,14 @@ class LocalRepositoryTest {
 
     @Test
     void getAllReturnsSnapshotNotLiveView() {
-        LocalRepository<String, PlayerData> repo = playerRepo("players.json");
-        repo.put("a", new PlayerData(UUID.randomUUID(), "Alice"));
+        LocalRepository<UUID, PlayerData> repo = playerRepo("players.json");
+        UUID a = UUID.randomUUID();
+        repo.put(a, new PlayerData(a, "Alice"));
         Collection<PlayerData> snapshot = repo.getAll();
 
         // Modify the repo after taking the snapshot
-        repo.put("b", new PlayerData(UUID.randomUUID(), "Bob"));
+        UUID b = UUID.randomUUID();
+        repo.put(b, new PlayerData(b, "Bob"));
 
         // Snapshot should still have only 1 entry
         assertEquals(1, snapshot.size());
@@ -113,11 +118,11 @@ class LocalRepositoryTest {
     @Test
     void flushWritesDataToFile() {
         File file = new File(tempDir, "players.json");
-        LocalRepository<String, PlayerData> repo =
-                new LocalRepository<>(file, gson, String.class, PlayerData.class);
+        LocalRepository<UUID, PlayerData> repo =
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
 
         UUID uuid = UUID.randomUUID();
-        repo.put(uuid.toString(), new PlayerData(uuid, "Steve"));
+        repo.put(uuid, new PlayerData(uuid, "Steve"));
         repo.flush();
 
         assertTrue(file.exists(), "JSON file should be created after flush");
@@ -129,8 +134,8 @@ class LocalRepositoryTest {
     @Test
     void flushIsNoOpWhenNotDirty() {
         File file = new File(tempDir, "players.json");
-        LocalRepository<String, PlayerData> repo =
-                new LocalRepository<>(file, gson, String.class, PlayerData.class);
+        LocalRepository<UUID, PlayerData> repo =
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
 
         // No puts — flush should not create the file
         repo.flush();
@@ -140,10 +145,11 @@ class LocalRepositoryTest {
     @Test
     void flushResetsCleanState() {
         File file = new File(tempDir, "players.json");
-        LocalRepository<String, PlayerData> repo =
-                new LocalRepository<>(file, gson, String.class, PlayerData.class);
+        LocalRepository<UUID, PlayerData> repo =
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
 
-        repo.put("key", new PlayerData(UUID.randomUUID(), "Test"));
+        UUID key = UUID.randomUUID();
+        repo.put(key, new PlayerData(key, "Test"));
         repo.flush();
 
         long lastModified = file.lastModified();
@@ -159,18 +165,18 @@ class LocalRepositoryTest {
         File file = new File(tempDir, "data.json");
 
         // Write data, then create a new repo that loads from the same file
-        LocalRepository<String, PlayerData> repo1 =
-                new LocalRepository<>(file, gson, String.class, PlayerData.class);
+        LocalRepository<UUID, PlayerData> repo1 =
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
         UUID uuid = UUID.randomUUID();
-        repo1.put(uuid.toString(), new PlayerData(uuid, "Steve"));
+        repo1.put(uuid, new PlayerData(uuid, "Steve"));
         repo1.flush();
 
         // New repo should load persisted data
-        LocalRepository<String, PlayerData> repo2 =
-                new LocalRepository<>(file, gson, String.class, PlayerData.class);
+        LocalRepository<UUID, PlayerData> repo2 =
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
         repo2.load();
 
-        PlayerData loaded = repo2.get(uuid.toString());
+        PlayerData loaded = repo2.get(uuid);
         assertNotNull(loaded, "Data should survive save/load cycle");
         assertEquals("Steve", loaded.name());
         assertEquals(uuid, loaded.uuid());
@@ -179,8 +185,8 @@ class LocalRepositoryTest {
     @Test
     void loadFromNonexistentFileStartsEmpty() {
         File file = new File(tempDir, "nonexistent.json");
-        LocalRepository<String, PlayerData> repo =
-                new LocalRepository<>(file, gson, String.class, PlayerData.class);
+        LocalRepository<UUID, PlayerData> repo =
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
         repo.load(); // should not throw
         assertTrue(repo.getAll().isEmpty());
     }
@@ -190,8 +196,8 @@ class LocalRepositoryTest {
         File file = new File(tempDir, "empty.json");
         file.createNewFile();
 
-        LocalRepository<String, PlayerData> repo =
-                new LocalRepository<>(file, gson, String.class, PlayerData.class);
+        LocalRepository<UUID, PlayerData> repo =
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
         repo.load(); // should not throw
         assertTrue(repo.getAll().isEmpty());
     }
@@ -201,8 +207,8 @@ class LocalRepositoryTest {
     @Test
     void playerDataFieldsSurviveRoundTrip() {
         File file = new File(tempDir, "players.json");
-        LocalRepository<String, PlayerData> repo =
-                new LocalRepository<>(file, gson, String.class, PlayerData.class);
+        LocalRepository<UUID, PlayerData> repo =
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
 
         UUID uuid = UUID.randomUUID();
         PlayerData original = new PlayerData(uuid, "Steve");
@@ -214,15 +220,15 @@ class LocalRepositoryTest {
         original.firstJoin(1000000L);
         original.lastPlayed(2000000L);
 
-        repo.put(uuid.toString(), original);
+        repo.put(uuid, original);
         repo.flush();
 
         // Reload in a fresh repo
-        LocalRepository<String, PlayerData> repo2 =
-                new LocalRepository<>(file, gson, String.class, PlayerData.class);
+        LocalRepository<UUID, PlayerData> repo2 =
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
         repo2.load();
 
-        PlayerData loaded = repo2.get(uuid.toString());
+        PlayerData loaded = repo2.get(uuid);
         assertNotNull(loaded);
         assertEquals(uuid, loaded.uuid());
         assertEquals("Steve", loaded.name());
@@ -269,22 +275,22 @@ class LocalRepositoryTest {
     @Test
     void multipleEntriesSurviveRoundTrip() {
         File file = new File(tempDir, "players.json");
-        LocalRepository<String, PlayerData> repo =
-                new LocalRepository<>(file, gson, String.class, PlayerData.class);
+        LocalRepository<UUID, PlayerData> repo =
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
 
         UUID uuid1 = UUID.randomUUID();
         UUID uuid2 = UUID.randomUUID();
-        repo.put(uuid1.toString(), new PlayerData(uuid1, "Alice"));
-        repo.put(uuid2.toString(), new PlayerData(uuid2, "Bob"));
+        repo.put(uuid1, new PlayerData(uuid1, "Alice"));
+        repo.put(uuid2, new PlayerData(uuid2, "Bob"));
         repo.flush();
 
-        LocalRepository<String, PlayerData> repo2 =
-                new LocalRepository<>(file, gson, String.class, PlayerData.class);
+        LocalRepository<UUID, PlayerData> repo2 =
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
         repo2.load();
 
         assertEquals(2, repo2.getAll().size());
-        assertNotNull(repo2.get(uuid1.toString()));
-        assertNotNull(repo2.get(uuid2.toString()));
+        assertNotNull(repo2.get(uuid1));
+        assertNotNull(repo2.get(uuid2));
     }
 
     // -- atomic write safety -------------------------------------------------
@@ -292,10 +298,11 @@ class LocalRepositoryTest {
     @Test
     void flushDoesNotLeaveTmpFileOnSuccess() {
         File file = new File(tempDir, "data.json");
-        LocalRepository<String, PlayerData> repo =
-                new LocalRepository<>(file, gson, String.class, PlayerData.class);
+        LocalRepository<UUID, PlayerData> repo =
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
 
-        repo.put("key", new PlayerData(UUID.randomUUID(), "Test"));
+        UUID key = UUID.randomUUID();
+        repo.put(key, new PlayerData(key, "Test"));
         repo.flush();
 
         File tmpFile = new File(tempDir, "data.json.tmp");
@@ -304,9 +311,9 @@ class LocalRepositoryTest {
 
     // -- helpers ------------------------------------------------------------
 
-    private LocalRepository<String, PlayerData> playerRepo(String filename) {
+    private LocalRepository<UUID, PlayerData> playerRepo(String filename) {
         File file = new File(tempDir, filename);
-        return new LocalRepository<>(file, gson, String.class, PlayerData.class);
+        return new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
     }
 
     private static String readFile(File file) {

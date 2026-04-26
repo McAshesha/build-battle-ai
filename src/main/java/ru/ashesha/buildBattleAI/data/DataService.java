@@ -10,8 +10,10 @@ import ru.ashesha.buildBattleAI.data.api.BBAIDataService;
 import ru.ashesha.buildBattleAI.data.api.PlayerData;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -51,8 +53,8 @@ public class DataService implements BBAIDataService, PluginService {
     /** The active storage backend, or {@code null} if disabled. */
     private DataProvider provider;
 
-    /** Player data repository, backed by the active provider. */
-    private DataRepository<String, PlayerData> playerRepo;
+    /** Player data repository, keyed by player UUID. */
+    private DataRepository<UUID, PlayerData> playerRepo;
 
     /** Arena stats repository, backed by the active provider. */
     private DataRepository<String, ArenaStats> arenaStatsRepo;
@@ -116,7 +118,7 @@ public class DataService implements BBAIDataService, PluginService {
         }
 
         // Obtain typed repositories
-        playerRepo = provider.getRepository(PLAYERS_REPO, String.class, PlayerData.class);
+        playerRepo = provider.getRepository(PLAYERS_REPO, UUID.class, PlayerData.class);
         arenaStatsRepo = provider.getRepository(ARENA_STATS_REPO, String.class, ArenaStats.class);
         enabled = true;
 
@@ -155,7 +157,7 @@ public class DataService implements BBAIDataService, PluginService {
     public PlayerData getPlayer(UUID uuid) {
         if (!enabled)
             return null;
-        return playerRepo.get(uuid.toString());
+        return playerRepo.get(uuid);
     }
 
     @Override
@@ -163,15 +165,14 @@ public class DataService implements BBAIDataService, PluginService {
         if (!enabled)
             return new PlayerData(uuid, name);
 
-        String key = uuid.toString();
-        PlayerData data = playerRepo.get(key);
+        PlayerData data = playerRepo.get(uuid);
         if (data == null) {
             data = new PlayerData(uuid, name);
-            playerRepo.put(key, data);
+            playerRepo.put(uuid, data);
         } else if (!name.equals(data.name())) {
             // Update the stored name if the player renamed themselves
             data.name(name);
-            playerRepo.put(key, data);
+            playerRepo.put(uuid, data);
         }
         return data;
     }
@@ -180,7 +181,7 @@ public class DataService implements BBAIDataService, PluginService {
     public void savePlayer(PlayerData data) {
         if (!enabled)
             return;
-        playerRepo.put(data.uuid().toString(), data);
+        playerRepo.put(data.uuid(), data);
     }
 
     @Override
@@ -256,11 +257,71 @@ public class DataService implements BBAIDataService, PluginService {
      * @return the Ignite provider, or a local fallback on class-not-found
      */
     private DataProvider createIgniteProvider(YamlConfiguration config) {
-        // TODO: Phase 2 — implement Ignite provider creation
-        // This method will instantiate IgniteEmbeddedProvider or IgniteThinProvider
-        // based on config.getString("data.ignite.mode"). For now, fall back to local.
-        plugin.getLogger().warning("Ignite provider is not yet implemented. Falling back to local storage.");
-        return createLocalProvider(config);
+        try {
+            String mode = config.getString("data.ignite.mode", "server");
+
+            if ("thin-client".equals(mode))
+                return createIgniteThinProvider(config);
+            else
+                return createIgniteEmbeddedProvider(config, "thick-client".equals(mode));
+        } catch (NoClassDefFoundError e) {
+            plugin.getLogger().severe("Apache Ignite classes not found on classpath! "
+                    + "Falling back to local file storage. Add ignite-core to the server classpath "
+                    + "or switch to provider: local in config.yml.");
+            return createLocalProvider(config);
+        }
+    }
+
+    /**
+     * Creates an embedded Ignite provider (server or thick-client mode).
+     * Reads all Ignite-specific config keys from the {@code data.ignite.*} section.
+     *
+     * @param config     the plugin configuration
+     * @param clientMode {@code true} for thick-client, {@code false} for server
+     * @return the embedded provider
+     */
+    private DataProvider createIgniteEmbeddedProvider(YamlConfiguration config, boolean clientMode) {
+        String instanceName = config.getString("data.ignite.instance-name", "BuildBattleAI");
+        boolean persistence = config.getBoolean("data.ignite.persistence-enabled", false);
+        String workDir = config.getString("data.ignite.work-directory", "ignite");
+        boolean quietMode = config.getBoolean("data.ignite.quiet-mode", true);
+        long metricsFreq = config.getLong("data.ignite.metrics-log-frequency", 0L);
+        int initialMb = config.getInt("data.ignite.initial-memory-mb", 64);
+        int maxMb = config.getInt("data.ignite.max-memory-mb", 128);
+
+        List<String> addresses = new ArrayList<>();
+        List<?> rawAddresses = config.getList("data.ignite.discovery-addresses");
+        if (rawAddresses != null)
+            for (Object addr : rawAddresses)
+                addresses.add(String.valueOf(addr));
+        if (addresses.isEmpty())
+            addresses.add("127.0.0.1:47500..47509");
+
+        File workDirectory = new File(plugin.getDataFolder(), workDir);
+
+        return new IgniteEmbeddedProvider(
+                clientMode, instanceName, persistence, workDirectory,
+                quietMode, metricsFreq, initialMb, maxMb, addresses);
+    }
+
+    /**
+     * Creates a thin-client Ignite provider. Reads the thin-client
+     * connection addresses from the {@code data.ignite.thin-client-addresses}
+     * config section.
+     *
+     * @param config the plugin configuration
+     * @return the thin-client provider
+     */
+    private DataProvider createIgniteThinProvider(YamlConfiguration config) {
+        List<String> addresses = new ArrayList<>();
+        List<?> rawAddresses = config.getList("data.ignite.thin-client-addresses");
+        if (rawAddresses != null)
+            for (Object addr : rawAddresses)
+                addresses.add(String.valueOf(addr));
+        if (addresses.isEmpty())
+            addresses.add("127.0.0.1:10800");
+
+        return new IgniteThinProvider(addresses);
     }
 
     /**
