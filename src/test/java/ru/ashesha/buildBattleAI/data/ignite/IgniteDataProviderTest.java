@@ -1,7 +1,8 @@
-package ru.ashesha.buildBattleAI.data;
+package ru.ashesha.buildBattleAI.data.ignite;
 
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
+import ru.ashesha.buildBattleAI.data.DataRepository;
 import ru.ashesha.buildBattleAI.data.api.ArenaStats;
 import ru.ashesha.buildBattleAI.data.api.PlayerData;
 

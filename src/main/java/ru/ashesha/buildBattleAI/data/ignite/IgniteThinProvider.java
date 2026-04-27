@@ -1,4 +1,4 @@
-package ru.ashesha.buildBattleAI.data;
+package ru.ashesha.buildBattleAI.data.ignite;
 
 import org.apache.ignite.Ignition;
 import org.apache.ignite.client.ClientCache;
@@ -7,6 +7,8 @@ import org.apache.ignite.client.IgniteClient;
 import org.apache.ignite.cache.CacheAtomicityMode;
 import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.configuration.ClientConfiguration;
+import ru.ashesha.buildBattleAI.data.DataProvider;
+import ru.ashesha.buildBattleAI.data.DataRepository;
 
 import java.util.HashMap;
 import java.util.List;
@@ -22,7 +24,7 @@ import java.util.Map;
  * <p>
  * Requires at least one running Ignite server node in the cluster. If no
  * server is reachable, {@link #start()} fails with a connection exception
- * and the {@link DataService} falls back gracefully.
+ * and the {@link ru.ashesha.buildBattleAI.data.DataService DataService} falls back gracefully.
  * <p>
  * The thin client protocol (port 10800 by default) is separate from the
  * thick client / server discovery protocol (port 47500). Both are configured
@@ -30,7 +32,7 @@ import java.util.Map;
  *
  * @see IgniteEmbeddedProvider
  */
-class IgniteThinProvider implements DataProvider {
+public class IgniteThinProvider implements DataProvider {
 
     /** Remote server addresses for the thin-client connection. */
     private final List<String> addresses;
@@ -46,7 +48,7 @@ class IgniteThinProvider implements DataProvider {
      *
      * @param addresses server addresses (e.g. {@code "127.0.0.1:10800"})
      */
-    IgniteThinProvider(List<String> addresses) {
+    public IgniteThinProvider(List<String> addresses) {
         this.addresses = addresses;
     }
 

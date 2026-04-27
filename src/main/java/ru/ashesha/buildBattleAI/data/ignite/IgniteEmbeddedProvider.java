@@ -1,4 +1,4 @@
-package ru.ashesha.buildBattleAI.data;
+package ru.ashesha.buildBattleAI.data.ignite;
 
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
@@ -12,6 +12,8 @@ import org.apache.ignite.cache.CacheAtomicityMode;
 import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
+import ru.ashesha.buildBattleAI.data.DataProvider;
+import ru.ashesha.buildBattleAI.data.DataRepository;
 
 import java.io.File;
 import java.util.HashMap;
@@ -36,7 +38,7 @@ import java.util.Map;
  *
  * @see IgniteThinProvider
  */
-class IgniteEmbeddedProvider implements DataProvider {
+public class IgniteEmbeddedProvider implements DataProvider {
 
     /** Whether this node runs as a thick client (true) or full server (false). */
     private final boolean clientMode;
@@ -84,7 +86,7 @@ class IgniteEmbeddedProvider implements DataProvider {
      * @param maxMemoryMb        maximum data region size in megabytes
      * @param discoveryAddresses static addresses for TCP discovery
      */
-    IgniteEmbeddedProvider(boolean clientMode, String instanceName,
+    public IgniteEmbeddedProvider(boolean clientMode, String instanceName,
                            boolean persistenceEnabled, File workDirectory,
                            boolean quietMode, long metricsLogFrequency,
                            int initialMemoryMb, int maxMemoryMb,

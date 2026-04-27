@@ -1,8 +1,9 @@
-package ru.ashesha.buildBattleAI.data;
+package ru.ashesha.buildBattleAI.data.ignite;
 
 import org.apache.ignite.IgniteCache;
 import org.apache.ignite.cache.query.QueryCursor;
 import org.apache.ignite.cache.query.ScanQuery;
+import ru.ashesha.buildBattleAI.data.DataRepository;
 
 import javax.cache.Cache;
 import java.util.ArrayList;

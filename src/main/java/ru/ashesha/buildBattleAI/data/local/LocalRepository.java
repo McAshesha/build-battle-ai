@@ -1,8 +1,9 @@
-package ru.ashesha.buildBattleAI.data;
+package ru.ashesha.buildBattleAI.data.local;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import lombok.NonNull;
+import ru.ashesha.buildBattleAI.data.DataRepository;
 
 import java.io.*;
 import java.lang.reflect.Type;
@@ -17,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * dominate the access pattern in a game server). Writes update the map
  * immediately (visible to all threads) but disk persistence is deferred
  * until an explicit {@link #flush()} call — the auto-save scheduler in
- * {@link DataService} triggers these periodically.
+ * {@link ru.ashesha.buildBattleAI.data.DataService DataService} triggers these periodically.
  * <p>
  * The JSON file format is a map from string keys to value objects:
  * <pre>{@code

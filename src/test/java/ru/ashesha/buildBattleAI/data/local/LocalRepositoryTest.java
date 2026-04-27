@@ -1,4 +1,4 @@
-package ru.ashesha.buildBattleAI.data;
+package ru.ashesha.buildBattleAI.data.local;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;

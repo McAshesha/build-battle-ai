@@ -16,7 +16,7 @@ package ru.ashesha.buildBattleAI.data;
  * Implementations are package-private and instantiated by {@link DataService}
  * based on the {@code data.provider} configuration key.
  */
-interface DataProvider {
+public interface DataProvider {
 
     /**
      * Starts the provider — opens connections, creates directories,

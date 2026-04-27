@@ -17,7 +17,7 @@ import java.util.Collection;
  * @param <K> key type (typically {@code String})
  * @param <V> value type (e.g. {@code PlayerData}, {@code ArenaStats})
  */
-interface DataRepository<K, V> {
+public interface DataRepository<K, V> {
 
     /**
      * Retrieves a value by key.

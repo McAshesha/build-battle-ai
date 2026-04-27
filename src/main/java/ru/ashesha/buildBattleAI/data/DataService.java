@@ -8,6 +8,9 @@ import ru.ashesha.buildBattleAI.core.PluginService;
 import ru.ashesha.buildBattleAI.data.api.ArenaStats;
 import ru.ashesha.buildBattleAI.data.api.BBAIDataService;
 import ru.ashesha.buildBattleAI.data.api.PlayerData;
+import ru.ashesha.buildBattleAI.data.ignite.IgniteEmbeddedProvider;
+import ru.ashesha.buildBattleAI.data.ignite.IgniteThinProvider;
+import ru.ashesha.buildBattleAI.data.local.LocalDataProvider;
 
 import java.io.File;
 import java.util.ArrayList;

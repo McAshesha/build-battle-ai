@@ -1,8 +1,10 @@
-package ru.ashesha.buildBattleAI.data;
+package ru.ashesha.buildBattleAI.data.local;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import lombok.NonNull;
+import ru.ashesha.buildBattleAI.data.DataProvider;
+import ru.ashesha.buildBattleAI.data.DataRepository;
 
 import java.io.File;
 import java.util.HashMap;
@@ -23,7 +25,7 @@ import java.util.Map;
  *
  * @see LocalRepository
  */
-class LocalDataProvider implements DataProvider {
+public class LocalDataProvider implements DataProvider {
 
     /** The directory where JSON data files are stored. */
     private final File dataDir;
@@ -39,7 +41,7 @@ class LocalDataProvider implements DataProvider {
      *
      * @param dataDir the data directory (created on {@link #start()} if missing)
      */
-    LocalDataProvider(@NonNull File dataDir) {
+    public LocalDataProvider(@NonNull File dataDir) {
         this.dataDir = dataDir;
         this.gson = new GsonBuilder().setPrettyPrinting().create();
     }
