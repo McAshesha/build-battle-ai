@@ -93,6 +93,7 @@ public class MessageService implements BBAIMessageService, PluginService {
         this.tabMicroService = new TabMicroService(plugin);
         this.nameMicroService = new NameMicroService(plugin);
         this.boardMicroService = new BoardMicroService(plugin);
+        plugin.getPluginLogger().debug("MessageService enabled (6 micro-services initialized).");
     }
 
     /**
@@ -100,5 +101,6 @@ public class MessageService implements BBAIMessageService, PluginService {
      */
     @Override
     public void shutdown() {
+        // Intentionally empty — micro-services are stateless.
     }
 }

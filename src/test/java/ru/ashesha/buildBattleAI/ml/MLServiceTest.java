@@ -2,6 +2,7 @@ package ru.ashesha.buildBattleAI.ml;
 
 import org.junit.jupiter.api.Test;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
+import ru.ashesha.buildBattleAI.core.PluginLogger;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -104,6 +105,7 @@ class MLServiceTest {
     @Test
     void trailingSlashIsStripped() {
         BuildBattleAI plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
         when(plugin.getLogger()).thenReturn(Logger.getLogger("MLServiceTest"));
         // Constructor should strip trailing slash — we can't inspect the field
         // directly, but the service should not throw on construction
@@ -114,6 +116,7 @@ class MLServiceTest {
     @Test
     void noTrailingSlashIsUnchanged() {
         BuildBattleAI plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
         when(plugin.getLogger()).thenReturn(Logger.getLogger("MLServiceTest"));
         MLService service = new MLService(plugin, "http://localhost:8001");
         assertNotNull(service);
@@ -122,6 +125,7 @@ class MLServiceTest {
     @Test
     void defaultConstructorDoesNotThrow() {
         BuildBattleAI plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
         when(plugin.getLogger()).thenReturn(Logger.getLogger("MLServiceTest"));
         MLService service = new MLService(plugin);
         assertNotNull(service);
@@ -132,6 +136,7 @@ class MLServiceTest {
     @Test
     void enableIsNoOp() {
         BuildBattleAI plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
         when(plugin.getLogger()).thenReturn(Logger.getLogger("MLServiceTest"));
         MLService service = new MLService(plugin);
         assertDoesNotThrow(service::enable);
@@ -140,6 +145,7 @@ class MLServiceTest {
     @Test
     void shutdownIsNoOp() {
         BuildBattleAI plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
         when(plugin.getLogger()).thenReturn(Logger.getLogger("MLServiceTest"));
         MLService service = new MLService(plugin);
         assertDoesNotThrow(service::shutdown);
@@ -148,6 +154,7 @@ class MLServiceTest {
     @Test
     void multipleEnableShutdownCyclesAreIdempotent() {
         BuildBattleAI plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
         when(plugin.getLogger()).thenReturn(Logger.getLogger("MLServiceTest"));
         MLService service = new MLService(plugin);
         service.enable();
@@ -162,6 +169,7 @@ class MLServiceTest {
     @Test
     void predictWithoutServerThrows() {
         BuildBattleAI plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
         when(plugin.getLogger()).thenReturn(Logger.getLogger("MLServiceTest"));
         MLService service = new MLService(plugin, "http://localhost:99999");
 
@@ -173,6 +181,7 @@ class MLServiceTest {
     @Test
     void healthWithoutServerThrows() {
         BuildBattleAI plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
         when(plugin.getLogger()).thenReturn(Logger.getLogger("MLServiceTest"));
         MLService service = new MLService(plugin, "http://localhost:99999");
 
@@ -182,6 +191,7 @@ class MLServiceTest {
     @Test
     void centroidsWithoutServerThrows() {
         BuildBattleAI plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
         when(plugin.getLogger()).thenReturn(Logger.getLogger("MLServiceTest"));
         MLService service = new MLService(plugin, "http://localhost:99999");
 

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.config.api.BBAIConfigService;
+import ru.ashesha.buildBattleAI.core.PluginLogger;
 import ru.ashesha.buildBattleAI.core.PluginContext;
 import ru.ashesha.buildBattleAI.data.api.ArenaStats;
 import ru.ashesha.buildBattleAI.data.api.PlayerData;
@@ -44,6 +45,7 @@ class DataServiceTest {
     @BeforeEach
     void setUp() {
         plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
         context = mock(PluginContext.class);
         configService = mock(BBAIConfigService.class);
 

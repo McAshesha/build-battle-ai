@@ -29,7 +29,7 @@ public class GameManager implements BBAIGameManager, PluginService {
      */
     @Override
     public void enable() {
-        plugin.getLogger().info("GameManager enabled.");
+        plugin.getPluginLogger().info("GameManager enabled.");
     }
 
     /**
@@ -38,6 +38,6 @@ public class GameManager implements BBAIGameManager, PluginService {
      */
     @Override
     public void shutdown() {
-        plugin.getLogger().info("GameManager shut down.");
+        plugin.getPluginLogger().debug("GameManager shut down.");
     }
 }

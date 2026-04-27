@@ -28,7 +28,7 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
      */
     @Override
     public void enable() {
-        plugin.getLogger().info("ArenaManager enabled.");
+        plugin.getPluginLogger().info("ArenaManager enabled.");
     }
 
     /**
@@ -37,6 +37,6 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
      */
     @Override
     public void shutdown() {
-        plugin.getLogger().info("ArenaManager shut down.");
+        plugin.getPluginLogger().debug("ArenaManager shut down.");
     }
 }

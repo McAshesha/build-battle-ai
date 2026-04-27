@@ -6,6 +6,7 @@ import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder
 import lombok.Getter;
 import org.bukkit.plugin.java.JavaPlugin;
 import ru.ashesha.buildBattleAI.core.PluginContext;
+import ru.ashesha.buildBattleAI.core.PluginLogger;
 import ru.ashesha.buildBattleAI.util.JarIntegrityVerifier;
 
 /**
@@ -28,6 +29,13 @@ public final class BuildBattleAI extends JavaPlugin {
     private PluginContext context;
 
     /**
+     * Configurable plugin logger that respects the {@code log-level} setting
+     * in {@code config.yml}. Created in {@link #onLoad()} so it is available
+     * to all services from the very start of the lifecycle.
+     */
+    private PluginLogger pluginLogger;
+
+    /**
      * Set to {@code false} in {@link #onLoad()} when the JAR's digital
      * signature is broken — the plugin refuses to enable in that case.
      */
@@ -44,9 +52,13 @@ public final class BuildBattleAI extends JavaPlugin {
     @SuppressWarnings("UnstableApiUsage")
     @Override
     public void onLoad() {
+        // Create the plugin logger early so all services can use it
+        pluginLogger = new PluginLogger(getLogger());
+
         // Integrity gate — must run before any other initialisation.
         if (!JarIntegrityVerifier.verify(getClass(), getLogger())) {
             integrityVerified = false;
+            pluginLogger.error("JAR integrity verification failed — aborting plugin load.");
             return;
         }
 

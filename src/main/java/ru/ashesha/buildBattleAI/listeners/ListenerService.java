@@ -53,6 +53,7 @@ public class ListenerService implements PluginService {
         listener.registeredPacketListener = PacketEvents.getAPI().getEventManager()
                 .registerListener(listener, listener.priority);
         registeredListeners.add(listener);
+        plugin.getPluginLogger().debug("Registered listener %s.", listener.getClass().getSimpleName());
     }
 
     /**
@@ -88,6 +89,8 @@ public class ListenerService implements PluginService {
      */
     @Override
     public void shutdown() {
+        if (!registeredListeners.isEmpty())
+            plugin.getPluginLogger().debug("ListenerService unregistering %d listener(s).", registeredListeners.size());
         for (PluginListener listener : registeredListeners) {
             HandlerList.unregisterAll(listener);
             if (listener.registeredPacketListener != null) {

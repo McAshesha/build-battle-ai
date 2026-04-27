@@ -12,6 +12,8 @@ import ru.ashesha.buildBattleAI.data.ignite.IgniteEmbeddedProvider;
 import ru.ashesha.buildBattleAI.data.ignite.IgniteThinProvider;
 import ru.ashesha.buildBattleAI.data.local.LocalDataProvider;
 
+import ru.ashesha.buildBattleAI.core.PluginLogger;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -93,13 +95,16 @@ public class DataService implements BBAIDataService, PluginService {
     public void enable() {
         YamlConfiguration config = plugin.getContext().getConfigService().config();
 
+        PluginLogger log = plugin.getPluginLogger();
+
         // Check if data storage is enabled at all
         if (!config.getBoolean("data.enabled", true)) {
-            plugin.getLogger().info("DataService is disabled in config.");
+            log.info("DataService is disabled in config.");
             return;
         }
 
         String providerType = config.getString("data.provider", "local");
+        log.debug("DataService initializing with provider '%s'.", providerType);
 
         // Create the appropriate provider
         if ("ignite".equals(providerType))
@@ -110,12 +115,13 @@ public class DataService implements BBAIDataService, PluginService {
         // Start the provider (open connections, create directories, etc.)
         try {
             if (provider == null) {
-                plugin.getLogger().severe("Failed to create data provider. DataService disabled.");
+                log.error("Failed to create data provider. DataService disabled.");
                 return;
             }
             provider.start();
+            log.debug("Data provider started successfully.");
         } catch (Throwable e) {
-            plugin.getLogger().severe("Failed to start data provider: " + e.getMessage());
+            log.error("Failed to start data provider: " + e.getMessage());
             provider = null;
             return;
         }
@@ -129,7 +135,7 @@ public class DataService implements BBAIDataService, PluginService {
         if ("local".equals(providerType))
             scheduleAutoSave(config);
 
-        plugin.getLogger().info("DataService enabled (provider: " + providerType + ").");
+        log.info("DataService enabled (provider: %s).", providerType);
     }
 
     /**
@@ -142,11 +148,13 @@ public class DataService implements BBAIDataService, PluginService {
         if (autoSaveTask != null) {
             autoSaveTask.cancel();
             autoSaveTask = null;
+            plugin.getPluginLogger().debug("DataService auto-save task cancelled.");
         }
 
         if (provider != null) {
             provider.stop();
             provider = null;
+            plugin.getPluginLogger().debug("DataService provider stopped.");
         }
 
         playerRepo = null;
@@ -268,7 +276,7 @@ public class DataService implements BBAIDataService, PluginService {
             else
                 return createIgniteEmbeddedProvider(config, "thick-client".equals(mode));
         } catch (NoClassDefFoundError e) {
-            plugin.getLogger().severe("Apache Ignite classes not found on classpath! "
+            plugin.getPluginLogger().error("Apache Ignite classes not found on classpath! "
                     + "Falling back to local file storage. Add ignite-core to the server classpath "
                     + "or switch to provider: local in config.yml.");
             return createLocalProvider(config);
@@ -336,9 +344,12 @@ public class DataService implements BBAIDataService, PluginService {
      */
     private void scheduleAutoSave(YamlConfiguration config) {
         int intervalSec = config.getInt("data.local.auto-save-interval", 300);
-        if (intervalSec <= 0)
+        if (intervalSec <= 0) {
+            plugin.getPluginLogger().debug("Auto-save disabled (interval <= 0).");
             return;
+        }
 
+        plugin.getPluginLogger().debug("Scheduling auto-save every %d seconds.", intervalSec);
         long intervalTicks = intervalSec * 20L;
         autoSaveTask = plugin.getServer().getScheduler().runTaskTimerAsynchronously(
                 plugin,

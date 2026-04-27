@@ -158,6 +158,8 @@ public class NPCService implements BBAINPCService, PluginService {
         this.playerInfoRemoveFactory = resolvePlayerInfoRemoveFactory(version);
         this.spawnFactory = resolveSpawnFactory(version);
         this.skinLayersIndex = resolveSkinLayersIndex(version);
+        plugin.getPluginLogger().debug("NPCService enabled (version: %s, skinLayersIndex: %d).",
+                version.name(), skinLayersIndex);
     }
 
     // ── public API ──────────────────────────────────────────────────────────
@@ -171,6 +173,7 @@ public class NPCService implements BBAINPCService, PluginService {
         profile.setTextureProperties(Collections.singletonList(
                 new TextureProperty("textures", texture, signature)
         ));
+        plugin.getPluginLogger().debug("Created NPC '%s' (entityId: %d).", name, entityId);
         return new NPC(entityId, profile);
     }
 
@@ -213,6 +216,8 @@ public class NPCService implements BBAINPCService, PluginService {
     public void spawn(@NonNull Collection<Player> viewers, @NonNull NPC npc, @NonNull Location location) {
         if (viewers.isEmpty())
             return;
+        plugin.getPluginLogger().debug("Spawning NPC %d for %d viewer(s) at [%.1f, %.1f, %.1f].",
+                npc.entityId, viewers.size(), location.getX(), location.getY(), location.getZ());
 
         UserProfile profile = npc.profile;
         int entityId = npc.entityId;

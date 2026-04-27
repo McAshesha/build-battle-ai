@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
+import ru.ashesha.buildBattleAI.core.PluginLogger;
 
 import java.util.logging.Logger;
 
@@ -18,14 +19,14 @@ import static org.mockito.Mockito.*;
 class GameManagerTest {
 
     private BuildBattleAI plugin;
-    private Logger logger;
+    private PluginLogger pluginLogger;
     private GameManager manager;
 
     @BeforeEach
     void setUp() {
         plugin = mock(BuildBattleAI.class);
-        logger = mock(Logger.class);
-        when(plugin.getLogger()).thenReturn(logger);
+        pluginLogger = mock(PluginLogger.class);
+        when(plugin.getPluginLogger()).thenReturn(pluginLogger);
         manager = new GameManager(plugin);
     }
 
@@ -37,20 +38,20 @@ class GameManagerTest {
     @Test
     void enableLogsMessage() {
         manager.enable();
-        verify(logger).info("GameManager enabled.");
+        verify(pluginLogger).info("GameManager enabled.");
     }
 
     @Test
     void shutdownLogsMessage() {
         manager.shutdown();
-        verify(logger).info("GameManager shut down.");
+        verify(pluginLogger).debug("GameManager shut down.");
     }
 
     @Test
     void shutdownCanBeCalledMultipleTimes() {
         manager.shutdown();
         manager.shutdown();
-        verify(logger, times(2)).info("GameManager shut down.");
+        verify(pluginLogger, times(2)).debug("GameManager shut down.");
     }
 
     @Test
@@ -58,8 +59,8 @@ class GameManagerTest {
         // Default PluginService.reload() must run shutdown before enable so
         // the service is re-bootstrapped exactly as on a fresh server start.
         manager.reload();
-        InOrder order = inOrder(logger);
-        order.verify(logger).info("GameManager shut down.");
-        order.verify(logger).info("GameManager enabled.");
+        InOrder order = inOrder(pluginLogger);
+        order.verify(pluginLogger).debug("GameManager shut down.");
+        order.verify(pluginLogger).info("GameManager enabled.");
     }
 }

@@ -232,6 +232,7 @@ public class MLService implements BBAIMLService, PluginService {
     @Override
     @NonNull
     public PredictionResult predict(byte @NonNull [] rgbPixels, int width, int height, int topK) {
+        plugin.getPluginLogger().debug("Encoding %dx%d image to PNG for prediction (topK: %d).", width, height, topK);
         byte[] pngData = encodeToPng(rgbPixels, width, height);
         return predictImage(pngData, topK);
     }
@@ -239,6 +240,7 @@ public class MLService implements BBAIMLService, PluginService {
     @Override
     @NonNull
     public PredictionResult predictImage(byte @NonNull [] imageData, int topK) {
+        plugin.getPluginLogger().debug("Sending prediction request (%d bytes, topK: %d).", imageData.length, topK);
         String base64 = "data:image/png;base64," + Base64.getEncoder().encodeToString(imageData);
 
         JsonObject request = new JsonObject();
@@ -246,14 +248,21 @@ public class MLService implements BBAIMLService, PluginService {
         request.addProperty("top_k", topK);
 
         JsonObject response = postJson(baseUrl + "/predict", request);
-        return parsePredictionResult(response);
+        PredictionResult result = parsePredictionResult(response);
+        plugin.getPluginLogger().debug("Prediction result: class='%s', score=%.4f.",
+                result.predictedClass(), result.predictedScore());
+        return result;
     }
 
     @Override
     @NonNull
     public HealthInfo health() {
+        plugin.getPluginLogger().debug("Checking ML service health at %s/health.", baseUrl);
         JsonObject response = getJson(baseUrl + "/health");
-        return parseHealthInfo(response);
+        HealthInfo info = parseHealthInfo(response);
+        plugin.getPluginLogger().debug("ML service healthy: model='%s', device='%s', %d classes.",
+                info.modelName(), info.device(), info.numClasses());
+        return info;
     }
 
     @Override
@@ -276,7 +285,7 @@ public class MLService implements BBAIMLService, PluginService {
      */
     @Override
     public void enable() {
-        // Intentionally empty — REST proxy has nothing to initialize per-cycle.
+        plugin.getPluginLogger().debug("MLService enabled (endpoint: %s).", baseUrl);
     }
 
     @Override

@@ -1,3 +1,13 @@
+# ── Logging ──────────────────────────────────────────────────────────────
+# Controls the verbosity of plugin console output.
+# Levels: debug, info, warn, error, off
+#   debug - All messages including verbose diagnostics (useful for development)
+#   info  - Normal operational messages, warnings, and errors (default)
+#   warn  - Only warnings and errors
+#   error - Only critical errors
+#   off   - Suppress all plugin log output
+log-level: info
+
 default-language: en
 
 # ── Data Storage ─────────────────────────────────────────────────────────

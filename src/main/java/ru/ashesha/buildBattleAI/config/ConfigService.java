@@ -5,6 +5,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.config.api.BBAIConfigService;
 import ru.ashesha.buildBattleAI.config.api.Lang;
+import ru.ashesha.buildBattleAI.core.PluginLogger;
 import ru.ashesha.buildBattleAI.core.PluginService;
 
 import java.io.*;
@@ -126,6 +127,14 @@ public class ConfigService implements BBAIConfigService, PluginService {
         configFile = new File(dataFolder, CONFIG_FILE);
         config = loadWithDefaults(CONFIG_FILE, configFile);
 
+        // Apply the configured log level to the plugin logger immediately so
+        // all subsequent service enable() calls log at the desired verbosity.
+        PluginLogger log = plugin.getPluginLogger();
+        String rawLevel = config.getString("log-level", "info");
+        PluginLogger.LogLevel logLevel = PluginLogger.LogLevel.fromString(rawLevel);
+        log.setLevel(logLevel);
+        log.debug("Log level set to %s (from config value '%s').", logLevel, rawLevel);
+
         // Phase 2: language files
         langDir = new File(dataFolder, LANG_DIR);
         if (!langDir.exists())
@@ -139,6 +148,7 @@ public class ConfigService implements BBAIConfigService, PluginService {
             File langFile = new File(langDir, name + ".yml");
             YamlConfiguration langConfig = loadWithDefaults(resourcePath, langFile);
             langConfigs.put(name, langConfig);
+            log.debug("Loaded bundled language '%s' (%d keys).", name, langConfig.getKeys(true).size());
         }
 
         // Load any additional user-created language files (e.g. ru.yml, de.yml).
@@ -153,9 +163,8 @@ public class ConfigService implements BBAIConfigService, PluginService {
             Map.Entry<String, YamlConfiguration> first = langConfigs.entrySet().iterator().next();
             defaultLangName = first.getKey();
             defaultLangConfig = first.getValue();
-            plugin.getLogger().warning("Default language '"
-                    + config.getString("default-language")
-                    + "' not found, falling back to '" + defaultLangName + "'.");
+            log.warn("Default language '%s' not found, falling back to '%s'.",
+                    config.getString("default-language"), defaultLangName);
         }
 
         // Merge missing keys from the default language into every other
@@ -183,9 +192,8 @@ public class ConfigService implements BBAIConfigService, PluginService {
             arenaDir.mkdirs();
         loadDirectory(arenaDir, arenaConfigs);
 
-        plugin.getLogger().info("ConfigService enabled ("
-                + langConfigs.size() + " language(s), "
-                + arenaConfigs.size() + " arena(s)).");
+        log.info("ConfigService enabled (%d language(s), %d arena(s)).",
+                langConfigs.size(), arenaConfigs.size());
     }
 
     /**
@@ -314,7 +322,7 @@ public class ConfigService implements BBAIConfigService, PluginService {
             config.loadFromString(content);
             return config;
         } catch (Throwable e) {
-            plugin.getLogger().warning("Failed to load resource " + path + ": " + e.getMessage());
+            plugin.getPluginLogger().warn("Failed to load resource %s: %s", path, e.getMessage());
             return null;
         }
     }
@@ -336,7 +344,7 @@ public class ConfigService implements BBAIConfigService, PluginService {
             String content = readStream(new FileInputStream(file));
             config.loadFromString(content);
         } catch (Throwable e) {
-            plugin.getLogger().warning("Failed to load " + file.getName() + ": " + e.getMessage());
+            plugin.getPluginLogger().warn("Failed to load %s: %s", file.getName(), e.getMessage());
         }
         return config;
     }
@@ -361,7 +369,7 @@ public class ConfigService implements BBAIConfigService, PluginService {
             writer.flush();
             writer.close();
         } catch (IOException e) {
-            plugin.getLogger().warning("Failed to save " + file.getName() + ": " + e.getMessage());
+            plugin.getPluginLogger().warn("Failed to save %s: %s", file.getName(), e.getMessage());
         }
     }
 

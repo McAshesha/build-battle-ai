@@ -10,12 +10,14 @@ import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.commands.CommandService.PluginCommand;
+import ru.ashesha.buildBattleAI.core.PluginLogger;
 import ru.ashesha.buildBattleAI.util.ReflectionUtils;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -47,6 +49,7 @@ class CommandServiceTest {
     @BeforeEach
     void setUp() {
         plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
         when(plugin.getName()).thenReturn("BuildBattleAI");
         commandMap = mock(CommandMap.class);
         knownCommands = new HashMap<>();

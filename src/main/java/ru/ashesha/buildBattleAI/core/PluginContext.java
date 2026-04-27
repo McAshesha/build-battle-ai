@@ -30,6 +30,8 @@ import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.ml.MLService;
 import ru.ashesha.buildBattleAI.ml.api.BBAIMLService;
 import ru.ashesha.buildBattleAI.render.RenderService;
+import ru.ashesha.buildBattleAI.world.WorldService;
+import ru.ashesha.buildBattleAI.world.api.BBAIWorldService;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -68,6 +70,8 @@ public class PluginContext {
     private final BBAIConfigService configService;
     @Getter
     private final BBAIDataService dataService;
+    @Getter
+    private final BBAIWorldService worldService;
     @Getter
     private final BBAIArenaManager arenaManager;
     @Getter
@@ -118,6 +122,7 @@ public class PluginContext {
         // services, then command / listener / render plumbing.
         ConfigService configServiceImpl = new ConfigService(plugin);
         DataService dataServiceImpl = new DataService(plugin);
+        WorldService worldServiceImpl = new WorldService(plugin);
         ArenaManager arenaManagerImpl = new ArenaManager(plugin);
         GameManager gameManagerImpl = new GameManager(plugin);
         MessageService messageServiceImpl = new MessageService(plugin);
@@ -131,6 +136,7 @@ public class PluginContext {
 
         this.configService = configServiceImpl;
         this.dataService = dataServiceImpl;
+        this.worldService = worldServiceImpl;
         this.arenaManager = arenaManagerImpl;
         this.gameManager = gameManagerImpl;
         this.messageService = messageServiceImpl;
@@ -147,6 +153,7 @@ public class PluginContext {
         this.services = Collections.unmodifiableList(Arrays.asList(
                 configServiceImpl,
                 dataServiceImpl,
+                worldServiceImpl,
                 arenaManagerImpl,
                 gameManagerImpl,
                 messageServiceImpl,
@@ -170,6 +177,8 @@ public class PluginContext {
      * by {@link #reload()} during hot reload.
      */
     public void enable() {
+        long start = System.currentTimeMillis();
+
         // Phase 1: each service acquires its own runtime resources.
         for (PluginService service : services)
             service.enable();
@@ -178,6 +187,10 @@ public class PluginContext {
         // belong here because they are owned by the plugin as a whole, not by
         // the command / listener services (those services only provide the
         // registration mechanism and the bulk-unregistration guarantees).
+
+        long elapsed = System.currentTimeMillis() - start;
+        plugin.getPluginLogger().debug("PluginContext enabled %d service(s) in %d ms.",
+                services.size(), elapsed);
     }
 
     /**
@@ -194,6 +207,8 @@ public class PluginContext {
      * {@link #reload()} during hot reload.
      */
     public void shutdown() {
+        plugin.getPluginLogger().debug("PluginContext shutting down %d service(s) in reverse order.",
+                services.size());
         for (int i = services.size() - 1; i >= 0; i--)
             services.get(i).shutdown();
     }
@@ -205,6 +220,7 @@ public class PluginContext {
      * subsystem is disturbed in the process.
      */
     public void reload() {
+        plugin.getPluginLogger().info("Reloading plugin — shutting down and re-enabling all services.");
         shutdown();
         enable();
     }
@@ -247,8 +263,8 @@ public class PluginContext {
             User user = PacketEvents.getAPI().getPlayerManager().getUser(player);
             user.sendPacket(packet);
         } catch (Throwable e) {
-            plugin.getLogger().warning("Failed to send " + packet.getClass().getSimpleName()
-                    + " to " + player.getName() + ": " + e.getMessage());
+            plugin.getPluginLogger().warn("Failed to send %s to %s: %s",
+                    packet.getClass().getSimpleName(), player.getName(), e.getMessage());
         }
     }
 }

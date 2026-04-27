@@ -61,6 +61,7 @@ public class RenderService implements PluginService {
     public void enable() {
         this.legacy = !plugin.getContext().getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_13);
         this.renderer = new CpuRenderer();
+        plugin.getPluginLogger().debug("RenderService enabled (legacy: %s).", legacy);
     }
 
     /**
@@ -85,6 +86,7 @@ public class RenderService implements PluginService {
         if (renderer != null) {
             renderer.shutdown();
             renderer = null;
+            plugin.getPluginLogger().debug("RenderService shut down — thread pool released.");
         }
     }
 }

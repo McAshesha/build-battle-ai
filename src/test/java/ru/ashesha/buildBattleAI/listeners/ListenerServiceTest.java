@@ -12,7 +12,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
+import ru.ashesha.buildBattleAI.core.PluginLogger;
 import ru.ashesha.buildBattleAI.listeners.ListenerService.PluginListener;
+
+import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -34,6 +37,7 @@ class ListenerServiceTest {
     @BeforeEach
     void setUp() {
         plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
         Server server = mock(Server.class);
         pluginManager = mock(PluginManager.class);
         eventManager = mock(EventManager.class);

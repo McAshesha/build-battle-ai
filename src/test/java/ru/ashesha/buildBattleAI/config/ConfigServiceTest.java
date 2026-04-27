@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.config.api.Lang;
+import ru.ashesha.buildBattleAI.core.PluginLogger;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -36,6 +37,7 @@ class ConfigServiceTest {
     @BeforeEach
     void setUp() {
         plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
         when(plugin.getDataFolder()).thenReturn(dataFolder);
         when(plugin.getLogger()).thenReturn(Logger.getLogger("ConfigServiceTest"));
 

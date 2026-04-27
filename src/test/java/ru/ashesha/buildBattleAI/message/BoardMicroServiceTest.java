@@ -18,10 +18,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.core.PluginContext;
+import ru.ashesha.buildBattleAI.core.PluginLogger;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -44,6 +46,7 @@ class BoardMicroServiceTest {
     @BeforeEach
     void setUp() {
         plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
         context = mock(PluginContext.class);
         player = mock(Player.class);
         when(plugin.getContext()).thenReturn(context);

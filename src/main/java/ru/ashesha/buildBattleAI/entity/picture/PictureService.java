@@ -150,6 +150,8 @@ public class PictureService implements BBAIPictureService, PluginService {
         this.itemFrameItemIndex = resolveItemFrameItemIndex(version);
         this.mapItemFactory = resolveMapItemFactory(version);
         this.faceDataFactory = resolveFaceDataFactory(version);
+        plugin.getPluginLogger().debug("PictureService enabled (version: %s, itemFrameIndex: %d).",
+                version.name(), itemFrameItemIndex);
     }
 
     /**

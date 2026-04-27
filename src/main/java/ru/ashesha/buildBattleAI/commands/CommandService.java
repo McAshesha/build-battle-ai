@@ -76,6 +76,7 @@ public class CommandService implements PluginService {
     public void enable() {
         this.commandMap = ReflectionUtils.getFieldValue(Bukkit.getServer(), "commandMap");
         this.knownCommands = ReflectionUtils.getFieldValue(commandMap, "knownCommands");
+        plugin.getPluginLogger().debug("CommandService enabled — resolved CommandMap via reflection.");
     }
 
     /**
@@ -88,6 +89,7 @@ public class CommandService implements PluginService {
     public void register(@NonNull PluginCommand command) {
         commandMap.register(plugin.getName().toLowerCase(), command);
         registeredCommands.add(command);
+        plugin.getPluginLogger().debug("Registered command '/%s'.", command.getName());
     }
 
     /**
@@ -111,6 +113,8 @@ public class CommandService implements PluginService {
      */
     @Override
     public void shutdown() {
+        if (!registeredCommands.isEmpty())
+            plugin.getPluginLogger().debug("CommandService unregistering %d command(s).", registeredCommands.size());
         for (PluginCommand command : registeredCommands) {
             knownCommands.values().removeIf(c -> c == command);
             command.unregister(commandMap);

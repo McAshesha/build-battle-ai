@@ -121,6 +121,8 @@ public class HologramService implements BBAIHologramService, PluginService {
         this.armorStandFlagsValue = version.isNewerThanOrEquals(ServerVersion.V_1_16_2)
                 ? (byte) 0x19
                 : (byte) 0x09;
+        plugin.getPluginLogger().debug("HologramService enabled (version: %s, flagsIndex: %d, flagsValue: 0x%02X).",
+                version.name(), armorStandFlagsIndex, armorStandFlagsValue);
     }
 
     /**
