@@ -7,12 +7,18 @@ import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.core.PluginContext;
 import ru.ashesha.buildBattleAI.core.PluginService;
 import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
+import ru.ashesha.buildBattleAI.message.micro.BarMicroService;
+import ru.ashesha.buildBattleAI.message.micro.BoardMicroService;
+import ru.ashesha.buildBattleAI.message.micro.ChatMicroService;
+import ru.ashesha.buildBattleAI.message.micro.NameMicroService;
+import ru.ashesha.buildBattleAI.message.micro.TabMicroService;
+import ru.ashesha.buildBattleAI.message.micro.TitleMicroService;
 
 /**
  * PacketEvents-based implementation of {@link BBAIMessageService}.
  * <p>
  * Delegates all messaging responsibilities to specialized micro-services located
- * in the {@code core.message} package. Each micro-service handles a specific
+ * in the {@code message.micro} package. Each micro-service handles a specific
  * category of packet-based messages:
  * <ul>
  *     <li>{@link ChatMicroService} — chat messages (plain-text and rich)</li>

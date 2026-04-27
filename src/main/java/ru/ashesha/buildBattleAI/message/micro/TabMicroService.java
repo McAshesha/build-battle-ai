@@ -1,4 +1,4 @@
-package ru.ashesha.buildBattleAI.message;
+package ru.ashesha.buildBattleAI.message.micro;
 
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerListHeaderAndFooter;
 import lombok.NonNull;
