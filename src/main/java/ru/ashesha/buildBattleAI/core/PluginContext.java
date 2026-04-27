@@ -11,6 +11,7 @@ import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.ArenaManager;
 import ru.ashesha.buildBattleAI.arena.api.BBAIArenaManager;
+import ru.ashesha.buildBattleAI.commands.ArenaCommand;
 import ru.ashesha.buildBattleAI.config.ConfigService;
 import ru.ashesha.buildBattleAI.config.api.BBAIConfigService;
 import ru.ashesha.buildBattleAI.data.DataService;
@@ -24,6 +25,7 @@ import ru.ashesha.buildBattleAI.entity.picture.PictureService;
 import ru.ashesha.buildBattleAI.entity.picture.api.BBAIPictureService;
 import ru.ashesha.buildBattleAI.game.GameManager;
 import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
+import ru.ashesha.buildBattleAI.listeners.ArenaSetupListener;
 import ru.ashesha.buildBattleAI.listeners.ListenerService;
 import ru.ashesha.buildBattleAI.message.MessageService;
 import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
@@ -187,6 +189,8 @@ public class PluginContext {
         // belong here because they are owned by the plugin as a whole, not by
         // the command / listener services (those services only provide the
         // registration mechanism and the bulk-unregistration guarantees).
+        commandService.register(new ArenaCommand(plugin));
+        listenerService.register(new ArenaSetupListener(plugin));
 
         long elapsed = System.currentTimeMillis() - start;
         plugin.getPluginLogger().debug("PluginContext enabled %d service(s) in %d ms.",

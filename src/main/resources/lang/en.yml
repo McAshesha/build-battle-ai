@@ -1,2 +1,121 @@
 test-join-message: "Welcome to the server, %player%!"
 test-leave-message: "Goodbye, %player%! See you next time!"
+
+# ── Arena Setup Panel ────────────────────────────────────────────────
+arena.setup.divider: "&6&l▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
+arena.setup.header: "&e  Arena Setup &8» &f%arena%"
+
+# Status indicators
+arena.setup.status.set: "&a✔"
+arena.setup.status.unset: "&c✘"
+arena.setup.status.optional: "&8○"
+
+# Value display
+arena.setup.value: "&f%x%&7, &f%y%&7, &f%z%"
+arena.setup.corner.value: "&f(%x%, %y%, %z%)"
+
+# Buttons
+arena.setup.btn.set: "&a[Set]"
+arena.setup.btn.change: "&e[Change]"
+
+# Player count
+arena.setup.players.label: "&7  Players: "
+arena.setup.players.selected: "&a&l[%count%✓]"
+arena.setup.players.unselected: "&7[%count%]"
+arena.setup.players.hover: "&7Set max players to &e%count%"
+arena.setup.select-players-hint: "&8  Select the number of players to configure plots"
+
+# Lobby
+arena.setup.lobby.label: "&7  Lobby: "
+arena.setup.lobby.hover-set: "&7Stand where players should wait and click"
+arena.setup.lobby.hover-change: "&7Click to update lobby to your position"
+
+# Spectator
+arena.setup.spectator.label: "&7  Spectator: "
+arena.setup.spectator.hover-set: "&7Stand at the spectator area and click"
+arena.setup.spectator.hover-change: "&7Click to update spectator to your position"
+
+# Plot section
+arena.setup.plot.header: "&6  ── Plot %index% ──"
+
+# Plot spawn
+arena.setup.plot.spawn.label: "&7    Spawn: "
+arena.setup.plot.spawn.hover-set: "&7Stand at plot %index% spawn and click"
+arena.setup.plot.spawn.hover-change: "&7Click to update spawn for plot %index%"
+
+# Plot cameras (3 per plot)
+arena.setup.plot.cameras.label: "&7    Cameras: "
+arena.setup.plot.cameras.set: "&a[Cam %camera%]"
+arena.setup.plot.cameras.unset: "&c[Cam %camera%]"
+arena.setup.plot.cameras.hover-set: "&7Position yourself where camera %camera% should be for plot %index%, look at the build zone, and click"
+arena.setup.plot.cameras.hover-change: "&7Click to update camera %camera% for plot %index%"
+
+# Plot zone (corners)
+arena.setup.plot.zone.label: "&7    Zone: "
+arena.setup.plot.zone.c1: "&e[C1]"
+arena.setup.plot.zone.c2: "&e[C2]"
+arena.setup.plot.zone.c1-hover-set: "&7Fly to first corner of plot %index% and click"
+arena.setup.plot.zone.c1-hover-change: "&7Click to update corner 1 for plot %index%"
+arena.setup.plot.zone.c2-hover-set: "&7Fly to opposite corner of plot %index% and click"
+arena.setup.plot.zone.c2-hover-change: "&7Click to update corner 2 for plot %index%"
+
+# Confirm / Cancel
+arena.setup.confirm.ready: "&a&l[Confirm]"
+arena.setup.confirm.not-ready: "&8[Confirm]"
+arena.setup.confirm.hover-ready: "&aAll settings filled — click to create!"
+arena.setup.confirm.hover-not-ready: "&cFill in all required settings first"
+arena.setup.cancel.btn: "&c&l[Cancel]"
+arena.setup.cancel.hover: "&7Cancel arena setup and delete the world"
+
+# Titles (shown during setup interactions)
+arena.setup.title.welcome: "&e&lArena Setup"
+arena.setup.title.welcome-sub: "&7Configure your new arena"
+arena.setup.title.players: "&6Players"
+arena.setup.title.players-sub: "&7Set to &e%count%"
+arena.setup.title.lobby: "&6Lobby"
+arena.setup.title.spectator: "&6Spectator"
+arena.setup.title.spawn: "&6Plot %index%"
+arena.setup.title.corner: "&6Plot %index%"
+arena.setup.title.camera: "&6Plot %index%"
+arena.setup.title.position-saved: "&7Position saved"
+arena.setup.title.corner1-saved: "&7Corner 1 saved"
+arena.setup.title.corner2-saved: "&7Corner 2 saved"
+arena.setup.title.camera-saved: "&7Camera %camera% saved"
+arena.setup.title.created: "&a&l✔ Arena Created"
+arena.setup.title.created-sub: "&f%arena%"
+arena.setup.title.incomplete: "&c&l✘ Incomplete"
+arena.setup.title.incomplete-sub: "&7Fill all required settings first"
+arena.setup.title.cancelled: "&c&l✘ Cancelled"
+arena.setup.title.cancelled-sub: "&7Arena setup cancelled"
+
+# Hologram markers (shown at set positions during setup)
+arena.setup.marker.lobby: "&6⬇ &eLobby"
+arena.setup.marker.spectator: "&6⬇ &eSpectator"
+arena.setup.marker.spawn: "&6⬇ &eSpawn #%index%"
+arena.setup.marker.corner1: "&c⬇ &eC1 #%index%"
+arena.setup.marker.corner2: "&c⬇ &eC2 #%index%"
+
+# Feedback
+arena.setup.created: "&a  Arena &f%arena% &ahas been created and activated!"
+arena.setup.cancelled: "&c  Arena setup has been cancelled."
+arena.setup.incomplete: "&c  Not all required settings are filled."
+arena.setup.already-exists: "&c  An arena named &f%arena% &calready exists."
+arena.setup.already-in-setup: "&c  You are already setting up an arena."
+arena.setup.world-failed: "&c  Failed to create world for arena &f%arena%&c."
+arena.setup.no-session: "&c  You don't have an active setup session."
+arena.setup.name-required: "&c  Usage: /bbai create <name>"
+
+# ── Arena List ───────────────────────────────────────────────────────
+arena.list.header: "&e  Active Arenas:"
+arena.list.entry: " &8- &f%arena% &8| &7Players: &f%players% &8| %status%"
+arena.list.empty: "&7  No arenas configured."
+arena.list.status-enabled: "&aEnabled"
+arena.list.status-disabled: "&cDisabled"
+
+# ── Arena Delete ─────────────────────────────────────────────────────
+arena.delete.success: "&a  Arena &f%arena% &adeleted."
+arena.delete.not-found: "&c  Arena &f%arena% &cnot found."
+arena.delete.usage: "&c  Usage: /bbai delete <name>"
+
+# ── General ──────────────────────────────────────────────────────────
+arena.usage: "&c  Usage: /bbai <create|list|delete> [name]"
