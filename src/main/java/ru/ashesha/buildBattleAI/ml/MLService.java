@@ -50,6 +50,19 @@ public class MLService implements BBAIMLService, PluginService {
     private static final String DEFAULT_BASE_URL = "http://localhost:8001";
 
     /**
+     * Fallback class names used when the ML microservice is unreachable.
+     * These represent the built-in theme set for offline/development play.
+     */
+    private static final List<String> FALLBACK_CLASSES = Arrays.asList(
+            "cat", "sword", "ball", "house", "tree", "glasses"
+    );
+
+    /**
+     * Random number generator for fallback predictions.
+     */
+    private static final Random RANDOM = new Random();
+
+    /**
      * Connection timeout for HTTP requests in milliseconds.
      */
     private static final int CONNECT_TIMEOUT = 5000;
@@ -227,6 +240,47 @@ public class MLService implements BBAIMLService, PluginService {
         return result;
     }
 
+    /**
+     * Generates a random fallback prediction when the ML microservice is unreachable.
+     * <p>
+     * Assigns random similarity scores to each of the {@link #FALLBACK_CLASSES},
+     * sorts them descending, and returns the top entry as the predicted class.
+     * Embedding and centroid vectors are zero-filled since no real inference occurred.
+     *
+     * @param topK the number of top predictions to include
+     * @return a synthetic prediction result with random scores
+     */
+    private static PredictionResult generateFallbackPrediction(int topK) {
+        // Generate random scores for each fallback class
+        List<TopKEntry> entries = new ArrayList<>(FALLBACK_CLASSES.size());
+        for (String className : FALLBACK_CLASSES)
+            entries.add(new TopKEntry(className, RANDOM.nextFloat()));
+
+        // Sort descending by score so the highest random score wins
+        Collections.sort(entries, new Comparator<TopKEntry>() {
+            @Override
+            public int compare(TopKEntry a, TopKEntry b) {
+                return Float.compare(b.score(), a.score());
+            }
+        });
+
+        // Trim to requested topK (capped at available classes)
+        int k = Math.min(topK, entries.size());
+        List<TopKEntry> topKEntries = Collections.unmodifiableList(
+                new ArrayList<>(entries.subList(0, k))
+        );
+
+        TopKEntry top = entries.get(0);
+        float[] dummyEmbedding = new float[128];
+        float[] dummyCentroid = new float[128];
+
+        return new PredictionResult(
+                "fallback", dummyEmbedding, top.className(), top.score(),
+                dummyCentroid, topKEntries,
+                Collections.unmodifiableList(new ArrayList<>(FALLBACK_CLASSES))
+        );
+    }
+
     // ── public API ──────────────────────────────────────────────────────────
 
     @Override
@@ -247,11 +301,19 @@ public class MLService implements BBAIMLService, PluginService {
         request.addProperty("image_base64", base64);
         request.addProperty("top_k", topK);
 
-        JsonObject response = postJson(baseUrl + "/predict", request);
-        PredictionResult result = parsePredictionResult(response);
-        plugin.getPluginLogger().debug("Prediction result: class='%s', score=%.4f.",
-                result.predictedClass(), result.predictedScore());
-        return result;
+        try {
+            JsonObject response = postJson(baseUrl + "/predict", request);
+            PredictionResult result = parsePredictionResult(response);
+            plugin.getPluginLogger().debug("Prediction result: class='%s', score=%.4f.",
+                    result.predictedClass(), result.predictedScore());
+            return result;
+        } catch (RuntimeException e) {
+            plugin.getPluginLogger().warn("ML service unavailable, using random fallback: %s", e.getMessage());
+            PredictionResult fallback = generateFallbackPrediction(topK);
+            plugin.getPluginLogger().debug("Fallback prediction: class='%s', score=%.4f.",
+                    fallback.predictedClass(), fallback.predictedScore());
+            return fallback;
+        }
     }
 
     @Override

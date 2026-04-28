@@ -164,19 +164,95 @@ class MLServiceTest {
         // No exception means idempotent behavior is correct
     }
 
-    // -- predict without server throws RuntimeException ---------------------
+    // -- fallback when server is unavailable ---------------------------------
 
     @Test
-    void predictWithoutServerThrows() {
+    void predictFallsBackWhenServerUnavailable() {
         BuildBattleAI plugin = mock(BuildBattleAI.class);
         when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
         when(plugin.getLogger()).thenReturn(Logger.getLogger("MLServiceTest"));
         MLService service = new MLService(plugin, "http://localhost:99999");
 
-        // predict should throw because the ML service is not reachable
         byte[] pixels = new byte[224 * 224 * 3];
-        assertThrows(RuntimeException.class, () -> service.predict(pixels, 224, 224, 5));
+        MLService.PredictionResult result = service.predict(pixels, 224, 224, 5);
+
+        assertNotNull(result);
+        assertEquals("fallback", result.modelName());
+        assertNotNull(result.predictedClass());
+        assertTrue(result.predictedScore() >= 0.0f && result.predictedScore() <= 1.0f);
+        assertEquals(5, result.topK().size());
+        assertEquals(6, result.availableClasses().size());
+        assertTrue(result.availableClasses().contains("cat"));
+        assertTrue(result.availableClasses().contains("sword"));
+        assertTrue(result.availableClasses().contains("ball"));
+        assertTrue(result.availableClasses().contains("house"));
+        assertTrue(result.availableClasses().contains("tree"));
+        assertTrue(result.availableClasses().contains("glasses"));
     }
+
+    @Test
+    void predictImageFallsBackWhenServerUnavailable() {
+        BuildBattleAI plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
+        when(plugin.getLogger()).thenReturn(Logger.getLogger("MLServiceTest"));
+        MLService service = new MLService(plugin, "http://localhost:99999");
+
+        MLService.PredictionResult result = service.predictImage(new byte[]{1, 2, 3}, 3);
+
+        assertNotNull(result);
+        assertEquals("fallback", result.modelName());
+        assertEquals(3, result.topK().size());
+    }
+
+    @Test
+    void fallbackTopKIsCappedAtAvailableClasses() {
+        BuildBattleAI plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
+        when(plugin.getLogger()).thenReturn(Logger.getLogger("MLServiceTest"));
+        MLService service = new MLService(plugin, "http://localhost:99999");
+
+        // Request more topK than fallback classes — should be capped at 6
+        MLService.PredictionResult result = service.predictImage(new byte[]{1}, 20);
+
+        assertEquals(6, result.topK().size());
+    }
+
+    @Test
+    void fallbackTopKIsSortedDescending() {
+        BuildBattleAI plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
+        when(plugin.getLogger()).thenReturn(Logger.getLogger("MLServiceTest"));
+        MLService service = new MLService(plugin, "http://localhost:99999");
+
+        MLService.PredictionResult result = service.predictImage(new byte[]{1}, 6);
+
+        // Scores should be in descending order
+        for (int i = 1; i < result.topK().size(); i++)
+            assertTrue(result.topK().get(i - 1).score() >= result.topK().get(i).score());
+
+        // Top prediction should match the first topK entry
+        assertEquals(result.topK().get(0).className(), result.predictedClass());
+        assertEquals(result.topK().get(0).score(), result.predictedScore(), 0.001f);
+    }
+
+    @Test
+    void fallbackEmbeddingIsZeroFilled() {
+        BuildBattleAI plugin = mock(BuildBattleAI.class);
+        when(plugin.getPluginLogger()).thenReturn(new PluginLogger(Logger.getLogger("Test")));
+        when(plugin.getLogger()).thenReturn(Logger.getLogger("MLServiceTest"));
+        MLService service = new MLService(plugin, "http://localhost:99999");
+
+        MLService.PredictionResult result = service.predictImage(new byte[]{1}, 1);
+
+        assertEquals(128, result.embedding().length);
+        assertEquals(128, result.predictedCentroid().length);
+        for (float v : result.embedding())
+            assertEquals(0.0f, v, 0.0f);
+        for (float v : result.predictedCentroid())
+            assertEquals(0.0f, v, 0.0f);
+    }
+
+    // -- health/centroids still throw without server --------------------------
 
     @Test
     void healthWithoutServerThrows() {
