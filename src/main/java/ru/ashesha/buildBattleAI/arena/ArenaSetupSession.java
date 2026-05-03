@@ -76,6 +76,22 @@ class ArenaSetupSession {
     @Setter
     private Arena.Position spectator;
 
+    /** Minimum players to start (optional, default 2). {@code null} = not yet set. */
+    @Setter
+    private Integer minPlayers;
+
+    /** Seconds per build attempt (optional, default 150). {@code null} = not yet set. */
+    @Setter
+    private Integer buildTime;
+
+    /** Total game duration in seconds (optional, default 300). {@code null} = not yet set. */
+    @Setter
+    private Integer gameTime;
+
+    /** Countdown duration in seconds (optional, default 5). {@code null} = not yet set. */
+    @Setter
+    private Integer countdownTime;
+
     /** Per-plot setup data, keyed by 1-based plot index. */
     private final Map<Integer, PlotSetupData> plots = new HashMap<>();
 

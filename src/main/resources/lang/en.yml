@@ -1,121 +1,232 @@
+# ══════════════════════════════════════════════════════════════════════
+#  BuildBattleAI — English Language File
+# ══════════════════════════════════════════════════════════════════════
+
 test-join-message: "Welcome to the server, %player%!"
 test-leave-message: "Goodbye, %player%! See you next time!"
 
-# ── Arena Setup Panel ────────────────────────────────────────────────
-arena.setup.divider: "&6&l▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
-arena.setup.header: "&e  Arena Setup &8» &f%arena%"
+# ── Arena ────────────────────────────────────────────────────────────
+arena:
 
-# Status indicators
-arena.setup.status.set: "&a✔"
-arena.setup.status.unset: "&c✘"
-arena.setup.status.optional: "&8○"
+  # General usage hint
+  usage: "&c  Usage: /bbai <create|list|delete|join|leave> [name]"
 
-# Value display
-arena.setup.value: "&f%x%&7, &f%y%&7, &f%z%"
-arena.setup.corner.value: "&f(%x%, %y%, %z%)"
+  # ── Arena Setup Panel ──────────────────────────────────────────────
+  setup:
+    divider: "&6&l▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
+    header: "&e  Arena Setup &8» &f%arena%"
 
-# Buttons
-arena.setup.btn.set: "&a[Set]"
-arena.setup.btn.change: "&e[Change]"
+    # Status indicators
+    status:
+      set: "&a✔"
+      unset: "&c✘"
+      optional: "&8○"
 
-# Player count
-arena.setup.players.label: "&7  Players: "
-arena.setup.players.selected: "&a&l[%count%✓]"
-arena.setup.players.unselected: "&7[%count%]"
-arena.setup.players.hover: "&7Set max players to &e%count%"
-arena.setup.select-players-hint: "&8  Select the number of players to configure plots"
+    # Coordinate display
+    value: "&f%x%&7, &f%y%&7, &f%z%"
+    corner:
+      value: "&f(%x%, %y%, %z%)"
 
-# Lobby
-arena.setup.lobby.label: "&7  Lobby: "
-arena.setup.lobby.hover-set: "&7Stand where players should wait and click"
-arena.setup.lobby.hover-change: "&7Click to update lobby to your position"
+    # Buttons
+    btn:
+      set: "&a[Set]"
+      change: "&e[Change]"
 
-# Spectator
-arena.setup.spectator.label: "&7  Spectator: "
-arena.setup.spectator.hover-set: "&7Stand at the spectator area and click"
-arena.setup.spectator.hover-change: "&7Click to update spectator to your position"
+    # Player count selector
+    players:
+      label: "&7  Players: "
+      selected: "&a&l[%count%✓]"
+      unselected: "&7[%count%]"
+      hover: "&7Set max players to &e%count%"
+    select-players-hint: "&8  Select the number of players to configure plots"
 
-# Plot section
-arena.setup.plot.header: "&6  ── Plot %index% ──"
+    # Lobby position
+    lobby:
+      label: "&7  Lobby: "
+      hover-set: "&7Stand where players should wait and click"
+      hover-change: "&7Click to update lobby to your position"
 
-# Plot spawn
-arena.setup.plot.spawn.label: "&7    Spawn: "
-arena.setup.plot.spawn.hover-set: "&7Stand at plot %index% spawn and click"
-arena.setup.plot.spawn.hover-change: "&7Click to update spawn for plot %index%"
+    # Spectator position
+    spectator:
+      label: "&7  Spectator: "
+      hover-set: "&7Stand at the spectator area and click"
+      hover-change: "&7Click to update spectator to your position"
 
-# Plot cameras (3 per plot)
-arena.setup.plot.cameras.label: "&7    Cameras: "
-arena.setup.plot.cameras.set: "&a[Cam %camera%]"
-arena.setup.plot.cameras.unset: "&c[Cam %camera%]"
-arena.setup.plot.cameras.hover-set: "&7Position yourself where camera %camera% should be for plot %index%, look at the build zone, and click"
-arena.setup.plot.cameras.hover-change: "&7Click to update camera %camera% for plot %index%"
+    # Min players setting
+    minplayers:
+      label: "&7  Min Players: "
+      value: "&f%count%"
+      hover: "&7Click and type the minimum player count"
+      invalid: "&c  Min players must be between 2 and %max%."
 
-# Plot zone (corners)
-arena.setup.plot.zone.label: "&7    Zone: "
-arena.setup.plot.zone.c1: "&e[C1]"
-arena.setup.plot.zone.c2: "&e[C2]"
-arena.setup.plot.zone.c1-hover-set: "&7Fly to first corner of plot %index% and click"
-arena.setup.plot.zone.c1-hover-change: "&7Click to update corner 1 for plot %index%"
-arena.setup.plot.zone.c2-hover-set: "&7Fly to opposite corner of plot %index% and click"
-arena.setup.plot.zone.c2-hover-change: "&7Click to update corner 2 for plot %index%"
+    # Build time setting
+    buildtime:
+      label: "&7  Build Time: "
+      value: "&f%minutes% min"
+      hover: "&7Click and type build time in minutes (0.5-10)"
+      invalid: "&c  Build time must be between 0.5 and 10 minutes."
 
-# Confirm / Cancel
-arena.setup.confirm.ready: "&a&l[Confirm]"
-arena.setup.confirm.not-ready: "&8[Confirm]"
-arena.setup.confirm.hover-ready: "&aAll settings filled — click to create!"
-arena.setup.confirm.hover-not-ready: "&cFill in all required settings first"
-arena.setup.cancel.btn: "&c&l[Cancel]"
-arena.setup.cancel.hover: "&7Cancel arena setup and delete the world"
+    # Game time setting
+    gametime:
+      label: "&7  Game Time: "
+      value: "&f%minutes% min"
+      hover: "&7Click and type total game time in minutes (1-30)"
+      invalid: "&c  Game time must be between 1 and 30 minutes."
 
-# Titles (shown during setup interactions)
-arena.setup.title.welcome: "&e&lArena Setup"
-arena.setup.title.welcome-sub: "&7Configure your new arena"
-arena.setup.title.players: "&6Players"
-arena.setup.title.players-sub: "&7Set to &e%count%"
-arena.setup.title.lobby: "&6Lobby"
-arena.setup.title.spectator: "&6Spectator"
-arena.setup.title.spawn: "&6Plot %index%"
-arena.setup.title.corner: "&6Plot %index%"
-arena.setup.title.camera: "&6Plot %index%"
-arena.setup.title.position-saved: "&7Position saved"
-arena.setup.title.corner1-saved: "&7Corner 1 saved"
-arena.setup.title.corner2-saved: "&7Corner 2 saved"
-arena.setup.title.camera-saved: "&7Camera %camera% saved"
-arena.setup.title.created: "&a&l✔ Arena Created"
-arena.setup.title.created-sub: "&f%arena%"
-arena.setup.title.incomplete: "&c&l✘ Incomplete"
-arena.setup.title.incomplete-sub: "&7Fill all required settings first"
-arena.setup.title.cancelled: "&c&l✘ Cancelled"
-arena.setup.title.cancelled-sub: "&7Arena setup cancelled"
+    # Countdown setting
+    countdown:
+      label: "&7  Countdown: "
+      value: "&f%seconds%s"
+      hover: "&7Click and type countdown duration in seconds (3-60)"
+      invalid: "&c  Countdown must be between 3 and 60 seconds."
 
-# Hologram markers (shown at set positions during setup)
-arena.setup.marker.lobby: "&6⬇ &eLobby"
-arena.setup.marker.spectator: "&6⬇ &eSpectator"
-arena.setup.marker.spawn: "&6⬇ &eSpawn #%index%"
-arena.setup.marker.corner1: "&c⬇ &eC1 #%index%"
-arena.setup.marker.corner2: "&c⬇ &eC2 #%index%"
+    # Per-plot settings
+    plot:
+      header: "&6  ── Plot %index% ──"
+      spawn:
+        label: "&7    Spawn: "
+        hover-set: "&7Stand at plot %index% spawn and click"
+        hover-change: "&7Click to update spawn for plot %index%"
+      cameras:
+        label: "&7    Cameras: "
+        set: "&a[Cam %camera%]"
+        unset: "&c[Cam %camera%]"
+        hover-set: "&7Position yourself where camera %camera% should be for plot %index%, look at the build zone, and click"
+        hover-change: "&7Click to update camera %camera% for plot %index%"
+      zone:
+        label: "&7    Zone: "
+        c1: "&e[C1]"
+        c2: "&e[C2]"
+        c1-hover-set: "&7Fly to first corner of plot %index% and click"
+        c1-hover-change: "&7Click to update corner 1 for plot %index%"
+        c2-hover-set: "&7Fly to opposite corner of plot %index% and click"
+        c2-hover-change: "&7Click to update corner 2 for plot %index%"
 
-# Feedback
-arena.setup.created: "&a  Arena &f%arena% &ahas been created and activated!"
-arena.setup.cancelled: "&c  Arena setup has been cancelled."
-arena.setup.incomplete: "&c  Not all required settings are filled."
-arena.setup.already-exists: "&c  An arena named &f%arena% &calready exists."
-arena.setup.already-in-setup: "&c  You are already setting up an arena."
-arena.setup.world-failed: "&c  Failed to create world for arena &f%arena%&c."
-arena.setup.no-session: "&c  You don't have an active setup session."
-arena.setup.name-required: "&c  Usage: /bbai create <name>"
+    # Confirm / Cancel buttons
+    confirm:
+      ready: "&a&l[Confirm]"
+      not-ready: "&8[Confirm]"
+      hover-ready: "&aAll settings filled — click to create!"
+      hover-not-ready: "&cFill in all required settings first"
+    cancel:
+      btn: "&c&l[Cancel]"
+      hover: "&7Cancel arena setup and delete the world"
 
-# ── Arena List ───────────────────────────────────────────────────────
-arena.list.header: "&e  Active Arenas:"
-arena.list.entry: " &8- &f%arena% &8| &7Players: &f%players% &8| %status%"
-arena.list.empty: "&7  No arenas configured."
-arena.list.status-enabled: "&aEnabled"
-arena.list.status-disabled: "&cDisabled"
+    # Titles shown during setup interactions
+    title:
+      welcome: "&e&lArena Setup"
+      welcome-sub: "&7Configure your new arena"
+      players: "&6Players"
+      players-sub: "&7Set to &e%count%"
+      lobby: "&6Lobby"
+      spectator: "&6Spectator"
+      spawn: "&6Plot %index%"
+      corner: "&6Plot %index%"
+      camera: "&6Plot %index%"
+      position-saved: "&7Position saved"
+      corner1-saved: "&7Corner 1 saved"
+      corner2-saved: "&7Corner 2 saved"
+      camera-saved: "&7Camera %camera% saved"
+      created: "&a&l✔ Arena Created"
+      created-sub: "&f%arena%"
+      incomplete: "&c&l✘ Incomplete"
+      incomplete-sub: "&7Fill all required settings first"
+      cancelled: "&c&l✘ Cancelled"
+      cancelled-sub: "&7Arena setup cancelled"
+      minplayers: "&6Min Players"
+      minplayers-sub: "&7Set to &e%count%"
+      buildtime: "&6Build Time"
+      buildtime-sub: "&7Set to &e%minutes% min"
+      gametime: "&6Game Time"
+      gametime-sub: "&7Set to &e%minutes% min"
+      countdown: "&6Countdown"
+      countdown-sub: "&7Set to &e%seconds%s"
 
-# ── Arena Delete ─────────────────────────────────────────────────────
-arena.delete.success: "&a  Arena &f%arena% &adeleted."
-arena.delete.not-found: "&c  Arena &f%arena% &cnot found."
-arena.delete.usage: "&c  Usage: /bbai delete <name>"
+    # Hologram markers at set positions during setup
+    marker:
+      lobby: "&6⬇ &eLobby"
+      spectator: "&6⬇ &eSpectator"
+      spawn: "&6⬇ &eSpawn #%index%"
+      corner1: "&c⬇ &eC1 #%index%"
+      corner2: "&c⬇ &eC2 #%index%"
 
-# ── General ──────────────────────────────────────────────────────────
-arena.usage: "&c  Usage: /bbai <create|list|delete> [name]"
+    # Feedback messages
+    created: "&a  Arena &f%arena% &ahas been created and activated!"
+    cancelled: "&c  Arena setup has been cancelled."
+    incomplete: "&c  Not all required settings are filled."
+    already-exists: "&c  An arena named &f%arena% &calready exists."
+    already-in-setup: "&c  You are already setting up an arena."
+    world-failed: "&c  Failed to create world for arena &f%arena%&c."
+    no-session: "&c  You don't have an active setup session."
+    name-required: "&c  Usage: /bbai create <name>"
+
+  # ── Arena List ─────────────────────────────────────────────────────
+  list:
+    header: "&e  Active Arenas:"
+    entry: " &8- &f%arena% &8| &7Players: &f%players% &8| %status%"
+    entry-game: " &8- &f%arena% &8| &7%current%/%max% &8| %state% "
+    join-btn: "&a[Join]"
+    join-hover: "&7Click to join &e%arena%"
+    full-btn: "&8[Full]"
+    in-progress-btn: "&8[In Progress]"
+    state-waiting: "&aWaiting"
+    state-countdown: "&eStarting"
+    state-playing: "&cPlaying"
+    state-ending: "&6Ending"
+    empty: "&7  No arenas configured."
+    status-enabled: "&aEnabled"
+    status-disabled: "&cDisabled"
+
+  # ── Arena Delete ───────────────────────────────────────────────────
+  delete:
+    success: "&a  Arena &f%arena% &adeleted."
+    not-found: "&c  Arena &f%arena% &cnot found."
+    usage: "&c  Usage: /bbai delete <name>"
+
+# ── Game ─────────────────────────────────────────────────────────────
+game:
+
+  # ── Join / Leave ───────────────────────────────────────────────────
+  join:
+    success: "&a  You joined arena &f%arena%&a!"
+    broadcast: "&e  %player% &7joined the game! &8(%current%/%max%)"
+    already-in-game: "&c  You are already in a game!"
+    arena-not-found: "&c  Arena &f%arena% &cnot found."
+    arena-disabled: "&c  Arena &f%arena% &cis not enabled."
+    arena-full: "&c  Arena &f%arena% &cis full!"
+    arena-in-progress: "&c  Arena &f%arena% &cis already in progress!"
+  leave:
+    success: "&a  You left the arena."
+    broadcast: "&e  %player% &7left the game. &8(%current%/%max%)"
+    not-in-game: "&c  You are not in a game."
+
+  # ── Lobby / Waiting ────────────────────────────────────────────────
+  waiting:
+    waiting-for-players: "&7  Waiting for players... &8(%current%/%min%)"
+    player-needed: "&7  Need &e%needed% &7more player(s) to start."
+
+  # ── Countdown ──────────────────────────────────────────────────────
+  countdown:
+    starting: "&e  Game starting in &f%seconds% &esecond(s)!"
+    cancelled: "&c  Countdown cancelled — not enough players."
+    go: "&a  Game started! Build!"
+
+  # ── Playing / Themes ───────────────────────────────────────────────
+  playing:
+    theme-assigned: "&e  Your theme: &b&l%theme%"
+    build-time-warning: "&7  Build time remaining: &e%seconds%s"
+    build-time-expired: "&c  Time's up! Theme changed."
+    new-theme: "&e  New theme: &b&l%theme%"
+    score: "&a  Correct! +1 point! &7(Total: &f%score%&7)"
+    game-time-warning: "&7  Game time remaining: &e%minutes%m %seconds%s"
+    zone-cleared: "&7  Your zone has been cleared."
+
+  # ── Ending / Results ───────────────────────────────────────────────
+  ending:
+    time-up: "&e&l  Time's up!"
+    results-header: "&6&l  ══ Game Results ══"
+    result-entry: "&7  %position%. &f%player% &8— &e%score% point(s)"
+    winner: "&a  Winner: &f&l%player% &awith &e%score% &apoint(s)!"
+    draw: "&e  It's a draw between: &f%players%"
+    no-winner: "&7  No one scored this round."
+    returning: "&7  Returning to spawn in &e%seconds%s&7..."

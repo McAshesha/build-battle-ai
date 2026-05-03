@@ -215,12 +215,13 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
         // ── read optional fields with defaults ─────────────────────────
         Arena.Position spectator = readPosition(config, "spectator");
         int minPlayers = config.getInt("min-players", 2);
-        int buildTime = config.getInt("build-time", 300);
-        int rounds = config.getInt("rounds", 3);
+        int buildTime = config.getInt("build-time", 150);
+        int gameTime = config.getInt("game-time", 300);
+        int countdownTime = config.getInt("countdown", 5);
         boolean enabled = config.getBoolean("enabled", true);
 
         return new Arena(name, worldName, maxPlayers, enabled, lobby, spectator,
-                minPlayers, buildTime, rounds, plots);
+                minPlayers, buildTime, gameTime, countdownTime, plots);
     }
 
     /**
@@ -258,7 +259,8 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
         config.set("enabled", arena.enabled());
         config.set("min-players", arena.minPlayers());
         config.set("build-time", arena.buildTime());
-        config.set("rounds", arena.rounds());
+        config.set("game-time", arena.gameTime());
+        config.set("countdown", arena.countdownTime());
 
         writePosition(config, "lobby", arena.lobby());
         if (arena.spectator() != null)
@@ -566,6 +568,78 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
     }
 
     @Override
+    public void handleSetMinPlayers(@NonNull Player player, int count) {
+        ArenaSetupSession session = setupSessions.get(player.getUniqueId());
+        if (session == null)
+            return;
+
+        session.minPlayers(count);
+
+        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+        plugin.getContext().getMessageService().sendTitle(player,
+                lang.get("arena.setup.title.minplayers"),
+                lang.get("arena.setup.title.minplayers-sub", "%count%", String.valueOf(count)),
+                TITLE_FADE_IN, TITLE_STAY, TITLE_FADE_OUT);
+        SoundPalette.CONFIRM.play(player);
+
+        sendSetupPanel(player, session);
+    }
+
+    @Override
+    public void handleSetBuildTime(@NonNull Player player, int seconds) {
+        ArenaSetupSession session = setupSessions.get(player.getUniqueId());
+        if (session == null)
+            return;
+
+        session.buildTime(seconds);
+
+        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+        plugin.getContext().getMessageService().sendTitle(player,
+                lang.get("arena.setup.title.buildtime"),
+                lang.get("arena.setup.title.buildtime-sub", "%minutes%", fmt(seconds / 60.0)),
+                TITLE_FADE_IN, TITLE_STAY, TITLE_FADE_OUT);
+        SoundPalette.CONFIRM.play(player);
+
+        sendSetupPanel(player, session);
+    }
+
+    @Override
+    public void handleSetGameTime(@NonNull Player player, int seconds) {
+        ArenaSetupSession session = setupSessions.get(player.getUniqueId());
+        if (session == null)
+            return;
+
+        session.gameTime(seconds);
+
+        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+        plugin.getContext().getMessageService().sendTitle(player,
+                lang.get("arena.setup.title.gametime"),
+                lang.get("arena.setup.title.gametime-sub", "%minutes%", fmt(seconds / 60.0)),
+                TITLE_FADE_IN, TITLE_STAY, TITLE_FADE_OUT);
+        SoundPalette.CONFIRM.play(player);
+
+        sendSetupPanel(player, session);
+    }
+
+    @Override
+    public void handleSetCountdown(@NonNull Player player, int seconds) {
+        ArenaSetupSession session = setupSessions.get(player.getUniqueId());
+        if (session == null)
+            return;
+
+        session.countdownTime(seconds);
+
+        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+        plugin.getContext().getMessageService().sendTitle(player,
+                lang.get("arena.setup.title.countdown"),
+                lang.get("arena.setup.title.countdown-sub", "%seconds%", String.valueOf(seconds)),
+                TITLE_FADE_IN, TITLE_STAY, TITLE_FADE_OUT);
+        SoundPalette.CONFIRM.play(player);
+
+        sendSetupPanel(player, session);
+    }
+
+    @Override
     public void handleConfirm(@NonNull Player player) {
         ArenaSetupSession session = setupSessions.get(player.getUniqueId());
         if (session == null)
@@ -598,9 +672,14 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
             ));
         }
 
+        int minPlayers = session.minPlayers() != null ? session.minPlayers() : 2;
+        int buildTime = session.buildTime() != null ? session.buildTime() : 150;
+        int gameTime = session.gameTime() != null ? session.gameTime() : 300;
+        int countdownTime = session.countdownTime() != null ? session.countdownTime() : 5;
+
         Arena arena = new Arena(session.arenaName(), session.worldName(),
                 session.maxPlayers(), true, session.lobby(), session.spectator(),
-                2, 300, 3, plots);
+                minPlayers, buildTime, gameTime, countdownTime, plots);
         arenas.put(arena.name(), arena);
         serializeArena(arena);
 
@@ -875,6 +954,41 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
                 lang.get("arena.setup.spectator.hover-set"),
                 lang.get("arena.setup.spectator.hover-change"));
 
+        // ── Optional game settings ────────────────────────────────────
+        msg.sendChat(player, " ");
+        sendSuggestLine(player, lang,
+                lang.get("arena.setup.minplayers.label"),
+                session.minPlayers() != null
+                        ? lang.get("arena.setup.minplayers.value", "%count%",
+                        String.valueOf(session.minPlayers()))
+                        : lang.get("arena.setup.status.optional") + " &8(default: 2)",
+                "/bbai setup minplayers ",
+                lang.get("arena.setup.minplayers.hover"));
+        sendSuggestLine(player, lang,
+                lang.get("arena.setup.buildtime.label"),
+                session.buildTime() != null
+                        ? lang.get("arena.setup.buildtime.value", "%minutes%",
+                        fmt(session.buildTime() / 60.0))
+                        : lang.get("arena.setup.status.optional") + " &8(default: 2.5 min)",
+                "/bbai setup buildtime ",
+                lang.get("arena.setup.buildtime.hover"));
+        sendSuggestLine(player, lang,
+                lang.get("arena.setup.gametime.label"),
+                session.gameTime() != null
+                        ? lang.get("arena.setup.gametime.value", "%minutes%",
+                        fmt(session.gameTime() / 60.0))
+                        : lang.get("arena.setup.status.optional") + " &8(default: 5 min)",
+                "/bbai setup gametime ",
+                lang.get("arena.setup.gametime.hover"));
+        sendSuggestLine(player, lang,
+                lang.get("arena.setup.countdown.label"),
+                session.countdownTime() != null
+                        ? lang.get("arena.setup.countdown.value", "%seconds%",
+                        String.valueOf(session.countdownTime()))
+                        : lang.get("arena.setup.status.optional") + " &8(default: 5s)",
+                "/bbai setup countdown ",
+                lang.get("arena.setup.countdown.hover"));
+
         // Plot sections — only shown if player count is selected
         if (session.maxPlayers() != null) {
             for (int i = 1; i <= session.maxPlayers(); i++) {
@@ -910,6 +1024,20 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
                     "/bbai setup players " + i,
                     lang.get("arena.setup.players.hover", "%count%", String.valueOf(i)));
         }
+        plugin.getContext().getMessageService().sendChat(player, line);
+    }
+
+    /**
+     * Sends a line for a setting that uses {@code SUGGEST_COMMAND} so the admin
+     * types the value. Used for min players, build time, game time, countdown.
+     */
+    private void sendSuggestLine(Player player, Lang lang,
+                                 String label, String valueDisplay,
+                                 String suggestCommand, String hoverText) {
+        ChatMicroService.ChatMessage line = new ChatMicroService.ChatMessage();
+        line.append(label);
+        line.append(valueDisplay,
+                ChatMicroService.ClickAction.SUGGEST_COMMAND, suggestCommand, hoverText);
         plugin.getContext().getMessageService().sendChat(player, line);
     }
 

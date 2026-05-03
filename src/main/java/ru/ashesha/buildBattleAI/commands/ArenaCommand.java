@@ -7,6 +7,8 @@ import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.api.Arena;
 import ru.ashesha.buildBattleAI.arena.api.BBAIArenaManager;
 import ru.ashesha.buildBattleAI.config.api.Lang;
+import ru.ashesha.buildBattleAI.game.ArenaState;
+import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
 import ru.ashesha.buildBattleAI.message.micro.ChatMicroService;
 
 import java.util.ArrayList;
@@ -20,8 +22,10 @@ import java.util.List;
  * Public subcommands (visible in tab completion):
  * <ul>
  *     <li>{@code create <name>} — starts the interactive arena setup wizard</li>
- *     <li>{@code list} — displays all configured arenas with their status</li>
+ *     <li>{@code list} — displays all configured arenas with game status</li>
  *     <li>{@code delete <name>} — permanently removes an arena and its world</li>
+ *     <li>{@code join <arena>} — joins a game in the specified arena</li>
+ *     <li>{@code leave} — leaves the current game</li>
  * </ul>
  * Internal subcommands (triggered by clickable chat messages during the
  * setup wizard, intentionally hidden from tab completion):
@@ -38,7 +42,8 @@ import java.util.List;
 public class ArenaCommand extends CommandService.PluginCommand {
 
     /** Subcommands exposed in tab completion. */
-    private static final List<String> PUBLIC_SUBCOMMANDS = Arrays.asList("create", "list", "delete");
+    private static final List<String> PUBLIC_SUBCOMMANDS =
+            Arrays.asList("create", "list", "delete", "join", "leave");
 
     /**
      * Creates the arena command.
@@ -46,7 +51,8 @@ public class ArenaCommand extends CommandService.PluginCommand {
      * @param plugin the plugin instance
      */
     public ArenaCommand(@NonNull BuildBattleAI plugin) {
-        super(plugin, "bbai", "BuildBattleAI arena management", "<create|list|delete> [name]");
+        super(plugin, "bbai", "BuildBattleAI arena management",
+                "<create|list|delete|join|leave> [name]");
     }
 
     @Override
@@ -67,6 +73,12 @@ public class ArenaCommand extends CommandService.PluginCommand {
             case "delete":
                 handleDelete(sender, args);
                 break;
+            case "join":
+                handleJoin(sender, args);
+                break;
+            case "leave":
+                handleLeave(sender);
+                break;
             case "setup":
                 handleSetup(sender, args);
                 break;
@@ -80,10 +92,13 @@ public class ArenaCommand extends CommandService.PluginCommand {
     protected List<String> suggest(CommandSender sender, String[] args) {
         if (args.length == 1)
             return filterStartsWith(PUBLIC_SUBCOMMANDS, args[0]);
-        if (args.length == 2 && "delete".equalsIgnoreCase(args[0]))
-            return filterStartsWith(
-                    new ArrayList<>(plugin.getContext().getArenaManager().getArenaNames()),
-                    args[1]);
+        if (args.length == 2) {
+            String sub = args[0].toLowerCase();
+            if ("delete".equals(sub) || "join".equals(sub))
+                return filterStartsWith(
+                        new ArrayList<>(plugin.getContext().getArenaManager().getArenaNames()),
+                        args[1]);
+        }
         return Collections.emptyList();
     }
 
@@ -104,7 +119,7 @@ public class ArenaCommand extends CommandService.PluginCommand {
         plugin.getContext().getArenaManager().startSetup((Player) sender, args[1]);
     }
 
-    /** Handles {@code /bbai list}. */
+    /** Handles {@code /bbai list} — shows arenas with game state and clickable join. */
     private void handleList(CommandSender sender) {
         if (!(sender instanceof Player)) {
             sendPlayerOnly(sender);
@@ -112,6 +127,7 @@ public class ArenaCommand extends CommandService.PluginCommand {
         }
         Player player = (Player) sender;
         BBAIArenaManager arenaManager = plugin.getContext().getArenaManager();
+        BBAIGameManager gameManager = plugin.getContext().getGameManager();
         Lang lang = plugin.getContext().getConfigService().getDefaultLang();
 
         plugin.getContext().getMessageService().sendChat(player, lang.get("arena.setup.divider"));
@@ -121,18 +137,88 @@ public class ArenaCommand extends CommandService.PluginCommand {
             plugin.getContext().getMessageService().sendChat(player, lang.get("arena.list.empty"));
         else
             for (Arena arena : arenaManager.getArenas()) {
-                String status = arena.enabled()
-                        ? lang.get("arena.list.status-enabled")
-                        : lang.get("arena.list.status-disabled");
+                if (!arena.enabled())
+                    continue;
+
+                ArenaState state = gameManager.getArenaState(arena.name());
+                int current = gameManager.getPlayerCount(arena.name());
+                int max = arena.maxPlayers();
+
+                String stateText;
+                switch (state) {
+                    case COUNTDOWN:
+                        stateText = lang.get("arena.list.state-countdown");
+                        break;
+                    case PLAYING:
+                        stateText = lang.get("arena.list.state-playing");
+                        break;
+                    case ENDING:
+                        stateText = lang.get("arena.list.state-ending");
+                        break;
+                    default:
+                        stateText = lang.get("arena.list.state-waiting");
+                        break;
+                }
+
                 ChatMicroService.ChatMessage entry = new ChatMicroService.ChatMessage();
-                entry.append(lang.get("arena.list.entry",
+                entry.append(lang.get("arena.list.entry-game",
                         "%arena%", arena.name(),
-                        "%players%", String.valueOf(arena.maxPlayers()),
-                        "%status%", status));
+                        "%current%", String.valueOf(current),
+                        "%max%", String.valueOf(max),
+                        "%state%", stateText));
+
+                // Join / Full / In Progress button
+                boolean joinable = (state == ArenaState.WAITING || state == ArenaState.COUNTDOWN)
+                        && current < max;
+                if (joinable)
+                    entry.append(lang.get("arena.list.join-btn"),
+                            ChatMicroService.ClickAction.RUN_COMMAND,
+                            "/bbai join " + arena.name(),
+                            lang.get("arena.list.join-hover", "%arena%", arena.name()));
+                else if (state == ArenaState.PLAYING || state == ArenaState.ENDING)
+                    entry.append(lang.get("arena.list.in-progress-btn"));
+                else
+                    entry.append(lang.get("arena.list.full-btn"));
+
                 plugin.getContext().getMessageService().sendChat(player, entry);
             }
 
         plugin.getContext().getMessageService().sendChat(player, lang.get("arena.setup.divider"));
+    }
+
+    /** Handles {@code /bbai join <arena>}. */
+    private void handleJoin(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player)) {
+            sendPlayerOnly(sender);
+            return;
+        }
+        if (args.length < 2) {
+            Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+            plugin.getContext().getMessageService().sendChat((Player) sender,
+                    lang.get("arena.usage"));
+            return;
+        }
+        plugin.getContext().getGameManager().joinArena((Player) sender, args[1]);
+    }
+
+    /** Handles {@code /bbai leave}. */
+    private void handleLeave(CommandSender sender) {
+        if (!(sender instanceof Player)) {
+            sendPlayerOnly(sender);
+            return;
+        }
+        Player player = (Player) sender;
+        BBAIGameManager gameManager = plugin.getContext().getGameManager();
+        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+
+        if (!gameManager.isInGame(player.getUniqueId())) {
+            plugin.getContext().getMessageService().sendChat(player,
+                    lang.get("game.leave.not-in-game"));
+            return;
+        }
+        gameManager.leaveArena(player);
+        plugin.getContext().getMessageService().sendChat(player,
+                lang.get("game.leave.success"));
     }
 
     /** Handles {@code /bbai delete <name>}. */
@@ -237,6 +323,22 @@ public class ArenaCommand extends CommandService.PluginCommand {
                         am.handleSetCamera(player, plot, 3);
                 }
                 break;
+            case "minplayers":
+                if (args.length >= 3)
+                    handleSetupMinPlayers(player, am, args[2]);
+                break;
+            case "buildtime":
+                if (args.length >= 3)
+                    handleSetupBuildTime(player, am, args[2]);
+                break;
+            case "gametime":
+                if (args.length >= 3)
+                    handleSetupGameTime(player, am, args[2]);
+                break;
+            case "countdown":
+                if (args.length >= 3)
+                    handleSetupCountdown(player, am, args[2]);
+                break;
             case "confirm":
                 am.handleConfirm(player);
                 break;
@@ -246,6 +348,69 @@ public class ArenaCommand extends CommandService.PluginCommand {
             default:
                 break;
         }
+    }
+
+    /**
+     * Validates and applies the min-players setup value.
+     * Must be an integer between 2 and maxPlayers (or 8 if maxPlayers not set).
+     */
+    private void handleSetupMinPlayers(Player player, BBAIArenaManager am, String value) {
+        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+        int count = parseIntSafe(value);
+        int maxAllowed = 8; // default cap if max players not yet set
+        if (count < 2 || count > maxAllowed) {
+            plugin.getContext().getMessageService().sendChat(player,
+                    lang.get("arena.setup.minplayers.invalid", "%max%", String.valueOf(maxAllowed)));
+            return;
+        }
+        am.handleSetMinPlayers(player, count);
+    }
+
+    /**
+     * Validates and applies the build-time setup value.
+     * Input is in decimal minutes (0.5–10), stored as seconds internally.
+     */
+    private void handleSetupBuildTime(Player player, BBAIArenaManager am, String value) {
+        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+        double minutes = parseDoubleSafe(value);
+        if (minutes < 0.5 || minutes > 10.0) {
+            plugin.getContext().getMessageService().sendChat(player,
+                    lang.get("arena.setup.buildtime.invalid"));
+            return;
+        }
+        int seconds = (int) Math.round(minutes * 60);
+        am.handleSetBuildTime(player, seconds);
+    }
+
+    /**
+     * Validates and applies the game-time setup value.
+     * Input is in decimal minutes (1–30), stored as seconds internally.
+     */
+    private void handleSetupGameTime(Player player, BBAIArenaManager am, String value) {
+        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+        double minutes = parseDoubleSafe(value);
+        if (minutes < 1.0 || minutes > 30.0) {
+            plugin.getContext().getMessageService().sendChat(player,
+                    lang.get("arena.setup.gametime.invalid"));
+            return;
+        }
+        int seconds = (int) Math.round(minutes * 60);
+        am.handleSetGameTime(player, seconds);
+    }
+
+    /**
+     * Validates and applies the countdown setup value.
+     * Input is in integer seconds (3–60).
+     */
+    private void handleSetupCountdown(Player player, BBAIArenaManager am, String value) {
+        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+        int seconds = parseIntSafe(value);
+        if (seconds < 3 || seconds > 60) {
+            plugin.getContext().getMessageService().sendChat(player,
+                    lang.get("arena.setup.countdown.invalid"));
+            return;
+        }
+        am.handleSetCountdown(player, seconds);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────
@@ -267,6 +432,15 @@ public class ArenaCommand extends CommandService.PluginCommand {
     private static int parseIntSafe(String s) {
         try {
             return Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    /** Parses a double from a string, returning -1 on failure. */
+    private static double parseDoubleSafe(String s) {
+        try {
+            return Double.parseDouble(s);
         } catch (NumberFormatException e) {
             return -1;
         }

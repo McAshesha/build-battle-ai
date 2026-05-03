@@ -226,8 +226,9 @@ class ArenaManagerTest {
         assertNull(arena.spectator());
         assertNotNull(arena.effectiveSpectator()); // falls back to lobby
         assertEquals(2, arena.minPlayers());
-        assertEquals(300, arena.buildTime());
-        assertEquals(3, arena.rounds());
+        assertEquals(150, arena.buildTime());
+        assertEquals(300, arena.gameTime());
+        assertEquals(5, arena.countdownTime());
     }
 
     @Test

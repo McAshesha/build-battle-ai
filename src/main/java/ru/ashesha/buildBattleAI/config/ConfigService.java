@@ -282,28 +282,65 @@ public class ConfigService implements BBAIConfigService, PluginService {
 
     /**
      * Loads a config from disk and merges any missing keys from the bundled
-     * resource version. If the file does not exist on disk, it is created
-     * with the full bundled content. The merged result is always saved back
-     * so the admin sees any new keys that were added in a plugin update.
+     * resource version.
+     * <p>
+     * If the file does <b>not</b> exist on disk, the raw resource is copied
+     * byte-for-byte from the JAR, preserving comments and formatting. If the
+     * file <b>does</b> exist, only missing leaf keys are added (preserving
+     * admin customizations) and the merged result is saved back.
      *
      * @param resourcePath path inside the plugin JAR (e.g. {@code "lang/en.yml"})
      * @param file         target file on disk
      * @return the loaded (and possibly merged) configuration
      */
     private YamlConfiguration loadWithDefaults(String resourcePath, File file) {
+        if (!file.exists()) {
+            // First run — copy the raw resource to preserve comments and formatting.
+            // The resource stream is consumed only once (by copyResource), then
+            // the file is loaded from the written copy.
+            if (copyResource(resourcePath, file))
+                return loadFromFile(file);
+            // Fallback: resource not found — create empty config
+            return new YamlConfiguration();
+        }
+
+        // File exists — merge any new keys added in a plugin update.
+        // This consumes the resource stream through loadFromResource (parsed),
+        // then merges missing keys into the admin's existing file.
         YamlConfiguration internal = loadFromResource(resourcePath);
-        YamlConfiguration fileConfig;
-
-        if (file.exists())
-            fileConfig = loadFromFile(file);
-        else
-            fileConfig = new YamlConfiguration();
-
-        if (internal != null)
-            mergeDefaults(internal, fileConfig);
-
-        saveToFile(fileConfig, file);
+        YamlConfiguration fileConfig = loadFromFile(file);
+        if (internal != null && mergeDefaults(internal, fileConfig))
+            saveToFile(fileConfig, file);
         return fileConfig;
+    }
+
+    /**
+     * Copies a raw resource from the plugin JAR to a file on disk,
+     * preserving the original formatting, comments, and structure.
+     *
+     * @param resourcePath path inside the JAR
+     * @param target       destination file
+     * @return {@code true} if the copy succeeded
+     */
+    private boolean copyResource(String resourcePath, File target) {
+        InputStream stream = plugin.getResource(resourcePath);
+        if (stream == null)
+            return false;
+        try {
+            FileOutputStream out = new FileOutputStream(target);
+            byte[] buf = new byte[BUFFER_SIZE];
+            int n;
+            while ((n = stream.read(buf)) != -1)
+                out.write(buf, 0, n);
+            out.flush();
+            out.close();
+            stream.close();
+            return true;
+        } catch (IOException e) {
+            plugin.getPluginLogger().warn("Failed to copy resource %s: %s",
+                    resourcePath, e.getMessage());
+            return false;
+        }
     }
 
     /**

@@ -147,6 +147,38 @@ public interface BBAIArenaManager {
     void handleSetCamera(Player player, int plotIndex, int cameraIndex);
 
     /**
+     * Sets the minimum player count for the arena being created.
+     *
+     * @param player the admin
+     * @param count  minimum player count (2–maxPlayers)
+     */
+    void handleSetMinPlayers(Player player, int count);
+
+    /**
+     * Sets the per-build time limit for the arena being created.
+     *
+     * @param player  the admin
+     * @param seconds build time in seconds (30–600)
+     */
+    void handleSetBuildTime(Player player, int seconds);
+
+    /**
+     * Sets the total game duration for the arena being created.
+     *
+     * @param player  the admin
+     * @param seconds game time in seconds (60–1800)
+     */
+    void handleSetGameTime(Player player, int seconds);
+
+    /**
+     * Sets the countdown duration for the arena being created.
+     *
+     * @param player  the admin
+     * @param seconds countdown in seconds (3–60)
+     */
+    void handleSetCountdown(Player player, int seconds);
+
+    /**
      * Finalizes arena creation if all required settings are filled.
      * Saves the arena config to YAML, registers it as active, and
      * returns the player to their original location.

@@ -15,7 +15,7 @@ import java.util.List;
  * <ul>
  *     <li>Global positions — lobby (where players wait) and spectator (where
  *         players go during results display, defaults to lobby if unset)</li>
- *     <li>Game parameters — player count, build time, rounds</li>
+ *     <li>Game parameters — player count, build time, game time, countdown</li>
  *     <li>Per-slot {@link PlotData plot definitions} — spawn point, cuboid
  *         build zone, and camera angle for AI capture</li>
  * </ul>
@@ -56,11 +56,14 @@ public class Arena {
     /** Minimum players required to start a game. Defaults to 2. */
     private final int minPlayers;
 
-    /** Duration of each building phase in seconds. Defaults to 300. */
+    /** Duration of each building phase in seconds. Defaults to 150. */
     private final int buildTime;
 
-    /** Number of rounds per game session. Defaults to 3. */
-    private final int rounds;
+    /** Total game session duration in seconds. Defaults to 300. */
+    private final int gameTime;
+
+    /** Countdown duration before game start in seconds. Defaults to 5. */
+    private final int countdownTime;
 
     /** Per-slot build zones and camera positions (indexed 0..maxPlayers-1). */
     @NonNull
@@ -75,14 +78,15 @@ public class Arena {
      * @param enabled    whether the arena loads on startup
      * @param lobby      lobby spawn position (required)
      * @param spectator  spectator/results position (nullable, defaults to lobby)
-     * @param minPlayers minimum players to start (default 2)
-     * @param buildTime  build phase duration in seconds (default 300)
-     * @param rounds     rounds per game (default 3)
-     * @param plots      plot definitions (one per player slot)
+     * @param minPlayers    minimum players to start (default 2)
+     * @param buildTime     build phase duration in seconds (default 150)
+     * @param gameTime      total game session duration in seconds (default 300)
+     * @param countdownTime countdown before start in seconds (default 5)
+     * @param plots         plot definitions (one per player slot)
      */
     public Arena(@NonNull String name, @NonNull String worldName, int maxPlayers,
                  boolean enabled, @NonNull Position lobby, Position spectator,
-                 int minPlayers, int buildTime, int rounds,
+                 int minPlayers, int buildTime, int gameTime, int countdownTime,
                  @NonNull List<PlotData> plots) {
         this.name = name;
         this.worldName = worldName;
@@ -92,7 +96,8 @@ public class Arena {
         this.spectator = spectator;
         this.minPlayers = minPlayers;
         this.buildTime = buildTime;
-        this.rounds = rounds;
+        this.gameTime = gameTime;
+        this.countdownTime = countdownTime;
         this.plots = Collections.unmodifiableList(plots);
     }
 

@@ -26,6 +26,7 @@ import ru.ashesha.buildBattleAI.entity.picture.api.BBAIPictureService;
 import ru.ashesha.buildBattleAI.game.GameManager;
 import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
 import ru.ashesha.buildBattleAI.listeners.ArenaSetupListener;
+import ru.ashesha.buildBattleAI.listeners.GameListener;
 import ru.ashesha.buildBattleAI.listeners.ListenerService;
 import ru.ashesha.buildBattleAI.message.MessageService;
 import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
@@ -191,6 +192,7 @@ public class PluginContext {
         // registration mechanism and the bulk-unregistration guarantees).
         commandService.register(new ArenaCommand(plugin));
         listenerService.register(new ArenaSetupListener(plugin));
+        listenerService.register(new GameListener(plugin));
 
         long elapsed = System.currentTimeMillis() - start;
         plugin.getPluginLogger().debug("PluginContext enabled %d service(s) in %d ms.",
