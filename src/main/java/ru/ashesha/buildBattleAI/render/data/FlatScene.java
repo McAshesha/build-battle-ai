@@ -70,9 +70,13 @@ public class FlatScene implements SceneData {
                      @NonNull String sourceName) {
         // Validate that the supplied data array length matches the declared region volume.
         // Uses long arithmetic to avoid silent int overflow on huge dimensions.
-        if ((long) sizeX * sizeY * sizeZ != data.length)
+        if ((long) sizeX * sizeY * sizeZ != data.length) {
+            long expected = (long) sizeX * sizeY * sizeZ;
             throw new IllegalArgumentException(
-                    "data length " + data.length + " != expected " + sizeX + "*" + sizeY + "*" + sizeZ);
+                    "FlatScene data length mismatch: actual=" + data.length
+                            + ", expected=" + expected
+                            + " (sizeX=" + sizeX + " * sizeY=" + sizeY + " * sizeZ=" + sizeZ + ")");
+        }
         this.data = data;
         this.legacyBlockData = legacyBlockData;
         this.blockStates = blockStates;

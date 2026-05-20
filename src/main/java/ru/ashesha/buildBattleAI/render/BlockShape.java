@@ -453,18 +453,6 @@ public class BlockShape {
         return null;
     }
 
-    private static boolean isPaneBlock(String name) {
-        return name.endsWith("_PANE") || name.equals("IRON_BARS");
-    }
-
-    private static boolean isFenceBlock(String name) {
-        return name.endsWith("_FENCE") && !name.contains("GATE");
-    }
-
-    private static boolean isWallBlock(String name) {
-        return name.endsWith("_WALL");
-    }
-
     /**
      * Checks whether a source block connects to its neighbor for shape connectivity.
      * Panes connect to other panes and opaque full blocks; fences connect to other fences,

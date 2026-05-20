@@ -9,6 +9,8 @@ import ru.ashesha.buildBattleAI.core.PluginService;
 import ru.ashesha.buildBattleAI.render.data.ChunkScene;
 import ru.ashesha.buildBattleAI.render.data.SceneData;
 
+import java.util.concurrent.RejectedExecutionException;
+
 /**
  * Centralized entry point for all rendering operations.
  * <p>
@@ -105,7 +107,7 @@ public class RenderService implements PluginService {
      * @param yaw   camera yaw (Minecraft convention: 0=south, 90=west, 180=north)
      * @param pitch camera pitch (-90=up, 0=horizontal, 90=down)
      * @return byte array of size 224×224×3 containing RGB pixel data in row-major HWC order
-     * @throws IllegalStateException if the service is not enabled
+     * @throws IllegalStateException if the service is not enabled, or if shutdown() was invoked concurrently with this call
      */
     public byte[] render(@NonNull SceneData scene,
                          double camX, double camY, double camZ,
@@ -117,7 +119,14 @@ public class RenderService implements PluginService {
         CpuRenderer r = renderer;
         if (r == null)
             throw new IllegalStateException("RenderService is not enabled");
-        return r.render(scene, camX, camY, camZ, yaw, pitch);
+        try {
+            return r.render(scene, camX, camY, camZ, yaw, pitch);
+        } catch (RejectedExecutionException exception) {
+            // shutdown() raced with this render: the pool was terminated
+            // between our null-check and pool.invoke(). Surface the same
+            // diagnosable IllegalStateException as the null-check path.
+            throw new IllegalStateException("RenderService is being shut down", exception);
+        }
     }
 
     /**
