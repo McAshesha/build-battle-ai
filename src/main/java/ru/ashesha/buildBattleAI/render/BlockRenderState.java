@@ -97,6 +97,12 @@ public class BlockRenderState {
     /**
      * Retrieves or parses the block render state at the given world coordinates.
      * Returns {@link #DEFAULT} if no block state string is available.
+     * <p>
+     * Convenience overload that performs the {@link SceneData#getBlockState}
+     * lookup itself. Callers that already hold the raw state string (e.g.
+     * {@link BlockShape#getStatefulShape} which fetched it for its own cache
+     * key) should use {@link #of(String)} instead to avoid the duplicate
+     * scene lookup.
      *
      * @param scene the scene data source
      * @param x     world X coordinate
@@ -105,7 +111,20 @@ public class BlockRenderState {
      * @return the parsed render state, never {@code null}
      */
     public static BlockRenderState of(SceneData scene, int x, int y, int z) {
-        String blockState = scene.getBlockState(x, y, z);
+        return of(scene.getBlockState(x, y, z));
+    }
+
+    /**
+     * Retrieves or parses the block render state from an already-fetched
+     * raw block-state string. Useful for hot paths that already obtained the
+     * string for another purpose (e.g. a cache key) — avoids a redundant
+     * {@link SceneData#getBlockState} call.
+     *
+     * @param blockState the raw block state string, may be {@code null} or empty
+     * @return the parsed render state, or {@link #DEFAULT} for null/empty input,
+     *         never {@code null}
+     */
+    public static BlockRenderState of(String blockState) {
         if (blockState == null || blockState.isEmpty())
             return DEFAULT;
         Map<String, BlockRenderState> cache = CACHE_REF.get();

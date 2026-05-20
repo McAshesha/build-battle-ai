@@ -4,9 +4,7 @@ import com.cryptomorin.xseries.XMaterial;
 import lombok.experimental.UtilityClass;
 import ru.ashesha.buildBattleAI.render.data.SceneData;
 
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 /**
@@ -18,12 +16,6 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
 @UtilityClass
 public class BlockShape {
 
-    /**
-     * Maximum state shape cache size before eviction. Higher than BlockRenderState's limit
-     * because keys include the material ordinal, producing more unique entries.
-     * Clearing is safe — entries are purely a performance cache and will be recomputed on miss.
-     */
-    static final int MAX_STATE_SHAPE_CACHE_SIZE = 2048;
     /**
      * Lock-free connectivity-shape cache. Keys are (familyIdx * 16 + mask) where
      * familyIdx is 0=pane, 1=fence, 2=wall — only 48 distinct entries total, all
@@ -183,16 +175,21 @@ public class BlockShape {
      */
     private static final double[][][] SHAPES = new double[XMaterial.values().length][][];
     /**
-     * Cache for shapes resolved from block state properties (slabs, stairs, trapdoors, etc.).
-     * Keyed by {@code material.ordinal() + "|" + blockState} — the full block-state
-     * string is used directly (instead of a 32-bit hash), eliminating the previous
-     * collision hazard where two distinct state strings could share a {@code Long}
-     * key and silently swap shapes. Wrapped in an {@link AtomicReference} so the
-     * over-capacity replacement is CAS-guarded: concurrent saturating writers
-     * collapse into a single eviction rather than thrashing the cache.
+     * Per-material state shape cache. Index is {@link XMaterial#ordinal()}. Each
+     * bucket is lazily initialized on first miss and stores
+     * {@code blockState -> shape} entries. Replaces the previous single
+     * {@code Map<String, double[][]>} keyed by {@code ordinal + "|" + blockState},
+     * which allocated a fresh concatenated string on every lookup in the hot
+     * path. With a per-material bucket the lookup key is just the raw
+     * block-state string (already in hand for the {@code getStatefulShape}
+     * caller), eliminating the per-call allocation entirely.
+     * <p>
+     * Each bucket is naturally small — a given material has a conservative
+     * number of state variants (slabs: 3, stairs: 16, trapdoors: 32, ...),
+     * so no per-bucket eviction is needed.
      */
-    private static final AtomicReference<Map<String, double[][]>> STATE_SHAPE_CACHE_REF =
-            new AtomicReference<Map<String, double[][]>>(new ConcurrentHashMap<String, double[][]>());
+    private static final AtomicReferenceArray<ConcurrentHashMap<String, double[][]>> STATE_SHAPE_CACHES =
+            new AtomicReferenceArray<ConcurrentHashMap<String, double[][]>>(XMaterial.values().length);
 
     // Assigns shapes to materials based on name patterns.
     // The static initializer iterates all XMaterial values and maps each one to
@@ -399,26 +396,26 @@ public class BlockShape {
         if (blockState == null || blockState.isEmpty())
             return null;
 
-        // String key avoids both Long-boxing on every lookup AND the silent
-        // hash-collision hazard of the previous packed-long scheme. The leading
-        // ordinal disambiguates two materials that happen to share a state
-        // shape string (e.g. all *_STAIRS share "...[facing=north,half=bottom]").
-        String key = material.ordinal() + "|" + blockState;
-        Map<String, double[][]> cache = STATE_SHAPE_CACHE_REF.get();
-        double[][] cached = cache.get(key);
+        // F5: per-material bucket avoids the per-lookup "ordinal + '|' + state"
+        // string concatenation. The raw block-state string serves as the key
+        // directly — material disambiguation is provided by the bucket index.
+        int ordinal = material.ordinal();
+        ConcurrentHashMap<String, double[][]> bucket = STATE_SHAPE_CACHES.get(ordinal);
+        if (bucket == null) {
+            STATE_SHAPE_CACHES.compareAndSet(ordinal, null, new ConcurrentHashMap<String, double[][]>());
+            bucket = STATE_SHAPE_CACHES.get(ordinal);
+        }
+        double[][] cached = bucket.get(blockState);
         if (cached != null)
             return cached;
 
-        BlockRenderState state = BlockRenderState.of(scene, x, y, z);
+        // F10: reuse the blockState string we already fetched for the cache key
+        // instead of calling scene.getBlockState(x,y,z) a second time inside
+        // BlockRenderState.of(scene,...).
+        BlockRenderState state = BlockRenderState.of(blockState);
         double[][] resolved = buildStatefulShape(material, state);
-        if (resolved != null) {
-            // CAS-guarded eviction: concurrent over-cap detections collapse to
-            // a single map replacement rather than throwing away just-cached
-            // entries in a thundering-herd loop.
-            if (cache.size() > MAX_STATE_SHAPE_CACHE_SIZE)
-                STATE_SHAPE_CACHE_REF.compareAndSet(cache, new ConcurrentHashMap<String, double[][]>());
-            STATE_SHAPE_CACHE_REF.get().put(key, resolved);
-        }
+        if (resolved != null)
+            bucket.put(blockState, resolved);
         return resolved;
     }
 
@@ -691,17 +688,25 @@ public class BlockShape {
     }
 
     /**
-     * Returns the current number of state shape cache entries. Package-visible for testing.
+     * Returns the current total number of state shape cache entries across all
+     * material buckets. Package-visible for testing.
      */
     static int stateShapeCacheSize() {
-        return STATE_SHAPE_CACHE_REF.get().size();
+        int total = 0;
+        for (int i = 0, n = STATE_SHAPE_CACHES.length(); i < n; i++) {
+            ConcurrentHashMap<String, double[][]> bucket = STATE_SHAPE_CACHES.get(i);
+            if (bucket != null)
+                total += bucket.size();
+        }
+        return total;
     }
 
     /**
-     * Replaces the state shape cache with a fresh empty map. Package-visible for testing.
+     * Clears all per-material state shape cache buckets. Package-visible for testing.
      */
     static void clearStateShapeCache() {
-        STATE_SHAPE_CACHE_REF.set(new ConcurrentHashMap<String, double[][]>());
+        for (int i = 0, n = STATE_SHAPE_CACHES.length(); i < n; i++)
+            STATE_SHAPE_CACHES.set(i, null);
     }
 
 }

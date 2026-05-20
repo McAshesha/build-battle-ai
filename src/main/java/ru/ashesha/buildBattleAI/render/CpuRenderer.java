@@ -868,7 +868,48 @@ public class CpuRenderer {
     public byte[] render(@NonNull SceneData scene,
                          double camX, double camY, double camZ,
                          float yaw, float pitch) {
-        byte[] pixels = new byte[RendererUtils.WIDTH * RendererUtils.HEIGHT * 3];
+        return render(scene, camX, camY, camZ, yaw, pitch,
+                new byte[RendererUtils.WIDTH * RendererUtils.HEIGHT * 3]);
+    }
+
+    /**
+     * Renders the scene into a caller-provided byte buffer. Useful for
+     * high-frequency rendering (e.g. ML inference loops) where reusing the
+     * same {@code byte[]} across calls eliminates the ~150 KB per-frame
+     * allocation produced by the no-buffer overload.
+     * <p>
+     * The buffer is overwritten in full — its prior contents are ignored. The
+     * caller may safely share a single buffer across sequential renders on the
+     * same thread; concurrent renders into the same buffer would race and must
+     * use distinct buffers.
+     * <p>
+     * <strong>This method blocks the calling thread</strong> until all pixels
+     * are rendered. It must never be called from the Bukkit main thread — use
+     * {@code Bukkit.getScheduler().runTaskAsynchronously()}.
+     *
+     * @param scene  the captured scene data (thread-safe)
+     * @param camX   camera X position
+     * @param camY   camera Y position
+     * @param camZ   camera Z position
+     * @param yaw    camera yaw (Minecraft convention: 0=south, 90=west, 180=north)
+     * @param pitch  camera pitch (-90=up, 0=horizontal, 90=down)
+     * @param outBuf a byte array of exactly {@code WIDTH*HEIGHT*3} bytes;
+     *               will be overwritten with the rendered pixel data
+     * @return {@code outBuf} (same reference, for fluent chaining)
+     * @throws IllegalArgumentException if {@code outBuf} is null or wrong length
+     */
+    public byte[] render(@NonNull SceneData scene,
+                         double camX, double camY, double camZ,
+                         float yaw, float pitch,
+                         byte[] outBuf) {
+        final int expectedSize = RendererUtils.WIDTH * RendererUtils.HEIGHT * 3;
+        if (outBuf == null)
+            throw new IllegalArgumentException("outBuf must not be null");
+        if (outBuf.length != expectedSize)
+            throw new IllegalArgumentException(
+                    "outBuf length " + outBuf.length + " != expected " + expectedSize);
+
+        byte[] pixels = outBuf;
 
         // Camera basis vectors (Minecraft coordinate system)
         double yawRad = Math.toRadians(yaw);

@@ -710,29 +710,34 @@ class BlockShapeTest {
     }
 
     @Test
-    void stateShapeCacheStaysBounded() {
-        int insertCount = BlockShape.MAX_STATE_SHAPE_CACHE_SIZE + 500;
+    void stateShapeCachePopulatesPerMaterialBucket() {
+        // After F5: the state-shape cache is split into per-material buckets
+        // (indexed by XMaterial.ordinal()), eliminating the per-lookup
+        // "ordinal + '|' + blockState" key concatenation. Each unique
+        // block-state string inserts one entry into the material's bucket.
+        int insertCount = 100;
         for (int i = 0; i < insertCount; i++) {
-            // Each unique block state string produces a unique cache key
             SceneData scene = sceneWithState(XMaterial.OAK_SLAB,
                     "minecraft:oak_slab[half=top,waterlogged=false,tag=" + i + "]");
             BlockShape.getShape(scene, 0, 0, 0, XMaterial.OAK_SLAB);
         }
-        assertTrue(BlockShape.stateShapeCacheSize() <= BlockShape.MAX_STATE_SHAPE_CACHE_SIZE + 1,
-                "State shape cache should be bounded, was: " + BlockShape.stateShapeCacheSize());
+        assertEquals(insertCount, BlockShape.stateShapeCacheSize(),
+                "All distinct block states should be cached in the OAK_SLAB bucket");
     }
 
     // ===== Helper =====
 
     @Test
-    void stateShapeCorrectnessAfterEviction() {
-        // Fill past the limit to trigger a clear
-        for (int i = 0; i < BlockShape.MAX_STATE_SHAPE_CACHE_SIZE + 100; i++) {
+    void stateShapeCorrectnessAcrossMaterials() {
+        // Populate the OAK_STAIRS bucket with many state variants, then
+        // ensure OAK_SLAB shape resolution remains unaffected (per-material
+        // buckets isolate state from other materials).
+        for (int i = 0; i < 100; i++) {
             SceneData scene = sceneWithState(XMaterial.OAK_STAIRS,
                     "minecraft:oak_stairs[facing=north,half=bottom,shape=straight,tag=" + i + "]");
             BlockShape.getShape(scene, 0, 0, 0, XMaterial.OAK_STAIRS);
         }
-        // Verify correctness after eviction
+        // Verify a different material in the same scene resolves correctly.
         SceneData scene = sceneWithState(XMaterial.OAK_SLAB, "minecraft:oak_slab[half=top]");
         double[][] shape = BlockShape.getShape(scene, 0, 0, 0, XMaterial.OAK_SLAB);
         assertNotNull(shape);

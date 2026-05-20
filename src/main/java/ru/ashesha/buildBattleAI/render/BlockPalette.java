@@ -830,6 +830,23 @@ public class BlockPalette {
     }
 
     /**
+     * Returns whether the material's collision shape depends on block state
+     * properties (slabs, stairs, trapdoors, doors, gates, signs, snow, chains,
+     * end rods, ladders, vines, wall torches, etc.).
+     * <p>
+     * Used by scene capture code to decide whether materializing the raw
+     * block-state string for this voxel is worthwhile: stateless blocks
+     * (stone, dirt, wool, glass, ...) can skip the string allocation entirely
+     * since {@link BlockShape#getShape} will never consult it.
+     *
+     * @param material the block material
+     * @return {@code true} if the block's shape depends on its state string
+     */
+    public static boolean needsBlockState(XMaterial material) {
+        return (BLOCK_FLAGS[material.ordinal()] & FLAG_NEEDS_STATE) != 0;
+    }
+
+    /**
      * Checks whether two adjacent translucent blocks should be treated as a single volume,
      * suppressing re-tinting at their shared boundary (e.g., adjacent water or glass blocks).
      *

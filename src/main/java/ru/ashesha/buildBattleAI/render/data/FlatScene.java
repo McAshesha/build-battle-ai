@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NonNull;
 import lombok.Value;
 import lombok.experimental.Accessors;
+import ru.ashesha.buildBattleAI.render.BlockPalette;
 
 /**
  * Fast scene backed by a flat {@code short[]} of {@link XMaterial#ordinal()} values.
@@ -123,8 +124,20 @@ public class FlatScene implements SceneData {
                 for (int z = 0; z < sizeZ; z++) {
                     int index = xyBase + z;
                     int worldZ = z + minZ;
-                    data[index] = (short) snapshot.getBlockType(worldX, worldY, worldZ).ordinal();
-                    blockStates[index] = snapshot.getBlockState(worldX, worldY, worldZ);
+                    XMaterial mat = snapshot.getBlockType(worldX, worldY, worldZ);
+                    data[index] = (short) mat.ordinal();
+                    // F4: materialize the block-state string only for blocks
+                    // whose collision shape actually depends on it. ~95% of
+                    // blocks in a typical scene (stone, dirt, wool, glass, …)
+                    // are stateless and never need this allocation. The
+                    // downstream getStatefulShape() short-circuits on a null
+                    // state, which matches the "stateless" behaviour exactly.
+                    // Note: legacyBlockData[] is *not* gated by this flag —
+                    // pre-1.13 legacy data is consumed by LegacyBlockStates
+                    // for many stateless blocks (e.g. log axis) and must
+                    // always be populated when available.
+                    if (BlockPalette.needsBlockState(mat))
+                        blockStates[index] = snapshot.getBlockState(worldX, worldY, worldZ);
                     if (legacyBlockData != null)
                         legacyBlockData[index] = snapshot.getLegacyBlockData(worldX, worldY, worldZ);
                 }

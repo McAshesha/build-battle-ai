@@ -130,6 +130,48 @@ public class RenderService implements PluginService {
     }
 
     /**
+     * Renders the scene into a caller-provided byte buffer. Useful for
+     * high-frequency rendering loops where reusing the same buffer avoids
+     * a ~150 KB allocation per frame. Delegates to
+     * {@link CpuRenderer#render(SceneData, double, double, double, float, float, byte[])}.
+     * <p>
+     * Same lifecycle and threading semantics as
+     * {@link #render(SceneData, double, double, double, float, float)}: must be
+     * called after {@link #enable()} and before {@link #shutdown()}, and the
+     * underlying call may run concurrently from any thread (but the same
+     * {@code outBuf} must not be shared across concurrent calls).
+     *
+     * @param scene  the captured scene data (thread-safe)
+     * @param camX   camera X position
+     * @param camY   camera Y position
+     * @param camZ   camera Z position
+     * @param yaw    camera yaw (Minecraft convention: 0=south, 90=west, 180=north)
+     * @param pitch  camera pitch (-90=up, 0=horizontal, 90=down)
+     * @param outBuf a byte array of exactly 224×224×3 bytes; will be
+     *               overwritten with the rendered pixel data
+     * @return {@code outBuf} (same reference, for fluent chaining)
+     * @throws IllegalStateException    if the service is not enabled, or if
+     *                                  shutdown() was invoked concurrently with this call
+     * @throws IllegalArgumentException if {@code outBuf} is null or wrong length
+     */
+    public byte[] render(@NonNull SceneData scene,
+                         double camX, double camY, double camZ,
+                         float yaw, float pitch,
+                         byte[] outBuf) {
+        // Mirror the unbuffered render(): capture the volatile reference,
+        // explicit null-check, and convert RejectedExecutionException into a
+        // diagnosable IllegalStateException for the shutdown-race case.
+        CpuRenderer r = renderer;
+        if (r == null)
+            throw new IllegalStateException("RenderService is not enabled");
+        try {
+            return r.render(scene, camX, camY, camZ, yaw, pitch, outBuf);
+        } catch (RejectedExecutionException exception) {
+            throw new IllegalStateException("RenderService is being shut down", exception);
+        }
+    }
+
+    /**
      * Shuts down the renderer's dedicated thread pool and releases the instance.
      * After this call, {@link #render} will throw {@link IllegalStateException}
      * until the next {@link #enable()} recreates the renderer.
