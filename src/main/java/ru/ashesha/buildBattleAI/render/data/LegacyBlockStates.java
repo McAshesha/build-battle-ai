@@ -47,6 +47,13 @@ public class LegacyBlockStates {
     private static final String[] AXIS_VALUES = {"y", "x", "z"};
 
     /**
+     * Initial capacity for {@link StringBuilder} instances used to assemble block-state strings.
+     * Tuned for typical outputs like {@code "minecraft:oak_stairs[facing=north,half=bottom,shape=straight]"};
+     * an oversized hint costs less than the cost of growing the internal char[] mid-append.
+     */
+    private static final int STATE_BUILDER_CAPACITY = 64;
+
+    /**
      * Converts a legacy material + data value to a modern-format block state string.
      * Returns {@code null} for blocks that don't need state-dependent shapes.
      *
@@ -71,7 +78,7 @@ public class LegacyBlockStates {
             return fenceGateState(name, d);
         // Standing signs (not wall signs)
         if (name.endsWith("_SIGN") && !name.endsWith("_WALL_SIGN"))
-            return "minecraft:" + name.toLowerCase() + "[rotation=" + (d & 15) + "]";
+            return signState(name, d);
         // Wall-mounted blocks: wall signs, ladders, wall torches
         if (name.endsWith("_WALL_SIGN") || name.equals("LADDER")
                 || name.equals("WALL_TORCH") || name.equals("SOUL_WALL_TORCH")
@@ -83,10 +90,8 @@ public class LegacyBlockStates {
                 || name.equals("PURPUR_PILLAR") || name.equals("QUARTZ_PILLAR")
                 || name.equals("CHAIN") || name.equals("END_ROD"))
             return axisState(name, d);
-        if (name.equals("SNOW")) {
-            int layers = (d & 7) + 1;
-            return "minecraft:snow[layers=" + layers + "]";
-        }
+        if (name.equals("SNOW"))
+            return snowState(d);
         if (name.equals("VINE"))
             return vineState(d);
 
@@ -102,8 +107,14 @@ public class LegacyBlockStates {
     private static String stairsState(String name, int d) {
         String facing = STAIR_FACING[d & 3];
         String half = (d & 4) != 0 ? "top" : "bottom";
-        return "minecraft:" + name.toLowerCase()
-                + "[facing=" + facing + ",half=" + half + ",shape=straight]";
+        // Explicit pre-sized StringBuilder — guaranteed to avoid the intermediate String
+        // produced when toLowerCase() participates in '+' concatenation.
+        StringBuilder sb = new StringBuilder(STATE_BUILDER_CAPACITY);
+        sb.append("minecraft:").append(name.toLowerCase())
+                .append("[facing=").append(facing)
+                .append(",half=").append(half)
+                .append(",shape=straight]");
+        return sb.toString();
     }
 
     /**
@@ -111,7 +122,9 @@ public class LegacyBlockStates {
      */
     private static String slabState(String name, int d) {
         String type = (d & 8) != 0 ? "top" : "bottom";
-        return "minecraft:" + name.toLowerCase() + "[type=" + type + "]";
+        StringBuilder sb = new StringBuilder(STATE_BUILDER_CAPACITY);
+        sb.append("minecraft:").append(name.toLowerCase()).append("[type=").append(type).append(']');
+        return sb.toString();
     }
 
     /**
@@ -121,8 +134,13 @@ public class LegacyBlockStates {
         String facing = TRAPDOOR_FACING[d & 3];
         boolean open = (d & 4) != 0;
         String half = (d & 8) != 0 ? "top" : "bottom";
-        return "minecraft:" + name.toLowerCase()
-                + "[facing=" + facing + ",half=" + half + ",open=" + open + "]";
+        StringBuilder sb = new StringBuilder(STATE_BUILDER_CAPACITY);
+        sb.append("minecraft:").append(name.toLowerCase())
+                .append("[facing=").append(facing)
+                .append(",half=").append(half)
+                .append(",open=").append(open)
+                .append(']');
+        return sb.toString();
     }
 
     /**
@@ -135,11 +153,19 @@ public class LegacyBlockStates {
         // Upper half — facing is unknown without reading the lower block.
         // Default to north; the renderer uses this only for shape, and doors
         // are rendered as thin cross panels regardless of facing.
-        if ((d & 8) != 0)
-            return "minecraft:" + lower + "[half=upper,facing=north,open=false]";
+        if ((d & 8) != 0) {
+            StringBuilder sb = new StringBuilder(STATE_BUILDER_CAPACITY);
+            sb.append("minecraft:").append(lower).append("[half=upper,facing=north,open=false]");
+            return sb.toString();
+        }
         String facing = DOOR_FACING[d & 3];
         boolean open = (d & 4) != 0;
-        return "minecraft:" + lower + "[facing=" + facing + ",half=lower,open=" + open + "]";
+        StringBuilder sb = new StringBuilder(STATE_BUILDER_CAPACITY);
+        sb.append("minecraft:").append(lower)
+                .append("[facing=").append(facing)
+                .append(",half=lower,open=").append(open)
+                .append(']');
+        return sb.toString();
     }
 
     /**
@@ -148,7 +174,12 @@ public class LegacyBlockStates {
     private static String fenceGateState(String name, int d) {
         String facing = FENCE_GATE_FACING[d & 3];
         boolean open = (d & 4) != 0;
-        return "minecraft:" + name.toLowerCase() + "[facing=" + facing + ",open=" + open + "]";
+        StringBuilder sb = new StringBuilder(STATE_BUILDER_CAPACITY);
+        sb.append("minecraft:").append(name.toLowerCase())
+                .append("[facing=").append(facing)
+                .append(",open=").append(open)
+                .append(']');
+        return sb.toString();
     }
 
     /**
@@ -156,7 +187,9 @@ public class LegacyBlockStates {
      */
     private static String wallMountedState(String name, int d) {
         String facing = (d >= 2 && d <= 5) ? WALL_MOUNTED_FACING[d] : "north";
-        return "minecraft:" + name.toLowerCase() + "[facing=" + facing + "]";
+        StringBuilder sb = new StringBuilder(STATE_BUILDER_CAPACITY);
+        sb.append("minecraft:").append(name.toLowerCase()).append("[facing=").append(facing).append(']');
+        return sb.toString();
     }
 
     /**
@@ -167,7 +200,28 @@ public class LegacyBlockStates {
     private static String axisState(String name, int d) {
         int axisIdx = (d >> 2) & 3;
         String axis = axisIdx < AXIS_VALUES.length ? AXIS_VALUES[axisIdx] : "y";
-        return "minecraft:" + name.toLowerCase() + "[axis=" + axis + "]";
+        StringBuilder sb = new StringBuilder(STATE_BUILDER_CAPACITY);
+        sb.append("minecraft:").append(name.toLowerCase()).append("[axis=").append(axis).append(']');
+        return sb.toString();
+    }
+
+    /**
+     * Standing signs: bits 0–3 encode rotation (0–15).
+     */
+    private static String signState(String name, int d) {
+        StringBuilder sb = new StringBuilder(STATE_BUILDER_CAPACITY);
+        sb.append("minecraft:").append(name.toLowerCase()).append("[rotation=").append(d & 15).append(']');
+        return sb.toString();
+    }
+
+    /**
+     * Snow layers: bits 0–2 encode layer count (1–8).
+     */
+    private static String snowState(int d) {
+        int layers = (d & 7) + 1;
+        StringBuilder sb = new StringBuilder(32);
+        sb.append("minecraft:snow[layers=").append(layers).append(']');
+        return sb.toString();
     }
 
     /**
@@ -186,7 +240,9 @@ public class LegacyBlockStates {
             facing = "east";
         else
             facing = "north";
-        return "minecraft:vine[facing=" + facing + "]";
+        StringBuilder sb = new StringBuilder(32);
+        sb.append("minecraft:vine[facing=").append(facing).append(']');
+        return sb.toString();
     }
 
 }

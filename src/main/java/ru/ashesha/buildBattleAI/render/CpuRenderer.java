@@ -7,7 +7,9 @@ import ru.ashesha.buildBattleAI.render.data.SceneData;
 import ru.ashesha.buildBattleAI.util.RendererUtils;
 
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.RecursiveAction;
+import java.util.concurrent.TimeUnit;
 
 /**
  * CPU-based voxel ray caster.
@@ -79,9 +81,27 @@ public class CpuRenderer {
 
     /**
      * Creates a renderer with a pool sized to available processors.
+     * <p>
+     * Worker threads are produced by a custom {@link ForkJoinPool.ForkJoinWorkerThreadFactory}
+     * that names each thread {@code bbai-renderer-<poolIndex>} and marks it as a daemon.
+     * Named threads make CPU profiles and thread dumps far easier to read, and daemon
+     * status ensures the JVM is never held alive by a forgotten renderer pool after
+     * {@link #shutdown()} fails to terminate cleanly.
      */
     public CpuRenderer() {
-        this(new ForkJoinPool(Runtime.getRuntime().availableProcessors()));
+        this(new ForkJoinPool(
+                Runtime.getRuntime().availableProcessors(),
+                new ForkJoinPool.ForkJoinWorkerThreadFactory() {
+                    @Override
+                    public ForkJoinWorkerThread newThread(ForkJoinPool p) {
+                        ForkJoinWorkerThread t = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(p);
+                        t.setName("bbai-renderer-" + t.getPoolIndex());
+                        t.setDaemon(true);
+                        return t;
+                    }
+                },
+                null,
+                false));
     }
 
     /**
@@ -109,9 +129,15 @@ public class CpuRenderer {
                                 int regionMinX, int regionMinY, int regionMinZ,
                                 int regionMaxX, int regionMaxY, int regionMaxZ,
                                 int[] heightMap) {
-        // Ray-AABB intersection (slab method)
+        // Ray-AABB intersection (slab method).
+        // Also tracks which axis-aligned slab produced the final tMin — this
+        // is the AABB face the ray enters through. The DDA traversal needs
+        // that as the initial value of `face` so that a starting voxel which
+        // already contains a block (tight-AABB case) is shaded with the
+        // correct face brightness instead of the bogus default.
         double tMin = Double.NEGATIVE_INFINITY;
         double tMax = Double.POSITIVE_INFINITY;
+        int entryAxis = -1;
 
         if (dx != 0) {
             double invD = 1.0 / dx;
@@ -122,7 +148,10 @@ public class CpuRenderer {
                 t1 = t2;
                 t2 = tmp;
             }
-            tMin = Math.max(tMin, t1);
+            if (t1 > tMin) {
+                tMin = t1;
+                entryAxis = 0;
+            }
             tMax = Math.min(tMax, t2);
         } else if (ox < aabbMinX || ox >= aabbMaxX)
             return BG_COLOR;
@@ -136,7 +165,10 @@ public class CpuRenderer {
                 t1 = t2;
                 t2 = tmp;
             }
-            tMin = Math.max(tMin, t1);
+            if (t1 > tMin) {
+                tMin = t1;
+                entryAxis = 1;
+            }
             tMax = Math.min(tMax, t2);
         } else if (oy < aabbMinY || oy >= aabbMaxY)
             return BG_COLOR;
@@ -150,7 +182,10 @@ public class CpuRenderer {
                 t1 = t2;
                 t2 = tmp;
             }
-            tMin = Math.max(tMin, t1);
+            if (t1 > tMin) {
+                tMin = t1;
+                entryAxis = 2;
+            }
             tMax = Math.min(tMax, t2);
         } else if (oz < aabbMinZ || oz >= aabbMaxZ)
             return BG_COLOR;
@@ -158,8 +193,26 @@ public class CpuRenderer {
         if (tMin >= tMax || tMax <= 0)
             return BG_COLOR;
 
-        // Entry point into the AABB (nudge slightly forward to avoid boundary issues)
-        double tStart = Math.max(tMin, 0.0) + NUDGE;
+        // Entry point into the AABB.
+        //
+        // When the ray enters the AABB from outside (tMin > 0), nudge
+        // slightly forward so floor() lands on the first voxel *inside*
+        // the AABB instead of the boundary voxel — the standard
+        // safety margin against floating-point boundary roundoff.
+        //
+        // When the camera is already inside the AABB (tMin <= 0), keep
+        // tStart = 0. Adding NUDGE here would advance startX/Y/Z one
+        // epsilon along the ray and, if the camera coordinate happens to
+        // sit within NUDGE of a voxel boundary, push the floor() to the
+        // *next* voxel. That misidentifies the starting voxel, breaks
+        // strict containment, and drops a legitimate inside-block hit
+        // (the camera's real voxel may be a block while the post-nudge
+        // voxel is air).
+        double tStart;
+        if (tMin > 0.0)
+            tStart = tMin + NUDGE;
+        else
+            tStart = 0.0;
         if (tStart >= tMax)
             return BG_COLOR;
 
@@ -217,13 +270,194 @@ public class CpuRenderer {
         else
             tMaxZ = Double.MAX_VALUE;
 
-        // Track which face was crossed to reach current voxel (for shading)
-        // 0=X face, 1=Y face, 2=Z face
-        int face = 1;
+        // Track which face was crossed to reach current voxel (for shading).
+        // 0 = X face, 1 = Y face, 2 = Z face. A sentinel -1 is used only
+        // when the camera is strictly inside the starting voxel's shape and
+        // the inside-AABB block below has already shaded that voxel out-of-
+        // band; the DDA loop's iteration-0 hit check is gated on
+        // `hitFace >= 0` so the sentinel suppresses the second pass.
+        //
+        // For inside-AABB starts where the camera is NOT strictly inside
+        // any shape box (the starting position lies on a voxel face or in
+        // empty space between sub-block boxes), the inside-AABB block below
+        // overrides `face` with the AABB exit axis so DDA can hit the
+        // voxel from its natural outside-hit convention.
+        int face;
+        if (tMin >= 0.0 && entryAxis >= 0)
+            face = entryAxis;
+        else
+            face = -1;
 
         // Translucency accumulation (front-to-back compositing)
         double accR = 0, accG = 0, accB = 0;
         double remaining = 1.0;
+
+        // ─── Camera-inside-AABB starting voxel ──────────────────────────
+        // When tMin < 0, the camera sits inside the AABB and the ray
+        // originates inside the starting voxel rather than entering it
+        // through a face. The DDA loop's per-voxel shading assumes an
+        // "outside-in" hit and uses the ray direction's sign to pick
+        // both the brightness side (Y_TOP vs Y_BOTTOM) and the
+        // face-dependent color (e.g. grass top vs dirt bottom). Applying
+        // that convention to a ray that *exits* the voxel through the
+        // same face would render the wrong side.
+        //
+        // Handle the starting voxel here with an *inverted* direction
+        // convention: a viewer inside a voxel looking out through some
+        // face is geometrically equivalent to a viewer outside the
+        // voxel hitting the same face with a ray going the opposite way.
+        // Inverting dx/dy/dz and stepX/Y/Z for this one shading call
+        // routes the brightness branch, color lookup, and AO sampling
+        // to the correct side of the exit face.
+        if (tMin < 0.0) {
+            // Exit face: the axis the ray will leave the starting voxel
+            // through first (smallest tMax{X,Y,Z}).
+            int exitAxis;
+            if (tMaxX <= tMaxY && tMaxX <= tMaxZ)
+                exitAxis = 0;
+            else if (tMaxY <= tMaxZ)
+                exitAxis = 1;
+            else
+                exitAxis = 2;
+
+            XMaterial startBlock = scene.getBlockType(vx, vy, vz);
+            int startColor = BlockPalette.getColor(startBlock);
+            // For inside-AABB starts where the camera lies on a voxel face
+            // (boundary case) the natural semantics is the regular DDA
+            // outside-hit through that face — *not* inside-out inversion.
+            // Pre-set `face` to the AABB exit axis so DDA's iteration 0 can
+            // shade the starting voxel with the standard convention. If the
+            // strict-containment check below succeeds the value is
+            // overridden to -1 (sentinel) and the voxel is shaded here
+            // out-of-band instead.
+            face = exitAxis;
+            if (startColor != -1) {
+                double[][] startShape = BlockShape.getShape(scene, vx, vy, vz, startBlock);
+
+                // Pick the AABB the inside-out shading applies to. For a
+                // full cube it is the voxel itself; for sub-block shapes
+                // (slabs, stairs, fences, walls, ...) it is the first
+                // shape box that strictly contains the camera origin.
+                // Strict containment is mandatory in both cases: a point
+                // on a box face is geometrically *on* the boundary, not
+                // inside, and the inverted-direction convention would
+                // pick the wrong side of a face-dependent block (top vs
+                // bottom for grass/mycelium/podzol, etc.).
+                double bMinX, bMinY, bMinZ, bMaxX, bMaxY, bMaxZ;
+                boolean cameraInsideShape = false;
+                bMinX = bMinY = bMinZ = 0;
+                bMaxX = bMaxY = bMaxZ = 0;
+                if (startShape == null) {
+                    double xLo = vx, yLo = vy, zLo = vz;
+                    double xHi = vx + 1.0, yHi = vy + 1.0, zHi = vz + 1.0;
+                    if (ox > xLo && ox < xHi
+                            && oy > yLo && oy < yHi
+                            && oz > zLo && oz < zHi) {
+                        bMinX = xLo;
+                        bMinY = yLo;
+                        bMinZ = zLo;
+                        bMaxX = xHi;
+                        bMaxY = yHi;
+                        bMaxZ = zHi;
+                        cameraInsideShape = true;
+                    }
+                } else {
+                    for (double[] box : startShape) {
+                        double xLo = vx + box[0], yLo = vy + box[1], zLo = vz + box[2];
+                        double xHi = vx + box[3], yHi = vy + box[4], zHi = vz + box[5];
+                        if (ox > xLo && ox < xHi
+                                && oy > yLo && oy < yHi
+                                && oz > zLo && oz < zHi) {
+                            bMinX = xLo;
+                            bMinY = yLo;
+                            bMinZ = zLo;
+                            bMaxX = xHi;
+                            bMaxY = yHi;
+                            bMaxZ = zHi;
+                            cameraInsideShape = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (cameraInsideShape) {
+                    // We are about to shade the starting voxel here. Mark
+                    // the DDA loop's iteration 0 hit check as already
+                    // satisfied so the same voxel is not re-shaded with the
+                    // outside-hit convention.
+                    face = -1;
+
+                    // Exit face of the containing AABB: axis with the
+                    // smallest forward-going time to a box face.
+                    double tExitX = dx > 0 ? (bMaxX - ox) / dx
+                                  : dx < 0 ? (bMinX - ox) / dx : Double.MAX_VALUE;
+                    double tExitY = dy > 0 ? (bMaxY - oy) / dy
+                                  : dy < 0 ? (bMinY - oy) / dy : Double.MAX_VALUE;
+                    double tExitZ = dz > 0 ? (bMaxZ - oz) / dz
+                                  : dz < 0 ? (bMinZ - oz) / dz : Double.MAX_VALUE;
+                    int boxExitAxis;
+                    if (tExitX <= tExitY && tExitX <= tExitZ)
+                        boxExitAxis = 0;
+                    else if (tExitY <= tExitZ)
+                        boxExitAxis = 1;
+                    else
+                        boxExitAxis = 2;
+
+                    // For full-cube starts the voxel-exit axis was the
+                    // same as the AABB-exit axis (kept above as a faster
+                    // path). For sub-block starts we use the box's own
+                    // exit axis instead.
+                    int effectiveExitAxis = (startShape == null) ? exitAxis : boxExitAxis;
+
+                    // Inverted direction for inside-out shading. AO is
+                    // skipped, so only dx/dy/dz are inverted (stepX/Y/Z
+                    // would have been inverted for AO neighbor lookup).
+                    double idx = -dx;
+                    double idy = -dy;
+                    double idz = -dz;
+
+                    int alpha = BlockPalette.getAlpha(startBlock);
+                    double brightness;
+                    if (BlockPalette.isEmissive(startBlock))
+                        brightness = 1.0;
+                    else {
+                        if (effectiveExitAxis == 0)
+                            brightness = BRIGHTNESS_X;
+                        else if (effectiveExitAxis == 1)
+                            brightness = idy < 0 ? BRIGHTNESS_Y_TOP : BRIGHTNESS_Y_BOTTOM;
+                        else
+                            brightness = BRIGHTNESS_Z;
+                        // AO is intentionally skipped for inside-voxel
+                        // hits: occlusion from "neighbors on the outward
+                        // side" makes little physical sense when the
+                        // viewer is enclosed by the block itself.
+                    }
+
+                    int shadedColor = BlockPalette.getColor(scene, vx, vy, vz, startBlock,
+                            effectiveExitAxis, idx, idy, idz);
+                    double sr = ((shadedColor >> 16) & 0xFF) * brightness;
+                    double sg = ((shadedColor >> 8) & 0xFF) * brightness;
+                    double sb = (shadedColor & 0xFF) * brightness;
+
+                    if (alpha >= 255) {
+                        // Opaque starting voxel — return immediately.
+                        int finalR = Math.min(255, (int) sr);
+                        int finalG = Math.min(255, (int) sg);
+                        int finalB = Math.min(255, (int) sb);
+                        return (finalR << 16) | (finalG << 8) | finalB;
+                    }
+                    // Translucent — accumulate and continue the DDA loop
+                    // from the *next* voxel. The first iteration's hit
+                    // check is gated on `hitFace >= 0` so this voxel is
+                    // not re-shaded with the wrong (outside-in) convention.
+                    double a = alpha / 255.0;
+                    accR = a * sr;
+                    accG = a * sg;
+                    accB = a * sb;
+                    remaining = 1.0 - a;
+                }
+            }
+        }
 
         // Column stride for height map index computation
         int hmSizeZ = regionMaxZ - regionMinZ + 1;
@@ -619,6 +853,9 @@ public class CpuRenderer {
      * Renders the scene from the given camera position and orientation.
      * Safe to call from any thread concurrently — each invocation operates
      * on its own pixel buffer and submits independent fork/join tasks.
+     * <p>
+     * <strong>This method blocks the calling thread</strong> until all pixels are rendered.
+     * It must never be called from the Bukkit main thread — use {@code Bukkit.getScheduler().runTaskAsynchronously()}.
      *
      * @param scene the captured scene data (thread-safe)
      * @param camX  camera X position
@@ -685,9 +922,26 @@ public class CpuRenderer {
      * Shuts down the dedicated thread pool, releasing worker threads back to the OS.
      * After this call, the renderer instance is no longer usable — discard it and
      * create a new {@code CpuRenderer} if rendering is needed again.
+     * <p>
+     * Performs a graceful shutdown: rejects new tasks, waits up to 5 seconds for
+     * already-submitted render tasks to complete, then escalates to
+     * {@link ForkJoinPool#shutdownNow()} if any worker is still running. This
+     * prevents partially-rendered frames from being silently abandoned during
+     * plugin reload, while still guaranteeing that {@code shutdown()} returns
+     * in bounded time even if a render is stuck.
+     * <p>
+     * If the calling thread is interrupted while waiting, the interrupt status
+     * is preserved and {@link ForkJoinPool#shutdownNow()} is invoked immediately.
      */
     public void shutdown() {
-        pool.shutdownNow();
+        pool.shutdown();
+        try {
+            if (!pool.awaitTermination(5L, TimeUnit.SECONDS))
+                pool.shutdownNow();
+        } catch (InterruptedException e) {
+            pool.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     // ===== Parallel rendering infrastructure =====

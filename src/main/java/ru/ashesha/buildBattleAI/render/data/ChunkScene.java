@@ -32,6 +32,14 @@ public class ChunkScene implements SceneData {
     private static final XMaterial[] MATERIAL_VALUES = XMaterial.values();
 
     /**
+     * Hard upper bound for any single axis of a captured region. Larger requests
+     * are rejected up front rather than allocating a multi-gigabyte voxel array
+     * or overflowing the int multiplication that backs the flat-index layout.
+     * Matches the limit enforced by {@code TestRenderCommand}.
+     */
+    public static final int MAX_REGION_AXIS = 512;
+
+    /**
      * Flat array of material ordinals, indexed by {@link #indexOf(int, int, int)}.
      */
     private final short[] data;
@@ -112,13 +120,28 @@ public class ChunkScene implements SceneData {
      * @param legacy {@code true} on 1.8–1.12 servers (pre-flattening); {@code false} on 1.13+
      */
     public static ChunkScene capture(@NonNull RenderRegion region, boolean legacy) {
+        // Validate region dimensions with long arithmetic. Prevents both
+        // NegativeArraySizeException from int overflow on huge regions and
+        // adversarial OOM via an unbounded admin-supplied region.
+        long sx = (long) region.maxX() - region.minX() + 1L;
+        long sy = (long) region.maxY() - region.minY() + 1L;
+        long sz = (long) region.maxZ() - region.minZ() + 1L;
+        if (sx <= 0 || sy <= 0 || sz <= 0)
+            throw new IllegalArgumentException(
+                    "Render region has non-positive dimension: " + sx + "x" + sy + "x" + sz);
+        if (sx > MAX_REGION_AXIS || sy > MAX_REGION_AXIS || sz > MAX_REGION_AXIS)
+            throw new IllegalArgumentException(
+                    "Render region axis exceeds " + MAX_REGION_AXIS + ": " + sx + "x" + sy + "x" + sz);
+
+        int sizeX = (int) sx;
+        int sizeY = (int) sy;
+        int sizeZ = (int) sz;
+        int sizeYZ = sizeY * sizeZ;
+
         int minCx = region.minX() >> 4;
         int minCz = region.minZ() >> 4;
         int maxCx = region.maxX() >> 4;
         int maxCz = region.maxZ() >> 4;
-        int sizeX = region.maxX() - region.minX() + 1;
-        int sizeY = region.maxY() - region.minY() + 1;
-        int sizeZ = region.maxZ() - region.minZ() + 1;
         short[] data = new short[sizeX * sizeY * sizeZ];
         byte[] legacyDataArray = legacy ? new byte[data.length] : null;
 
@@ -135,19 +158,31 @@ public class ChunkScene implements SceneData {
 
         // Eagerly populate material ordinals — fast and small (~4 MB for 2M voxels).
         // Block state strings are resolved lazily via getBlockState() to avoid ~2M String allocations.
-        for (int x = region.minX(); x <= region.maxX(); x++)
-            for (int y = region.minY(); y <= region.maxY(); y++)
-                for (int z = region.minZ(); z <= region.maxZ(); z++) {
-                    int cx = x >> 4;
-                    int cz = z >> 4;
-                    int snapshotIndex = (cx - minCx) * czCount + (cz - minCz);
-                    ChunkSnapshot snapshot = snapshots[snapshotIndex];
-                    int localX = x & 15;
-                    int localZ = z & 15;
-                    int flatIndex = (x - region.minX()) * sizeY * sizeZ
-                            + (y - region.minY()) * sizeZ
-                            + (z - region.minZ());
-
+        // Loop reorganized to X → Z → Y so that the chunk/snapshot resolution is hoisted
+        // out of the Y-axis inner loop: cx, localX depend only on x; cz, localZ, snapshot,
+        // snapshotIndex depend only on (x, z); only the per-voxel block lookup and the
+        // flat-index final term depend on y. The flat-index layout
+        //   [(x-minX)*sizeYZ + (y-minY)*sizeZ + (z-minZ)]
+        // is unchanged — only iteration order changes; the resulting `data[]` contents
+        // are bit-identical to the previous implementation.
+        int minX = region.minX();
+        int minY = region.minY();
+        int minZ = region.minZ();
+        int maxX = region.maxX();
+        int maxY = region.maxY();
+        int maxZ = region.maxZ();
+        for (int x = minX; x <= maxX; x++) {
+            int cx = x >> 4;
+            int localX = x & 15;
+            int xOffset = (x - minX) * sizeYZ;
+            for (int z = minZ; z <= maxZ; z++) {
+                int cz = z >> 4;
+                int localZ = z & 15;
+                int snapshotIndex = (cx - minCx) * czCount + (cz - minCz);
+                ChunkSnapshot snapshot = snapshots[snapshotIndex];
+                int xzBase = xOffset + (z - minZ);
+                for (int y = minY; y <= maxY; y++) {
+                    int flatIndex = xzBase + (y - minY) * sizeZ;
                     if (legacy) {
                         Material material = Version.getMaterialById(
                                 Version.getBlockTypeId(snapshot, localX, y, localZ));
@@ -157,20 +192,35 @@ public class ChunkScene implements SceneData {
                         legacyDataArray[flatIndex] = (byte) ld;
                     } else {
                         Material material = snapshot.getBlockType(localX, y, localZ);
-                        // Fast path: skip matchModernMaterial for plain AIR (most common block
-                        // in typical scenes — ~70% of voxels). Avoids XSeries enum lookup overhead.
-                        // Uses identity comparison instead of isAir() for 1.13–1.14 compatibility.
-                        XMaterial xMaterial = material == Material.AIR
+                        // Fast path: skip matchModernMaterial for AIR-family materials
+                        // (AIR, CAVE_AIR, VOID_AIR — covers ~70% of voxels in caves & arenas).
+                        // Avoids XSeries enum lookup overhead. isAirLike() uses string
+                        // comparison for the 1.13+ variants which don't exist as enum
+                        // constants on 1.8–1.12.
+                        XMaterial xMaterial = isAirLike(material)
                                 ? XMaterial.AIR
                                 : matchModernMaterial(material);
                         data[flatIndex] = (short) xMaterial.ordinal();
                     }
                 }
+            }
+        }
 
         return new ChunkScene(data, legacyDataArray, snapshots, minCx, minCz, czCount,
-                sizeY, sizeZ, sizeY * sizeZ,
-                region.minX(), region.minY(), region.minZ(),
-                region.maxX(), region.maxY(), region.maxZ());
+                sizeY, sizeZ, sizeYZ,
+                minX, minY, minZ, maxX, maxY, maxZ);
+    }
+
+    /**
+     * Whether the material represents some flavor of air (AIR, CAVE_AIR, VOID_AIR).
+     * Uses name-based comparison for the 1.13+ variants so the code compiles on 1.8 Spigot
+     * where those Material enum constants do not exist.
+     */
+    private static boolean isAirLike(Material material) {
+        if (material == Material.AIR)
+            return true;
+        String name = material.name();
+        return name.equals("CAVE_AIR") || name.equals("VOID_AIR");
     }
 
     /**
@@ -312,7 +362,11 @@ public class ChunkScene implements SceneData {
         int lx = wx - minX;
         int ly = wy - minY;
         int lz = wz - minZ;
-        if (lx < 0 || wx > maxX || ly < 0 || wy > maxY || lz < 0 || wz > maxZ)
+        // Symmetric bounds check using local offsets only (matches FlatScene.indexOf style).
+        // Logically equivalent to the previous `wx > maxX || wy > maxY || wz > maxZ` form.
+        if (lx < 0 || lx > maxX - minX
+                || ly < 0 || ly > maxY - minY
+                || lz < 0 || lz > maxZ - minZ)
             return -1;
         return lx * sizeYZ + ly * sizeZ + lz;
     }

@@ -6,6 +6,8 @@ import ru.ashesha.buildBattleAI.render.data.SceneData;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
 /**
  * Maps block materials to their sub-block collision shapes for ray intersection.
@@ -23,9 +25,15 @@ public class BlockShape {
      */
     static final int MAX_STATE_SHAPE_CACHE_SIZE = 2048;
     /**
-     * Cache for shapes resolved from neighbor connectivity (fences, walls, panes).
+     * Lock-free connectivity-shape cache. Keys are (familyIdx * 16 + mask) where
+     * familyIdx is 0=pane, 1=fence, 2=wall — only 48 distinct entries total, all
+     * computed once on first miss and never evicted. Reads are wait-free array
+     * loads; the first writer wins the {@code compareAndSet}, losers fall back
+     * to the published value. Replaces a {@code ConcurrentHashMap} that required
+     * a {@code "family|mask"} string allocation on every lookup.
      */
-    private static final Map<String, double[][]> CONNECTIVITY_SHAPE_CACHE = new ConcurrentHashMap<>();
+    private static final AtomicReferenceArray<double[][]> CONNECTIVITY_SHAPES =
+            new AtomicReferenceArray<double[][]>(3 * 16);
     // Fence: 4×16×4 center post
     private static final double[] FENCE_POST = {6 / 16.0, 0, 6 / 16.0, 10 / 16.0, 1, 10 / 16.0};
 
@@ -35,6 +43,11 @@ public class BlockShape {
     // Cross: two intersecting thin 2px panels (bars, panes, doors, fence gates)
     private static final double[] CROSS_NS = {7 / 16.0, 0, 0, 9 / 16.0, 1, 1};
     private static final double[] CROSS_EW = {0, 0, 7 / 16.0, 1, 1, 9 / 16.0};
+    // Wall straight-line (post + opposing arms collapsed into a single AABB).
+    // Hoisted to constants so the cache-miss path returns a shared array
+    // instead of allocating a fresh literal.
+    private static final double[] WALL_STRAIGHT_NS = {4 / 16.0, 0, 0, 12 / 16.0, 14 / 16.0, 1};
+    private static final double[] WALL_STRAIGHT_EW = {0, 0, 4 / 16.0, 1, 14 / 16.0, 12 / 16.0};
     // Small cross for flora / torches
     private static final double[] SMALL_CROSS_NS = {7 / 16.0, 0, 2 / 16.0, 9 / 16.0, 14 / 16.0, 14 / 16.0};
     private static final double[] SMALL_CROSS_EW = {2 / 16.0, 0, 7 / 16.0, 14 / 16.0, 14 / 16.0, 9 / 16.0};
@@ -171,9 +184,15 @@ public class BlockShape {
     private static final double[][][] SHAPES = new double[XMaterial.values().length][][];
     /**
      * Cache for shapes resolved from block state properties (slabs, stairs, trapdoors, etc.).
-     * Keyed by {@code (ordinal << 32) | hashCode}. Volatile for atomic swap eviction.
+     * Keyed by {@code material.ordinal() + "|" + blockState} — the full block-state
+     * string is used directly (instead of a 32-bit hash), eliminating the previous
+     * collision hazard where two distinct state strings could share a {@code Long}
+     * key and silently swap shapes. Wrapped in an {@link AtomicReference} so the
+     * over-capacity replacement is CAS-guarded: concurrent saturating writers
+     * collapse into a single eviction rather than thrashing the cache.
      */
-    private static volatile Map<Long, double[][]> STATE_SHAPE_CACHE = new ConcurrentHashMap<>();
+    private static final AtomicReference<Map<String, double[][]>> STATE_SHAPE_CACHE_REF =
+            new AtomicReference<Map<String, double[][]>>(new ConcurrentHashMap<String, double[][]>());
 
     // Assigns shapes to materials based on name patterns.
     // The static initializer iterates all XMaterial values and maps each one to
@@ -351,16 +370,19 @@ public class BlockShape {
         if (connects(scene, x - 1, y, z, material))
             mask |= 8;
 
-        String family = (flags & BlockPalette.FLAG_PANE) != 0 ? "pane"
-                : (flags & BlockPalette.FLAG_FENCE) != 0 ? "fence" : "wall";
-        String key = family + "|" + mask;
-        double[][] cached = CONNECTIVITY_SHAPE_CACHE.get(key);
+        // family index: 0 = pane, 1 = fence, 2 = wall. Selected by the
+        // already-fetched BLOCK_FLAGS bits.
+        int familyIdx = (flags & BlockPalette.FLAG_PANE) != 0 ? 0
+                : (flags & BlockPalette.FLAG_FENCE) != 0 ? 1 : 2;
+        int slot = familyIdx * 16 + mask;
+        double[][] cached = CONNECTIVITY_SHAPES.get(slot);
         if (cached != null)
             return cached;
 
+        String family = familyIdx == 0 ? "pane" : familyIdx == 1 ? "fence" : "wall";
         double[][] resolved = buildConnectivityShape(family, mask);
-        CONNECTIVITY_SHAPE_CACHE.put(key, resolved);
-        return resolved;
+        CONNECTIVITY_SHAPES.compareAndSet(slot, null, resolved);
+        return CONNECTIVITY_SHAPES.get(slot);
     }
 
     /**
@@ -377,17 +399,25 @@ public class BlockShape {
         if (blockState == null || blockState.isEmpty())
             return null;
 
-        long key = ((long) material.ordinal() << 32) | (blockState.hashCode() & 0xFFFFFFFFL);
-        double[][] cached = STATE_SHAPE_CACHE.get(key);
+        // String key avoids both Long-boxing on every lookup AND the silent
+        // hash-collision hazard of the previous packed-long scheme. The leading
+        // ordinal disambiguates two materials that happen to share a state
+        // shape string (e.g. all *_STAIRS share "...[facing=north,half=bottom]").
+        String key = material.ordinal() + "|" + blockState;
+        Map<String, double[][]> cache = STATE_SHAPE_CACHE_REF.get();
+        double[][] cached = cache.get(key);
         if (cached != null)
             return cached;
 
         BlockRenderState state = BlockRenderState.of(scene, x, y, z);
         double[][] resolved = buildStatefulShape(material, state);
         if (resolved != null) {
-            if (STATE_SHAPE_CACHE.size() > MAX_STATE_SHAPE_CACHE_SIZE)
-                STATE_SHAPE_CACHE = new ConcurrentHashMap<>();
-            STATE_SHAPE_CACHE.put(key, resolved);
+            // CAS-guarded eviction: concurrent over-cap detections collapse to
+            // a single map replacement rather than throwing away just-cached
+            // entries in a thundering-herd loop.
+            if (cache.size() > MAX_STATE_SHAPE_CACHE_SIZE)
+                STATE_SHAPE_CACHE_REF.compareAndSet(cache, new ConcurrentHashMap<String, double[][]>());
+            STATE_SHAPE_CACHE_REF.get().put(key, resolved);
         }
         return resolved;
     }
@@ -492,9 +522,9 @@ public class BlockShape {
         if (mask == 0)
             return new double[][]{WALL_POST};
         if (mask == (1 | 4))
-            return new double[][]{{4 / 16.0, 0, 0, 12 / 16.0, 14 / 16.0, 1}};
+            return new double[][]{WALL_STRAIGHT_NS};
         if (mask == (2 | 8))
-            return new double[][]{{0, 0, 4 / 16.0, 1, 14 / 16.0, 12 / 16.0}};
+            return new double[][]{WALL_STRAIGHT_EW};
         return connectivityBoxes(mask, 4 / 16.0, 12 / 16.0, 4 / 16.0, 12 / 16.0, 14 / 16.0, false);
     }
 
@@ -676,14 +706,14 @@ public class BlockShape {
      * Returns the current number of state shape cache entries. Package-visible for testing.
      */
     static int stateShapeCacheSize() {
-        return STATE_SHAPE_CACHE.size();
+        return STATE_SHAPE_CACHE_REF.get().size();
     }
 
     /**
      * Replaces the state shape cache with a fresh empty map. Package-visible for testing.
      */
     static void clearStateShapeCache() {
-        STATE_SHAPE_CACHE = new ConcurrentHashMap<>();
+        STATE_SHAPE_CACHE_REF.set(new ConcurrentHashMap<String, double[][]>());
     }
 
 }

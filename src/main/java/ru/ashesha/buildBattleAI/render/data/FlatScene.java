@@ -68,6 +68,11 @@ public class FlatScene implements SceneData {
                      int sizeX, int sizeY, int sizeZ,
                      @NonNull SourceFormat sourceFormat,
                      @NonNull String sourceName) {
+        // Validate that the supplied data array length matches the declared region volume.
+        // Uses long arithmetic to avoid silent int overflow on huge dimensions.
+        if ((long) sizeX * sizeY * sizeZ != data.length)
+            throw new IllegalArgumentException(
+                    "data length " + data.length + " != expected " + sizeX + "*" + sizeY + "*" + sizeZ);
         this.data = data;
         this.legacyBlockData = legacyBlockData;
         this.blockStates = blockStates;
@@ -101,18 +106,26 @@ public class FlatScene implements SceneData {
         boolean hasLegacy = snapshot.hasLegacyBlockData();
         byte[] legacyBlockData = hasLegacy ? new byte[data.length] : null;
 
-        for (int x = 0; x < sizeX; x++)
-            for (int y = 0; y < sizeY; y++)
+        // Hoist X-stride and world-coordinate offsets out of the inner loops so they're
+        // computed once per slab instead of being recomputed for every (x, y, z) voxel.
+        // Flat-index layout is preserved (X-major): [x*sizeY*sizeZ + y*sizeZ + z].
+        int sizeYZ = sizeY * sizeZ;
+        for (int x = 0; x < sizeX; x++) {
+            int xBase = x * sizeYZ;
+            int worldX = x + minX;
+            for (int y = 0; y < sizeY; y++) {
+                int xyBase = xBase + y * sizeZ;
+                int worldY = y + minY;
                 for (int z = 0; z < sizeZ; z++) {
-                    int index = x * sizeY * sizeZ + y * sizeZ + z;
-                    int worldX = x + minX;
-                    int worldY = y + minY;
+                    int index = xyBase + z;
                     int worldZ = z + minZ;
                     data[index] = (short) snapshot.getBlockType(worldX, worldY, worldZ).ordinal();
                     blockStates[index] = snapshot.getBlockState(worldX, worldY, worldZ);
                     if (legacyBlockData != null)
                         legacyBlockData[index] = snapshot.getLegacyBlockData(worldX, worldY, worldZ);
                 }
+            }
+        }
 
         return new FlatScene(data, legacyBlockData, blockStates, minX, minY, minZ,
                 sizeX, sizeY, sizeZ, SourceFormat.RUNTIME, "runtime");

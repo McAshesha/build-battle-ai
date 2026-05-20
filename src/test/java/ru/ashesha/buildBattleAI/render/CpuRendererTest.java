@@ -654,6 +654,472 @@ class CpuRendererTest {
                 "Full-block AO renders should be identical (sub-block AO extension must not affect full blocks)");
     }
 
+    // ===== Tight-AABB entry-face shading (regression for face=1 initial bug) =====
+
+    /**
+     * Regression for the bug where {@code traceRay} hard-coded the initial DDA
+     * {@code face = 1} (Y-axis). For a tight AABB enclosing a solid cube, every
+     * pixel hits the cube at the entry voxel, so the (broken) initial face would
+     * shade every visible face as a Y-face. With the camera at {@code pitch=0},
+     * the per-pixel ray {@code dy} varies smoothly across screen rows — top rows
+     * pick up {@code BRIGHTNESS_Y_BOTTOM} (0.6), bottom rows {@code BRIGHTNESS_Y_TOP}
+     * (1.0) — producing a vertical brightness gradient on a face that should be
+     * uniformly Z-shaded ({@code BRIGHTNESS_Z = 0.85}).
+     * <p>
+     * Sampling two horizontally-aligned pixel columns at different vertical
+     * positions on the {@code -Z} face must yield nearly identical luminance
+     * after the fix; under the bug, the spread exceeds 30 luminance units.
+     */
+    @Test
+    void tightAabbCubeSideFaceHasNoVerticalGradient() {
+        // 6×6×6 solid stone cube. AABB == cube extents (tight) — there is no
+        // air "frame" around the build, so every ray's entry voxel is on the
+        // cube surface and uses the initial DDA face value directly.
+        int size = 6;
+        short[] data = new short[size * size * size];
+        Arrays.fill(data, (short) XMaterial.STONE.ordinal());
+        FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
+
+        // Camera centered on the -Z face, far enough that the cube fills the
+        // middle of the image but does not overflow the FOV. pitch=0 ensures
+        // ray.dy spans both signs across the screen height — the exact failure
+        // condition for the face=1 bug.
+        double camX = 2.5;
+        double camY = 2.5;
+        double camZ = -6.0;
+        byte[] pixels = renderer.render(scene, camX, camY, camZ, 0, 0);
+
+        // Locate the cube's vertical extent on screen by scanning the center
+        // column for non-background pixels. The cube is centered horizontally,
+        // so column x=112 always intersects the silhouette.
+        int centerX = RendererUtils.WIDTH / 2;
+        int firstY = -1;
+        int lastY = -1;
+        for (int py = 0; py < RendererUtils.HEIGHT; py++) {
+            int idx = (py * RendererUtils.WIDTH + centerX) * 3;
+            int r = pixels[idx] & 0xFF;
+            int g = pixels[idx + 1] & 0xFF;
+            int b = pixels[idx + 2] & 0xFF;
+            boolean isBg = (r == 0xC8 && g == 0xD8 && b == 0xE8);
+            if (!isBg) {
+                if (firstY == -1)
+                    firstY = py;
+                lastY = py;
+            }
+        }
+        assertTrue(firstY >= 0 && lastY > firstY,
+                "Cube must be visible in the center column; firstY=" + firstY + ", lastY=" + lastY);
+
+        // Sample at 25% and 75% of the cube's vertical extent — well clear of
+        // top/bottom edges so AO at the cube corners does not pollute the test.
+        int sampleTopY = firstY + (lastY - firstY) / 4;
+        int sampleBotY = firstY + (lastY - firstY) * 3 / 4;
+
+        int topIdx = (sampleTopY * RendererUtils.WIDTH + centerX) * 3;
+        int botIdx = (sampleBotY * RendererUtils.WIDTH + centerX) * 3;
+
+        int lumTop = (pixels[topIdx] & 0xFF) + (pixels[topIdx + 1] & 0xFF) + (pixels[topIdx + 2] & 0xFF);
+        int lumBot = (pixels[botIdx] & 0xFF) + (pixels[botIdx + 1] & 0xFF) + (pixels[botIdx + 2] & 0xFF);
+        int spread = Math.abs(lumTop - lumBot);
+
+        // Under the bug: lumTop ≈ 3 * 0x7D * 0.6 ≈ 225, lumBot ≈ 3 * 0x7D * 1.0 ≈ 375
+        //   → spread ≈ 150 luminance units (vertical gradient).
+        // After the fix: both pixels hit the -Z face → BRIGHTNESS_Z ≈ 0.85
+        //   → both ≈ 0x7D * 3 * 0.85 ≈ 319 → spread ≈ 0 (modulo AO from corners).
+        // 25 is a comfortable margin: well below the bug's ~150, well above
+        // the legitimate AO/edge variation seen in correctly-shaded faces.
+        assertTrue(spread < 25,
+                "Side face should be uniformly Z-shaded, but top/bot luminance spread is "
+                        + spread + " (lumTop=" + lumTop + ", lumBot=" + lumBot + ")");
+    }
+
+    /**
+     * Regression for the same bug from the orthogonal direction: a top-down
+     * angled view of a solid stone cube must obey the physical brightness
+     * hierarchy (top face brighter than side faces).
+     * <p>
+     * Camera is placed above and slightly south of the cube, looking
+     * north-and-down at pitch=60°. With this geometry the cube's top face
+     * occupies the upper half of the silhouette (it is the receding rooftop)
+     * and the {@code -Z} face occupies the lower half (the front wall).
+     * Center column rays therefore transition between two physical faces
+     * with different brightness multipliers ({@code BRIGHTNESS_Y_TOP = 1.0}
+     * versus {@code BRIGHTNESS_Z = 0.85}).
+     * <p>
+     * Under the face=1 bug both samples take the same Y-face branch
+     * ({@code dy < 0} everywhere on this view), giving identical brightness
+     * and zero spread between them. The assertion below catches that.
+     */
+    @Test
+    void tightAabbCubeIsoViewObeysBrightnessHierarchy() {
+        int size = 6;
+        short[] data = new short[size * size * size];
+        Arrays.fill(data, (short) XMaterial.STONE.ordinal());
+        FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
+
+        // Camera above and south of the cube, yaw=0 (look toward +Z),
+        // pitch=20° (moderate downward tilt). The center column transitions
+        // from top face (upper half of silhouette) to -Z face (lower half).
+        // All hits carry dy<0 so the bug collapses every face brightness to
+        // BRIGHTNESS_Y_TOP, eliminating the top-vs-side luminance gap.
+        byte[] pixels = renderer.render(scene, 2.5, 9.0, -4.0, 0f, 20f);
+
+        // Find the cube silhouette via a center-column scan.
+        int centerX = RendererUtils.WIDTH / 2;
+        int firstY = -1;
+        int lastY = -1;
+        for (int py = 0; py < RendererUtils.HEIGHT; py++) {
+            int idx = (py * RendererUtils.WIDTH + centerX) * 3;
+            int r = pixels[idx] & 0xFF;
+            int g = pixels[idx + 1] & 0xFF;
+            int b = pixels[idx + 2] & 0xFF;
+            boolean isBg = (r == 0xC8 && g == 0xD8 && b == 0xE8);
+            if (!isBg) {
+                if (firstY == -1)
+                    firstY = py;
+                lastY = py;
+            }
+        }
+        assertTrue(firstY >= 0 && lastY > firstY,
+                "Cube must be visible in the center column; firstY=" + firstY + ", lastY=" + lastY);
+
+        // Upper portion of the silhouette = receding top face.
+        // Lower portion = front -Z face (the wall facing the camera).
+        int sampleTopY = firstY + (lastY - firstY) / 4;
+        int sampleSideY = firstY + (lastY - firstY) * 3 / 4;
+
+        int topIdx = (sampleTopY * RendererUtils.WIDTH + centerX) * 3;
+        int sideIdx = (sampleSideY * RendererUtils.WIDTH + centerX) * 3;
+        int lumTop = (pixels[topIdx] & 0xFF) + (pixels[topIdx + 1] & 0xFF) + (pixels[topIdx + 2] & 0xFF);
+        int lumSide = (pixels[sideIdx] & 0xFF) + (pixels[sideIdx + 1] & 0xFF) + (pixels[sideIdx + 2] & 0xFF);
+
+        // Expected after the fix:
+        //   top sample on +Y face  → 0x7D * 1.0  * 3 ≈ 375
+        //   side sample on -Z face → 0x7D * 0.85 * 3 ≈ 318
+        //   spread ≈ 57 — well above the 20 threshold.
+        // Under the bug both samples take face=1 with dy<0, both ≈ 375,
+        // and the assertion fails because the spread collapses to ≈ 0.
+        assertTrue(lumTop > lumSide + 20,
+                "Top face must be brighter than side face on a stone cube. lumTop="
+                        + lumTop + ", lumSide=" + lumSide);
+    }
+
+    /**
+     * Regression for the face=1 bug, exercised through translucent shading.
+     * A solid glass cube viewed straight-on (pitch=0) must NOT show a vertical
+     * gradient — the front face is a single Z-face. Under the bug, glass tiles
+     * along the screen vertical would render with different luminance because
+     * the per-voxel alpha-blend uses {@code hitFace=1} brightness.
+     */
+    @Test
+    void tightAabbGlassCubeFrontFaceHasNoVerticalGradient() {
+        int size = 4;
+        short[] data = new short[size * size * size];
+        Arrays.fill(data, (short) XMaterial.GLASS.ordinal());
+        FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
+
+        byte[] pixels = renderer.render(scene, 1.5, 1.5, -5.0, 0, 0);
+
+        int centerX = RendererUtils.WIDTH / 2;
+        int firstY = -1;
+        int lastY = -1;
+        for (int py = 0; py < RendererUtils.HEIGHT; py++) {
+            int idx = (py * RendererUtils.WIDTH + centerX) * 3;
+            int r = pixels[idx] & 0xFF;
+            int g = pixels[idx + 1] & 0xFF;
+            int b = pixels[idx + 2] & 0xFF;
+            boolean isBg = (r == 0xC8 && g == 0xD8 && b == 0xE8);
+            if (!isBg) {
+                if (firstY == -1)
+                    firstY = py;
+                lastY = py;
+            }
+        }
+        assertTrue(firstY >= 0 && lastY > firstY,
+                "Glass cube must be visible; firstY=" + firstY + ", lastY=" + lastY);
+
+        int sampleTopY = firstY + (lastY - firstY) / 4;
+        int sampleBotY = firstY + (lastY - firstY) * 3 / 4;
+        int topIdx = (sampleTopY * RendererUtils.WIDTH + centerX) * 3;
+        int botIdx = (sampleBotY * RendererUtils.WIDTH + centerX) * 3;
+        int lumTop = (pixels[topIdx] & 0xFF) + (pixels[topIdx + 1] & 0xFF) + (pixels[topIdx + 2] & 0xFF);
+        int lumBot = (pixels[botIdx] & 0xFF) + (pixels[botIdx + 1] & 0xFF) + (pixels[botIdx + 2] & 0xFF);
+        int spread = Math.abs(lumTop - lumBot);
+
+        assertTrue(spread < 25,
+                "Glass front face should be uniformly Z-shaded, but spread is "
+                        + spread + " (lumTop=" + lumTop + ", lumBot=" + lumBot + ")");
+    }
+
+    /**
+     * Regression for the secondary failure mode of the face=1 bug: when the
+     * camera sits exactly on an AABB face (tMin == 0 in the slab method), the
+     * entry axis is still well-defined. The fix must use it, not silently
+     * fall back to Y-face shading.
+     * <p>
+     * Stone cube 4×4×4 with camera placed exactly at {@code z = -0.0001},
+     * essentially touching the {@code -Z} face of the AABB. Looking down the
+     * {@code +Z} axis with {@code pitch = 0}, the center ray enters through
+     * the {@code -Z} AABB face and immediately hits a stone voxel. With the
+     * correct fix the pixel is shaded as Z-face ({@code BRIGHTNESS_Z = 0.85},
+     * lum ≈ 318). With the {@code tMin > 0} check it falls back to Y-face
+     * with {@code dy = 0} → {@code BRIGHTNESS_Y_BOTTOM = 0.6}, lum ≈ 225.
+     */
+    @Test
+    void cameraOnAabbBoundaryUsesEntryAxis() {
+        int size = 4;
+        short[] data = new short[size * size * size];
+        Arrays.fill(data, (short) XMaterial.STONE.ordinal());
+        FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
+
+        // Camera exactly on the -Z AABB face (z == aabbMinZ == 0), looking
+        // slightly up (pitch=-5). The slab method gives tMin == 0 exactly and
+        // entryAxis = 2. The slight upward tilt forces ray.dy > 0 at the
+        // center pixel, so a face=1 fallback would shade as
+        // BRIGHTNESS_Y_BOTTOM (0.6) — clearly distinguishable from the
+        // correct BRIGHTNESS_Z (0.85) for the -Z face.
+        byte[] pixels = renderer.render(scene, 1.5, 1.5, 0.0, 0f, -5f);
+
+        int centerIdx = (RendererUtils.HEIGHT / 2 * RendererUtils.WIDTH + RendererUtils.WIDTH / 2) * 3;
+        int r = pixels[centerIdx] & 0xFF;
+        int g = pixels[centerIdx + 1] & 0xFF;
+        int b = pixels[centerIdx + 2] & 0xFF;
+        int lum = r + g + b;
+
+        // Z-face stone: 0x7D * 0.85 * 3 ≈ 320.
+        // Y-bottom-face fallback: 0x7D * 0.6 * 3 ≈ 225.
+        // 280 is comfortably between the two, separating correct from broken.
+        assertTrue(lum > 280,
+                "Camera on -Z AABB face must shade hit as Z-face. lum=" + lum
+                        + " (R=" + r + ", G=" + g + ", B=" + b + ")");
+    }
+
+    /**
+     * Regression for the inside-AABB case: when the camera sits inside the
+     * AABB (tMin < 0 before clamping), the slab method's entryAxis points to
+     * a slab the ray crossed in the past — it is NOT the face the forward ray
+     * uses to enter the starting voxel. The fix must NOT use it to shade
+     * the starting voxel. With the correct fix, the starting voxel hit test
+     * is skipped (DDA overwrites face on its first step) and rendering of a
+     * block behind an air pocket continues to work identically to before.
+     * <p>
+     * This guards against future regressions in the "camera in air pocket
+     * inside a larger AABB" workflow (the normal case for live arena renders
+     * where the build region is wider than the build itself).
+     */
+    @Test
+    void cameraInsideAirPocketRendersBlockBehindCorrectly() {
+        // 11³ scene, single stone block at (5,5,8), camera at (5.5,5.5,5.5)
+        // — strictly inside the AABB, inside an all-air voxel.
+        // The starting voxel (5,5,5) is air; DDA must advance through air
+        // and hit the stone at (5,5,8) with face=2 (-Z face of the stone).
+        int size = 11;
+        short[] data = airArray(size * size * size);
+        data[5 * size * size + 5 * size + 8] = (short) XMaterial.STONE.ordinal();
+        FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
+
+        byte[] pixels = renderer.render(scene, 5.5, 5.5, 5.5, 0, 0);
+
+        int centerIdx = (RendererUtils.HEIGHT / 2 * RendererUtils.WIDTH + RendererUtils.WIDTH / 2) * 3;
+        int r = pixels[centerIdx] & 0xFF;
+        int g = pixels[centerIdx + 1] & 0xFF;
+        int b = pixels[centerIdx + 2] & 0xFF;
+        int lum = r + g + b;
+
+        // -Z face of the stone block: 0x7D * 0.85 * 3 ≈ 320 (no AO — block is isolated).
+        // Acceptable band: anything clearly above the Y-bottom fallback (225)
+        // and below the Y-top brightness (375). 280–360 covers the correct case.
+        assertTrue(lum > 280 && lum < 360,
+                "Isolated stone block viewed from inside an air pocket must shade as Z-face. lum="
+                        + lum + " (R=" + r + ", G=" + g + ", B=" + b + ")");
+    }
+
+    /**
+     * Regression guard for the camera-embedded-in-block edge case. The
+     * inside-AABB branch must still produce a block-colored hit for the
+     * starting voxel when that voxel contains a block — dropping the hit
+     * (rendering background sky from inside solid stone) is wrong.
+     * <p>
+     * Single 1×1×1 stone scene, camera placed at the voxel center. The
+     * ray exits through some axis-aligned face immediately. With a
+     * principled fix that uses the exit-face as the shading face, the
+     * pixel takes on a stone brightness (≈ {@code 0x7D × brightness}).
+     * If the starting-voxel hit is incorrectly dropped, the result is the
+     * background sky color {@code 0xC8D8E8} (lum = 624) — easy to detect.
+     */
+    @Test
+    void cameraEmbeddedInStoneVoxelRendersStone() {
+        short[] data = {(short) XMaterial.STONE.ordinal()};
+        FlatScene scene = new FlatScene(data, 0, 0, 0, 1, 1, 1);
+
+        // Camera dead-center of the single stone voxel, any orientation.
+        byte[] pixels = renderer.render(scene, 0.5, 0.5, 0.5, 0, 0);
+
+        int centerIdx = (RendererUtils.HEIGHT / 2 * RendererUtils.WIDTH + RendererUtils.WIDTH / 2) * 3;
+        int r = pixels[centerIdx] & 0xFF;
+        int g = pixels[centerIdx + 1] & 0xFF;
+        int b = pixels[centerIdx + 2] & 0xFF;
+
+        // Background sky color → reject. Anything stone-grey → accept.
+        boolean isBackground = (r == 0xC8 && g == 0xD8 && b == 0xE8);
+        assertFalse(isBackground,
+                "Camera embedded in a stone voxel must render stone, not background. "
+                        + "R=" + r + ", G=" + g + ", B=" + b);
+
+        // Sanity: a grey pixel has R≈G≈B (stone is achromatic in the palette).
+        int spread = Math.max(Math.max(Math.abs(r - g), Math.abs(g - b)), Math.abs(r - b));
+        assertTrue(spread < 5,
+                "Stone pixel should be achromatic grey, but channel spread is "
+                        + spread + " (R=" + r + ", G=" + g + ", B=" + b + ")");
+    }
+
+    /**
+     * Regression guard for facing-dependent blocks rendered from inside.
+     * Grass block has a green top (0x7CBD6B), a brown dirt bottom (0x866043),
+     * and a green-brown side (0x7D8A58). When the camera is inside the grass
+     * voxel and looks straight up, the viewer sees the inside of the top
+     * face — the rendered pixel must be GREEN (top color), not brown.
+     * <p>
+     * Under the naive exit-axis-only heuristic, looking up gives {@code dy > 0}
+     * which the existing palette/brightness branches interpret as "ray going
+     * up from below hits the bottom face" → brown dirt color. That is the
+     * outside-hit convention. Inside hits need an inverted sign convention.
+     */
+    @Test
+    void cameraInsideGrassBlockLookingUpSeesGreenTop() {
+        short[] data = {(short) XMaterial.GRASS_BLOCK.ordinal()};
+        FlatScene scene = new FlatScene(data, 0, 0, 0, 1, 1, 1);
+
+        // Camera at voxel center, looking straight up (pitch = -90).
+        byte[] pixels = renderer.render(scene, 0.5, 0.5, 0.5, 0, -90);
+
+        int centerIdx = (RendererUtils.HEIGHT / 2 * RendererUtils.WIDTH + RendererUtils.WIDTH / 2) * 3;
+        int r = pixels[centerIdx] & 0xFF;
+        int g = pixels[centerIdx + 1] & 0xFF;
+        int b = pixels[centerIdx + 2] & 0xFF;
+
+        boolean isBackground = (r == 0xC8 && g == 0xD8 && b == 0xE8);
+        assertFalse(isBackground, "Inside grass must render a grass pixel, not background.");
+
+        // Green top: R=0x7C(124), G=0xBD(189), B=0x6B(107) — G clearly dominant.
+        // Brown bottom: R=0x86(134), G=0x60(96), B=0x43(67) — R clearly dominant.
+        // After shading, ratios are preserved.
+        assertTrue(g > r,
+                "Looking up from inside grass must show the green top face. "
+                        + "R=" + r + ", G=" + g + ", B=" + b + " — got dirt-bottom shading.");
+    }
+
+    /**
+     * Regression guard for sub-block shapes (slabs, stairs, fences, etc.) when
+     * the camera starts inside one of their AABB boxes. {@link
+     * BlockShape#getShape} returns a non-null array of boxes, so the inside-
+     * AABB pre-loop block in {@link CpuRenderer#traceRay} skips this voxel.
+     * The fallback path through {@link CpuRenderer#testSubBlockHit} rejects
+     * any box intersection with {@code tMin < 0} — exactly the inside-the-box
+     * case. The combined effect is that the slab is dropped and the renderer
+     * shows the background sky from inside solid material.
+     * <p>
+     * An oak slab is a bottom half-block {@code [0,0,0, 1,0.5,1]}. Placing
+     * the camera at {@code y = 0.25} sits the origin inside the slab box.
+     * After the fix the rendered pixel must take on a slab color (any
+     * non-background pixel is acceptable).
+     */
+    @Test
+    void cameraEmbeddedInOakSlabRendersSlab() {
+        short[] data = {(short) XMaterial.OAK_SLAB.ordinal()};
+        FlatScene scene = new FlatScene(data, 0, 0, 0, 1, 1, 1);
+
+        // Camera inside the slab box (bottom half), looking +Z.
+        byte[] pixels = renderer.render(scene, 0.5, 0.25, 0.5, 0, 0);
+
+        int centerIdx = (RendererUtils.HEIGHT / 2 * RendererUtils.WIDTH + RendererUtils.WIDTH / 2) * 3;
+        int r = pixels[centerIdx] & 0xFF;
+        int g = pixels[centerIdx + 1] & 0xFF;
+        int b = pixels[centerIdx + 2] & 0xFF;
+        boolean isBackground = (r == 0xC8 && g == 0xD8 && b == 0xE8);
+
+        assertFalse(isBackground,
+                "Camera embedded inside an oak slab must render the slab, not background. "
+                        + "R=" + r + ", G=" + g + ", B=" + b);
+    }
+
+    /**
+     * Regression guard for the boundary-start case Codex flagged: the camera
+     * sits strictly inside the AABB but exactly on a voxel boundary inside
+     * it (e.g., {@code ox = 2.0} between voxel columns 1 and 2). Such a start
+     * is NOT geometrically inside any voxel — it is on a face. Treating it
+     * as an inside-block exit (with the inverted direction convention) would
+     * produce the wrong side of a face-dependent block.
+     * <p>
+     * For grass viewed looking straight up from {@code ox = 2.0} inside a
+     * 4³ grass cube: outside-hit semantics say "ray going up enters through
+     * bottom face → dirt-brown" (R > G). Inside-out inversion would say
+     * "ray exiting through top face → green-top" (G > R). The boundary case
+     * must follow the outside-hit interpretation.
+     */
+    @Test
+    void cameraOnFullCubeBoundaryUsesOutsideHitConvention() {
+        int size = 4;
+        short[] data = new short[size * size * size];
+        Arrays.fill(data, (short) XMaterial.GRASS_BLOCK.ordinal());
+        FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
+
+        // ox = 2.0 sits exactly on the X-boundary between voxels (1,*,*) and
+        // (2,*,*). oy = 2.5, oz = 2.5 keep Y/Z strictly interior so only the
+        // X axis exhibits the boundary condition. pitch = -90 looks straight up.
+        byte[] pixels = renderer.render(scene, 2.0, 2.5, 2.5, 0, -90);
+
+        int centerIdx = (RendererUtils.HEIGHT / 2 * RendererUtils.WIDTH + RendererUtils.WIDTH / 2) * 3;
+        int r = pixels[centerIdx] & 0xFF;
+        int g = pixels[centerIdx + 1] & 0xFF;
+        int b = pixels[centerIdx + 2] & 0xFF;
+
+        // The boundary lands on a face plane shared by two voxels, and a
+        // tiny per-pixel direction offset can route the hit through any of
+        // the three face axes. All outside-hit interpretations are valid:
+        //   bottom face (0x866043) → R≫G
+        //   side face   (0x7D8A58) → G slightly > R (G−R ≈ 13 unshaded)
+        //   top face    (0x7CBD6B) → G ≫ R   (G−R ≈ 65 unshaded — this is
+        //                            ONLY produced by the inside-out
+        //                            inversion path we are guarding against)
+        // The assertion catches the inversion path by rejecting the only
+        // shading that produces a large G-over-R gap.
+        assertTrue(g - r < 20,
+                "Voxel-boundary start must not use inside-out top inversion (G≫R). "
+                        + "R=" + r + ", G=" + g + ", B=" + b);
+    }
+
+    /**
+     * Regression guard for the NUDGE-induced voxel skip Codex flagged: when
+     * the camera sits strictly inside a block but its coordinate is within
+     * {@code NUDGE = 1e-4} of an exit face, the {@code tStart = NUDGE} step
+     * pushes the starting-voxel index one cell past the camera's real voxel.
+     * In a 4³ scene with a single stone voxel at the origin surrounded by
+     * air, a camera at {@code ox = 0.99995} (strictly inside the stone) with
+     * the NUDGE bug ends up testing voxel (1, *, *) — which is air — and the
+     * block hit is dropped, producing background sky.
+     */
+    @Test
+    void cameraInsideBlockWithinNudgeOfExitFaceStillRendersBlock() {
+        int size = 4;
+        short[] data = airArray(size * size * size);
+        data[0 * size * size + 0 * size + 0] = (short) XMaterial.STONE.ordinal();
+        FlatScene scene = new FlatScene(data, 0, 0, 0, size, size, size);
+
+        // Camera strictly inside stone voxel (0,0,0) but within NUDGE of the
+        // +X face. yaw=-90 = looking +X.
+        byte[] pixels = renderer.render(scene, 0.99995, 0.5, 0.5, -90, 0);
+
+        int centerIdx = (RendererUtils.HEIGHT / 2 * RendererUtils.WIDTH + RendererUtils.WIDTH / 2) * 3;
+        int r = pixels[centerIdx] & 0xFF;
+        int g = pixels[centerIdx + 1] & 0xFF;
+        int b = pixels[centerIdx + 2] & 0xFF;
+        boolean isBackground = (r == 0xC8 && g == 0xD8 && b == 0xE8);
+        assertFalse(isBackground,
+                "Camera inside stone within NUDGE of +X face must still render stone, not sky. "
+                        + "R=" + r + ", G=" + g + ", B=" + b);
+    }
+
     @Test
     void translucentBlocksStillExcludedFromAo() {
         // Place glass at (5,5,8) with stone at (6,5,8).

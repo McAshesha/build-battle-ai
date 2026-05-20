@@ -57,6 +57,17 @@ public class BlockPalette {
      */
     static final int FLAG_NEEDS_STATE = 1 << 5;
     /**
+     * Bit flag: block participates in translucent volume merging (water/glass/stained glass/ice/frosted ice).
+     * <p>
+     * Equivalent to the legacy {@code isMergeableTranslucent} name-based predicate, baked into
+     * {@link #BLOCK_FLAGS} at class load. The legacy implementation also defined "merge families"
+     * to allow different materials to share a volume, but in practice every mergeable material
+     * lives in a singleton family (WATER, GLASS, ICE, FROSTED_ICE, and each {@code *_STAINED_GLASS}
+     * is its own family), so two distinct materials never merge — the family check always failed
+     * for {@code a != b}. The simplified rule below preserves this behavior exactly.
+     */
+    static final int FLAG_MERGE_TRANSLUCENT = 1 << 6;
+    /**
      * Pre-computed per-material flag bits, indexed by {@link XMaterial#ordinal()}. Eliminates runtime string checks in the render hot path.
      */
     static final int[] BLOCK_FLAGS = new int[XMaterial.values().length];
@@ -732,6 +743,11 @@ public class BlockPalette {
                 flags |= FLAG_WALL;
             if (isNeedsStateBlock(name))
                 flags |= FLAG_NEEDS_STATE;
+            // Mergeable-translucent membership: same predicate as the legacy
+            // isMergeableTranslucent() helper, evaluated once at class load so the
+            // hot path becomes a pure ordinal-indexed bit-test.
+            if (isMergeableTranslucentName(name) && COLORS[mat.ordinal()] != TRANSPARENT && ALPHAS[mat.ordinal()] < 255)
+                flags |= FLAG_MERGE_TRANSLUCENT;
             BLOCK_FLAGS[mat.ordinal()] = flags;
         }
     }
@@ -822,11 +838,13 @@ public class BlockPalette {
      * @return {@code true} if the boundary should be skipped
      */
     public static boolean canMergeTranslucent(XMaterial first, XMaterial second) {
-        if (first == second)
-            return isMergeableTranslucent(first);
-        if (!isMergeableTranslucent(first) || !isMergeableTranslucent(second))
+        // Behaviour equivalent to the legacy three-step check (same material,
+        // both mergeable, same family) collapsed using the observation that every
+        // mergeable material is in a singleton family — so the family check could
+        // only succeed when first == second.
+        if (first != second)
             return false;
-        return getTranslucentMergeFamily(first).equals(getTranslucentMergeFamily(second));
+        return (BLOCK_FLAGS[first.ordinal()] & FLAG_MERGE_TRANSLUCENT) != 0;
     }
 
     /**
@@ -851,38 +869,17 @@ public class BlockPalette {
     }
 
     /**
-     * Checks if a material supports boundary merging (volumetric translucency).
+     * Name-based predicate used at class load to seed {@link #FLAG_MERGE_TRANSLUCENT}.
+     * Matches WATER, GLASS, any {@code *_STAINED_GLASS}, ICE, and FROSTED_ICE.
+     * The runtime predicate {@link #canMergeTranslucent} consults the precomputed
+     * flag bit instead of re-evaluating these string checks.
      */
-    private static boolean isMergeableTranslucent(XMaterial material) {
-        if (getColor(material) == TRANSPARENT)
-            return false;
-        if (getAlpha(material) >= 255)
-            return false;
-        String name = material.name();
+    private static boolean isMergeableTranslucentName(String name) {
         return name.equals("WATER")
                 || name.equals("GLASS")
                 || name.endsWith("_STAINED_GLASS")
                 || name.equals("ICE")
                 || name.equals("FROSTED_ICE");
-    }
-
-    /**
-     * Returns the merge family identifier for a translucent material.
-     * Blocks in the same family can share internal boundaries without re-tinting.
-     */
-    private static String getTranslucentMergeFamily(XMaterial material) {
-        String name = material.name();
-        if (name.equals("WATER"))
-            return "WATER";
-        if (name.equals("GLASS"))
-            return "GLASS";
-        if (name.endsWith("_STAINED_GLASS"))
-            return name;
-        if (name.equals("ICE"))
-            return "ICE";
-        if (name.equals("FROSTED_ICE"))
-            return "FROSTED_ICE";
-        return name;
     }
 
     /**

@@ -6,6 +6,7 @@ import ru.ashesha.buildBattleAI.render.data.SceneData;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Immutable snapshot of render-relevant block state properties.
@@ -39,10 +40,25 @@ public class BlockRenderState {
      */
     static final int MAX_CACHE_SIZE = 1024;
     /**
-     * Thread-safe cache keyed by raw block state strings.
-     * Volatile so that atomic swap (for eviction) is visible to all render threads.
+     * Thread-safe cache keyed by raw block state strings. Wrapped in an
+     * {@link AtomicReference} so that the over-capacity replacement uses a CAS
+     * and concurrent saturating writers collapse into a single eviction rather
+     * than thrashing the cache (thundering-herd-safe).
      */
-    private static volatile Map<String, BlockRenderState> CACHE = new ConcurrentHashMap<>();
+    private static final AtomicReference<Map<String, BlockRenderState>> CACHE_REF =
+            new AtomicReference<Map<String, BlockRenderState>>(new ConcurrentHashMap<String, BlockRenderState>());
+
+    // Pre-allocated property needles. The trailing `=` lets `parse()` reuse the
+    // same string instances across calls instead of allocating `key + "="` each
+    // time `property()` is invoked (8 needles × every parse() call).
+    private static final String NEEDLE_FACING = "facing=";
+    private static final String NEEDLE_AXIS = "axis=";
+    private static final String NEEDLE_TYPE = "type=";
+    private static final String NEEDLE_HALF = "half=";
+    private static final String NEEDLE_SHAPE = "shape=";
+    private static final String NEEDLE_OPEN = "open=";
+    private static final String NEEDLE_LAYERS = "layers=";
+    private static final String NEEDLE_ROTATION = "rotation=";
     /**
      * Horizontal direction the block faces (north/south/east/west).
      */
@@ -92,13 +108,17 @@ public class BlockRenderState {
         String blockState = scene.getBlockState(x, y, z);
         if (blockState == null || blockState.isEmpty())
             return DEFAULT;
-        BlockRenderState cached = CACHE.get(blockState);
+        Map<String, BlockRenderState> cache = CACHE_REF.get();
+        BlockRenderState cached = cache.get(blockState);
         if (cached != null)
             return cached;
-        if (CACHE.size() > MAX_CACHE_SIZE)
-            CACHE = new ConcurrentHashMap<>();
+        // CAS-guarded eviction: concurrent over-cap detections collapse to a
+        // single replacement instead of repeatedly throwing away just-cached
+        // entries (thundering herd).
+        if (cache.size() > MAX_CACHE_SIZE)
+            CACHE_REF.compareAndSet(cache, new ConcurrentHashMap<String, BlockRenderState>());
         BlockRenderState parsed = parse(blockState);
-        CACHE.put(blockState, parsed);
+        CACHE_REF.get().put(blockState, parsed);
         return parsed;
     }
 
@@ -106,42 +126,44 @@ public class BlockRenderState {
      * Returns the current number of cached entries. Package-visible for testing.
      */
     static int cacheSize() {
-        return CACHE.size();
+        return CACHE_REF.get().size();
     }
 
     /**
      * Replaces the cache with a fresh empty map. Package-visible for testing.
      */
     static void clearCache() {
-        CACHE = new ConcurrentHashMap<>();
+        CACHE_REF.set(new ConcurrentHashMap<String, BlockRenderState>());
     }
 
     /**
      * Parses all render-relevant properties from a raw block state string.
      */
     private static BlockRenderState parse(String blockState) {
-        String facing = property(blockState, "facing", "north");
-        String axis = property(blockState, "axis", "y");
-        String type = property(blockState, "type", "bottom");
-        String half = property(blockState, "half", "bottom");
-        String shape = property(blockState, "shape", "straight");
-        boolean open = "true".equals(property(blockState, "open", "false"));
-        int layers = parseInt(property(blockState, "layers", "1"), 1);
-        int rotation = parseInt(property(blockState, "rotation", "0"), 0);
+        // Compute `stateStart` once and reuse across all 8 property lookups
+        // instead of calling indexOf('[') eight times per parse.
+        int stateStart = blockState.indexOf('[');
+        String facing = property(blockState, stateStart, NEEDLE_FACING, "north");
+        String axis = property(blockState, stateStart, NEEDLE_AXIS, "y");
+        String type = property(blockState, stateStart, NEEDLE_TYPE, "bottom");
+        String half = property(blockState, stateStart, NEEDLE_HALF, "bottom");
+        String shape = property(blockState, stateStart, NEEDLE_SHAPE, "straight");
+        boolean open = "true".equals(property(blockState, stateStart, NEEDLE_OPEN, "false"));
+        int layers = parseInt(property(blockState, stateStart, NEEDLE_LAYERS, "1"), 1);
+        int rotation = parseInt(property(blockState, stateStart, NEEDLE_ROTATION, "0"), 0);
         return new BlockRenderState(facing, axis, type, half, shape, open, layers, rotation);
     }
 
     /**
      * Extracts a single property value from a block state string.
-     * Searches for {@code "key="} after the opening bracket and reads until the next
-     * comma or closing bracket. Returns the fallback if the property is not present.
+     * Searches for {@code needle} (which already contains the trailing {@code "="})
+     * after {@code stateStart} and reads until the next comma or closing bracket.
+     * Returns {@code fallback} if {@code stateStart < 0} or the property is absent.
      */
-    private static String property(String blockState, String key, String fallback) {
-        int stateStart = blockState.indexOf('[');
+    private static String property(String blockState, int stateStart, String needle, String fallback) {
         if (stateStart < 0)
             return fallback;
 
-        String needle = key + "=";
         int valueStart = blockState.indexOf(needle, stateStart);
         if (valueStart < 0)
             return fallback;

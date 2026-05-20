@@ -59,6 +59,13 @@ public class RendererUtils {
     }
 
     /**
+     * Maximum allowed column count (sizeX * sizeZ) for the height-map acceleration structure.
+     * A 512x512 horizontal footprint is well above realistic Build Battle plot sizes, and
+     * guards against pathological inputs that would otherwise allocate gigabytes or overflow int.
+     */
+    public final int MAX_HEIGHTMAP_AREA = 512 * 512;
+
+    /**
      * Pre-computes per-column Y bounds for non-transparent blocks.
      * For each (x, z) column, stores the lowest and highest Y containing a visible block.
      * Returns {@code int[sizeX * sizeZ * 2]} where index {@code [i*2]} = minY,
@@ -69,15 +76,26 @@ public class RendererUtils {
      *
      * @param scene the scene to analyze
      * @return flat array of (minY, maxY) pairs per column
+     * @throws IllegalArgumentException if the horizontal area exceeds {@link #MAX_HEIGHTMAP_AREA}
      */
     public int[] buildHeightMap(@NonNull SceneData scene) {
         int sizeX = scene.maxX() - scene.minX() + 1;
         int sizeZ = scene.maxZ() - scene.minZ() + 1;
-        int[] heightMap = new int[sizeX * sizeZ * 2];
+        // Use long arithmetic to detect overflow before allocation, then cap to a sane upper bound.
+        long area = (long) sizeX * sizeZ;
+        if (area <= 0 || area > MAX_HEIGHTMAP_AREA)
+            throw new IllegalArgumentException(
+                    "heightmap area " + area + " out of range (max " + MAX_HEIGHTMAP_AREA + ")");
+        int nCols = sizeX * sizeZ;
+        // Hoist scene Y-bounds out of the init loop — they're constant for the duration of this call.
+        int initialMaxY = scene.maxY() + 1;
+        int initialMinY = scene.minY() - 1;
+        int[] heightMap = new int[nCols * 2];
         // Initialize: minY = beyond max, maxY = below min (empty marker)
-        for (int i = 0; i < sizeX * sizeZ; i++) {
-            heightMap[i * 2] = scene.maxY() + 1;
-            heightMap[i * 2 + 1] = scene.minY() - 1;
+        for (int i = 0; i < nCols; i++) {
+            int base = i << 1;
+            heightMap[base] = initialMaxY;
+            heightMap[base + 1] = initialMinY;
         }
         for (int x = scene.minX(); x <= scene.maxX(); x++)
             for (int z = scene.minZ(); z <= scene.maxZ(); z++) {

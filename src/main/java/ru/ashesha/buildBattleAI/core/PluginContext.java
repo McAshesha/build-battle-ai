@@ -8,10 +8,13 @@ import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import lombok.Getter;
 import lombok.NonNull;
 import org.bukkit.entity.Player;
+import org.bukkit.event.HandlerList;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.ArenaManager;
 import ru.ashesha.buildBattleAI.arena.api.BBAIArenaManager;
 import ru.ashesha.buildBattleAI.commands.ArenaCommand;
+import ru.ashesha.buildBattleAI.commands.TeleportWorldCommand;
+import ru.ashesha.buildBattleAI.commands.TestRenderCommand;
 import ru.ashesha.buildBattleAI.config.ConfigService;
 import ru.ashesha.buildBattleAI.config.api.BBAIConfigService;
 import ru.ashesha.buildBattleAI.data.DataService;
@@ -95,6 +98,15 @@ public class PluginContext {
     private final ListenerService listenerService;
     @Getter
     private final RenderService renderService;
+
+    /**
+     * Temporary developer test command. Lives as a field (not constructed
+     * inline on each enable) because it also implements {@link org.bukkit.event.Listener}
+     * and needs an explicit {@link HandlerList#unregisterAll(Listener) unregisterAll}
+     * during shutdown. Remove this field — and the matching code in
+     * {@link #enable()} / {@link #shutdown()} — when the command is retired.
+     */
+    private TestRenderCommand testRenderCommand;
 
     /**
      * Ordered list of every service, used to drive the uniform lifecycle.
@@ -191,8 +203,17 @@ public class PluginContext {
         // the command / listener services (those services only provide the
         // registration mechanism and the bulk-unregistration guarantees).
         commandService.register(new ArenaCommand(plugin));
+        commandService.register(new TeleportWorldCommand(plugin));
         listenerService.register(new ArenaSetupListener(plugin));
         listenerService.register(new GameListener(plugin));
+
+        // Temporary developer command — also a Bukkit Listener. Register both
+        // sides explicitly; cleanup is in shutdown(). Remove this block when
+        // the command is retired.
+        this.testRenderCommand = new TestRenderCommand(plugin);
+        commandService.register(testRenderCommand);
+        plugin.getServer().getPluginManager().registerEvents(testRenderCommand, plugin);
+        testRenderCommand.registerCrossVersionListeners();
 
         long elapsed = System.currentTimeMillis() - start;
         plugin.getPluginLogger().debug("PluginContext enabled %d service(s) in %d ms.",
@@ -215,6 +236,18 @@ public class PluginContext {
     public void shutdown() {
         plugin.getPluginLogger().debug("PluginContext shutting down %d service(s) in reverse order.",
                 services.size());
+
+        // Temporary developer command — explicit Bukkit listener cleanup
+        // plus active-session teardown so the wand item doesn't leak into
+        // players' inventories across a plugin reload. The command itself
+        // is unregistered by CommandService.shutdown(). Remove this block
+        // when the command is retired.
+        if (testRenderCommand != null) {
+            testRenderCommand.shutdownAllSessions();
+            HandlerList.unregisterAll(testRenderCommand);
+            testRenderCommand = null;
+        }
+
         for (int i = services.size() - 1; i >= 0; i--)
             services.get(i).shutdown();
     }
