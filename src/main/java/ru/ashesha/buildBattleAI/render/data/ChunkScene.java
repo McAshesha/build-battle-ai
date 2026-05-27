@@ -35,7 +35,6 @@ public class ChunkScene implements SceneData {
      * Hard upper bound for any single axis of a captured region. Larger requests
      * are rejected up front rather than allocating a multi-gigabyte voxel array
      * or overflowing the int multiplication that backs the flat-index layout.
-     * Matches the limit enforced by {@code TestRenderCommand}.
      */
     public static final int MAX_REGION_AXIS = 512;
 
