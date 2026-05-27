@@ -1,5 +1,6 @@
 package ru.ashesha.buildBattleAI.arena.api;
 
+import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
 
 import java.util.Collection;
@@ -145,6 +146,51 @@ public interface BBAIArenaManager {
      * @param cameraIndex 1-based camera index (1–3)
      */
     void handleSetCamera(Player player, int plotIndex, int cameraIndex);
+
+    /**
+     * Switches the active plot tab in the setup panel.
+     * <p>
+     * Global settings stay visible at the top of the panel. Only the
+     * active plot's per-plot section is rendered below the tab bar.
+     * Other plots retain all their already-configured state.
+     *
+     * @param player    the admin
+     * @param plotIndex 1-based plot index in {@code 1..maxPlayers}
+     */
+    void handleSetTab(Player player, int plotIndex);
+
+    /**
+     * Records the player's current block position as the first corner
+     * of the given plot's picture region (where the rendered preview
+     * will be displayed in-world).
+     *
+     * @param player    the admin
+     * @param plotIndex 1-based plot index
+     */
+    void handleSetPictureCorner1(Player player, int plotIndex);
+
+    /**
+     * Records the player's current block position as the opposite
+     * corner of the given plot's picture region. For a 1×1 region the
+     * caller stands on the same block as corner 1.
+     *
+     * @param player    the admin
+     * @param plotIndex 1-based plot index
+     */
+    void handleSetPictureCorner2(Player player, int plotIndex);
+
+    /**
+     * Sets the cardinal facing direction of the picture region for the
+     * given plot. Must be one of {@code NORTH}, {@code SOUTH},
+     * {@code EAST}, or {@code WEST}, and compatible with the plane
+     * defined by the picture corners (for 2×2 regions); for 1×1
+     * regions all four cardinal directions are accepted.
+     *
+     * @param player    the admin
+     * @param plotIndex 1-based plot index
+     * @param face      the cardinal direction the picture faces
+     */
+    void handleSetPictureFace(Player player, int plotIndex, BlockFace face);
 
     /**
      * Sets the minimum player count for the arena being created.

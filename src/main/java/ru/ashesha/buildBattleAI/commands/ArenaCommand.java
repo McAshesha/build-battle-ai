@@ -1,6 +1,7 @@
 package ru.ashesha.buildBattleAI.commands;
 
 import lombok.NonNull;
+import org.bukkit.block.BlockFace;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
@@ -15,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Main plugin command ({@code /bbai}) for arena management.
@@ -323,6 +325,35 @@ public class ArenaCommand extends CommandService.PluginCommand {
                         am.handleSetCamera(player, plot, 3);
                 }
                 break;
+            case "tab":
+                if (args.length >= 3) {
+                    int plot = parseIntSafe(args[2]);
+                    if (plot >= 1)
+                        am.handleSetTab(player, plot);
+                }
+                break;
+            case "pic-corner1":
+                if (args.length >= 3) {
+                    int plot = parseIntSafe(args[2]);
+                    if (plot >= 1)
+                        am.handleSetPictureCorner1(player, plot);
+                }
+                break;
+            case "pic-corner2":
+                if (args.length >= 3) {
+                    int plot = parseIntSafe(args[2]);
+                    if (plot >= 1)
+                        am.handleSetPictureCorner2(player, plot);
+                }
+                break;
+            case "pic-face":
+                if (args.length >= 4) {
+                    int plot = parseIntSafe(args[2]);
+                    BlockFace face = parseCardinalFace(args[3]);
+                    if (plot >= 1 && face != null)
+                        am.handleSetPictureFace(player, plot, face);
+                }
+                break;
             case "minplayers":
                 if (args.length >= 3)
                     handleSetupMinPlayers(player, am, args[2]);
@@ -443,6 +474,31 @@ public class ArenaCommand extends CommandService.PluginCommand {
             return Double.parseDouble(s);
         } catch (NumberFormatException e) {
             return -1;
+        }
+    }
+
+    /**
+     * Parses a cardinal {@link BlockFace} name (NORTH/SOUTH/EAST/WEST,
+     * case-insensitive). Returns {@code null} for unknown or non-cardinal
+     * values; the picture surface only supports wall-mounted frames so the
+     * other {@link BlockFace} entries (UP/DOWN/diagonals) are rejected here.
+     */
+    private static BlockFace parseCardinalFace(String raw) {
+        if (raw == null)
+            return null;
+        try {
+            BlockFace face = BlockFace.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+            switch (face) {
+                case NORTH:
+                case SOUTH:
+                case EAST:
+                case WEST:
+                    return face;
+                default:
+                    return null;
+            }
+        } catch (IllegalArgumentException e) {
+            return null;
         }
     }
 

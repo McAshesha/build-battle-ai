@@ -5,6 +5,7 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import org.bukkit.block.BlockFace;
 import ru.ashesha.buildBattleAI.arena.api.Arena;
 import ru.ashesha.buildBattleAI.entity.hologram.HologramService;
 import ru.ashesha.buildBattleAI.entity.npc.NPCService;
@@ -97,6 +98,20 @@ class ArenaSetupSession {
     /** Per-plot setup data, keyed by 1-based plot index. */
     private final Map<Integer, PlotSetupData> plots = new HashMap<>();
 
+    /**
+     * 1-based index of the plot tab currently being edited.
+     * <p>
+     * The setup panel renders global settings always visible plus a tab bar
+     * with one button per plot; clicking a tab swaps which plot section is
+     * shown without losing the other plots' state ("browser tab" feel).
+     * <p>
+     * {@code null} until {@link #maxPlayers} has been chosen; defaults to
+     * {@code 1} as soon as the player count is selected. Clamped back to
+     * {@code 1} if it would exceed the current {@link #maxPlayers}.
+     */
+    @Setter
+    private Integer activePlotTab;
+
     // ── visual markers (managed by ArenaManager for setup feedback) ────
 
     /** Hologram marker at the lobby position. */
@@ -138,7 +153,9 @@ class ArenaSetupSession {
      * Checks whether all required settings have been configured.
      * <p>
      * Required: {@link #maxPlayers}, {@link #lobby}, and for each
-     * plot 1..maxPlayers: spawn, corner1, corner2, camera1, camera2, camera3.
+     * plot 1..maxPlayers: spawn, corner1, corner2, camera1, camera2,
+     * camera3, picture corner 1, picture corner 2, picture face
+     * (with a valid coplanar 1×1 or 2×2 layout and a face matching the plane).
      *
      * @return {@code true} if the arena can be created
      */
@@ -187,6 +204,26 @@ class ArenaSetupSession {
         /** Renderer camera 3 position and angle. {@code null} = not yet set. */
         private Arena.Position camera3;
 
+        /**
+         * First picture-region corner (block coords) for the in-world
+         * preview surface. {@code null} = not yet set.
+         */
+        private int[] pictureCorner1;
+
+        /**
+         * Opposite picture-region corner (block coords). For a 1×1 region
+         * this equals {@link #pictureCorner1}. {@code null} = not yet set.
+         */
+        private int[] pictureCorner2;
+
+        /**
+         * Cardinal direction the picture faces. {@code null} until the user
+         * picks from the face buttons. Reset to {@code null} automatically
+         * when a corner change makes the previous face incompatible with
+         * the new plane.
+         */
+        private BlockFace pictureFace;
+
         // ── visual markers (managed by ArenaManager) ───────────────────
 
         /** Hologram at the spawn position. */
@@ -207,14 +244,139 @@ class ArenaSetupSession {
         /** NPC marker for camera 3. */
         private NPCService.NPC cameraNpc3;
 
+        /** Hologram at picture corner 1 position. */
+        private HologramService.Hologram pictureCorner1Hologram;
+
+        /** Hologram at picture corner 2 position. */
+        private HologramService.Hologram pictureCorner2Hologram;
+
         /**
-         * Checks whether all required plot fields are set.
+         * Checks whether all required plot fields are set and the picture
+         * region is geometrically valid (coplanar, size 1×1 or 2×2) with a
+         * face that matches the determined plane.
          *
-         * @return {@code true} if spawn, corner1, corner2, and all 3 cameras are non-null
+         * @return {@code true} if the plot is fully configured
          */
         boolean isComplete() {
-            return spawn != null && corner1 != null && corner2 != null
-                    && camera1 != null && camera2 != null && camera3 != null;
+            if (spawn == null || corner1 == null || corner2 == null
+                    || camera1 == null || camera2 == null || camera3 == null)
+                return false;
+            if (pictureCorner1 == null || pictureCorner2 == null || pictureFace == null)
+                return false;
+            // Geometry must be valid AND the chosen face must match the plane.
+            return pictureGeometryStatus() == PictureGeometry.VALID
+                    && isFaceAllowed(pictureFace);
         }
+
+        /**
+         * Classifies the current picture corners against the allowed
+         * shapes (independent of the chosen face).
+         *
+         * @return the geometry status; never {@code null}
+         */
+        PictureGeometry pictureGeometryStatus() {
+            if (pictureCorner1 == null || pictureCorner2 == null)
+                return PictureGeometry.MISSING;
+            int dx = Math.abs(pictureCorner2[0] - pictureCorner1[0]);
+            int dy = Math.abs(pictureCorner2[1] - pictureCorner1[1]);
+            int dz = Math.abs(pictureCorner2[2] - pictureCorner1[2]);
+            if (dx > 0 && dz > 0)
+                return PictureGeometry.NOT_COPLANAR;
+            if (dx == 0 && dy == 0 && dz == 0)
+                return PictureGeometry.VALID;
+            if (dx == 0 && dy == 1 && dz == 1)
+                return PictureGeometry.VALID;
+            if (dx == 1 && dy == 1 && dz == 0)
+                return PictureGeometry.VALID;
+            return PictureGeometry.INVALID_SIZE;
+        }
+
+        /**
+         * Returns whether the corners describe a 1×1 region (corners
+         * coincide). Only meaningful when both corners are set.
+         *
+         * @return {@code true} when both corners refer to the same block
+         */
+        boolean isPictureOneByOne() {
+            if (pictureCorner1 == null || pictureCorner2 == null)
+                return false;
+            return pictureCorner1[0] == pictureCorner2[0]
+                    && pictureCorner1[1] == pictureCorner2[1]
+                    && pictureCorner1[2] == pictureCorner2[2];
+        }
+
+        /**
+         * Returns whether the corners describe a 2×2 region in the XY plane
+         * (i.e. share the same Z coordinate but differ in X and Y).
+         *
+         * @return {@code true} when face must be NORTH or SOUTH
+         */
+        boolean isPictureXYPlane() {
+            if (pictureCorner1 == null || pictureCorner2 == null)
+                return false;
+            int dx = Math.abs(pictureCorner2[0] - pictureCorner1[0]);
+            int dy = Math.abs(pictureCorner2[1] - pictureCorner1[1]);
+            int dz = Math.abs(pictureCorner2[2] - pictureCorner1[2]);
+            return dx == 1 && dy == 1 && dz == 0;
+        }
+
+        /**
+         * Returns whether the corners describe a 2×2 region in the YZ plane.
+         *
+         * @return {@code true} when face must be EAST or WEST
+         */
+        boolean isPictureYZPlane() {
+            if (pictureCorner1 == null || pictureCorner2 == null)
+                return false;
+            int dx = Math.abs(pictureCorner2[0] - pictureCorner1[0]);
+            int dy = Math.abs(pictureCorner2[1] - pictureCorner1[1]);
+            int dz = Math.abs(pictureCorner2[2] - pictureCorner1[2]);
+            return dx == 0 && dy == 1 && dz == 1;
+        }
+
+        /**
+         * Returns whether the given face is allowed by the current picture
+         * geometry. Used by the panel to reset an incompatible face after
+         * the user edits a corner.
+         *
+         * @param face the face to test
+         * @return {@code true} if the face matches the current plane
+         */
+        boolean isFaceAllowed(BlockFace face) {
+            if (face == null)
+                return false;
+            switch (pictureGeometryStatus()) {
+                case VALID:
+                    if (isPictureOneByOne())
+                        return face == BlockFace.NORTH || face == BlockFace.SOUTH
+                                || face == BlockFace.EAST || face == BlockFace.WEST;
+                    if (isPictureXYPlane())
+                        return face == BlockFace.NORTH || face == BlockFace.SOUTH;
+                    if (isPictureYZPlane())
+                        return face == BlockFace.EAST || face == BlockFace.WEST;
+                    return false;
+                default:
+                    return false;
+            }
+        }
+    }
+
+    /**
+     * Classification of the picture corner pair's geometric validity.
+     * Independent of the chosen {@link BlockFace}.
+     */
+    enum PictureGeometry {
+
+        /** At least one corner has not been set yet. */
+        MISSING,
+
+        /** Corners differ in both X and Z — not in a single plane. */
+        NOT_COPLANAR,
+
+        /** Corners are coplanar but the dimensions are not 1×1 or 2×2. */
+        INVALID_SIZE,
+
+        /** Corners form a valid 1×1 or 2×2 region. */
+        VALID
     }
 }

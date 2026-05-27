@@ -143,6 +143,10 @@ class GameManagerTest {
                 new Arena.Position(0, 70, -5, 0, 30),
                 new Arena.Position(5, 70, -5, 30, 30),
                 new Arena.Position(10, 70, -5, 60, 30));
-        return new Arena.PlotData(spawn, c1x, c1y, c1z, c2x, c2y, c2z, cameras);
+        // 1×1 picture region — geometry irrelevant for zone tests but
+        // required by the PlotData contract.
+        Arena.PictureRegion picture = new Arena.PictureRegion(
+                0, 80, 30, 0, 80, 30, org.bukkit.block.BlockFace.NORTH);
+        return new Arena.PlotData(spawn, c1x, c1y, c1z, c2x, c2y, c2z, cameras, picture);
     }
 }

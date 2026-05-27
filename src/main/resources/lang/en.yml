@@ -80,6 +80,14 @@ arena:
       hover: "&7Click and type countdown duration in seconds (3-60)"
       invalid: "&c  Countdown must be between 3 and 60 seconds."
 
+    # Plot tab bar
+    tab:
+      label: "&7  Plot Tabs: "
+      active: "&b&l[Plot %index%★]"
+      complete: "&a[Plot %index%✓]"
+      incomplete: "&7[Plot %index%✗]"
+      hover: "&7Switch to plot %index% configuration"
+
     # Per-plot settings
     plot:
       header: "&6  ── Plot %index% ──"
@@ -101,6 +109,21 @@ arena:
         c1-hover-change: "&7Click to update corner 1 for plot %index%"
         c2-hover-set: "&7Fly to opposite corner of plot %index% and click"
         c2-hover-change: "&7Click to update corner 2 for plot %index%"
+      picture:
+        label: "&7    Picture: "
+        c1: "&d[PC1]"
+        c2: "&d[PC2]"
+        c1-hover-set: "&7Stand on the first picture-region block for plot %index% and click"
+        c1-hover-change: "&7Click to update picture corner 1 for plot %index%"
+        c2-hover-set: "&7Stand on the opposite picture-region block for plot %index% (same block for 1×1) and click"
+        c2-hover-change: "&7Click to update picture corner 2 for plot %index%"
+        invalid-plane: "&c✘ corners not coplanar (need same X or same Z)"
+        invalid-size: "&c✘ picture must be 1×1 or 2×2"
+        face:
+          label: "&7    Face: "
+          option: "&7[%face%]"
+          option-selected: "&a&l[%face%✓]"
+          hover: "&7Set plot %index% picture face to &e%face%"
 
     # Confirm / Cancel buttons
     confirm:
@@ -141,6 +164,10 @@ arena:
       gametime-sub: "&7Set to &e%minutes% min"
       countdown: "&6Countdown"
       countdown-sub: "&7Set to &e%seconds%s"
+      picture: "&6Plot %index%"
+      picture-saved: "&7Picture corner %corner% saved"
+      face: "&6Plot %index%"
+      face-saved: "&7Face set to &e%face%"
 
     # Hologram markers at set positions during setup
     marker:
@@ -149,6 +176,8 @@ arena:
       spawn: "&6⬇ &eSpawn #%index%"
       corner1: "&c⬇ &eC1 #%index%"
       corner2: "&c⬇ &eC2 #%index%"
+      pic-corner1: "&d⬇ &ePicture C1 #%index%"
+      pic-corner2: "&d⬇ &ePicture C2 #%index%"
 
     # Feedback messages
     created: "&a  Arena &f%arena% &ahas been created and activated!"

@@ -210,6 +210,7 @@ class ArenaManagerTest {
         Arena.PlotData firstPlot = arena.plots().get(0);
         assertNotNull(firstPlot.spawn());
         assertEquals(3, firstPlot.cameras().size());
+        assertNotNull(firstPlot.picture());
     }
 
     @Test
@@ -320,6 +321,76 @@ class ArenaManagerTest {
     }
 
     @Test
+    void validationRejectsMissingPicture() {
+        YamlConfiguration config = buildValidArenaConfig("bbai_nopic", 2, true);
+        config.set("plots.1.picture", null); // remove plot 1 picture
+        when(configService.getArenaNames()).thenReturn(Collections.singleton("nopic"));
+        when(configService.getArenaConfig("nopic")).thenReturn(config);
+
+        manager.enable();
+
+        assertNull(manager.getArena("nopic"));
+        verify(pluginLogger).error("Arena '%s': %s", "nopic", "missing 'plots.1.picture.corner1'");
+        verify(pluginLogger).error("Arena '%s': %s", "nopic", "missing 'plots.1.picture.corner2'");
+        verify(pluginLogger).error("Arena '%s': %s", "nopic", "missing 'plots.1.picture.face'");
+    }
+
+    @Test
+    void validationRejectsPictureWithBadFace() {
+        YamlConfiguration config = buildValidArenaConfig("bbai_badface", 2, true);
+        config.set("plots.1.picture.face", "UP"); // not a cardinal wall face
+        when(configService.getArenaNames()).thenReturn(Collections.singleton("badface"));
+        when(configService.getArenaConfig("badface")).thenReturn(config);
+
+        manager.enable();
+
+        assertNull(manager.getArena("badface"));
+        verify(pluginLogger).error("Arena '%s': %s", "badface",
+                "'plots.1.picture.face' must be NORTH, SOUTH, EAST, or WEST (got 'UP')");
+    }
+
+    @Test
+    void validationRejectsNonCoplanarPicture() {
+        YamlConfiguration config = buildValidArenaConfig("bbai_skew", 2, true);
+        // Tilt corner2 in both X and Z so it is no longer coplanar with corner1.
+        config.set("plots.1.picture.corner2.x", 11);
+        config.set("plots.1.picture.corner2.z", 21);
+        when(configService.getArenaNames()).thenReturn(Collections.singleton("skew"));
+        when(configService.getArenaConfig("skew")).thenReturn(config);
+
+        manager.enable();
+
+        assertNull(manager.getArena("skew"));
+    }
+
+    @Test
+    void validationRejectsOversizedPicture() {
+        YamlConfiguration config = buildValidArenaConfig("bbai_big", 2, true);
+        // Stretch the region to 3×3 (still coplanar) — must be rejected.
+        config.set("plots.1.picture.corner2.x", 12);
+        config.set("plots.1.picture.corner2.y", 12);
+        when(configService.getArenaNames()).thenReturn(Collections.singleton("big"));
+        when(configService.getArenaConfig("big")).thenReturn(config);
+
+        manager.enable();
+
+        assertNull(manager.getArena("big"));
+    }
+
+    @Test
+    void validationRejectsPictureFaceMismatch() {
+        YamlConfiguration config = buildValidArenaConfig("bbai_mis", 2, true);
+        // Picture corners are 2×2 in XY-plane (z1==z2), so EAST is invalid.
+        config.set("plots.1.picture.face", "EAST");
+        when(configService.getArenaNames()).thenReturn(Collections.singleton("mis"));
+        when(configService.getArenaConfig("mis")).thenReturn(config);
+
+        manager.enable();
+
+        assertNull(manager.getArena("mis"));
+    }
+
+    @Test
     void validationCollectsMultipleErrors() {
         YamlConfiguration config = new YamlConfiguration();
         config.set("world", "bbai_multi");
@@ -332,7 +403,7 @@ class ArenaManagerTest {
         manager.enable();
 
         assertNull(manager.getArena("multi"));
-        // Should log missing lobby + 6 fields per plot * 2 plots = 13 errors + summary
+        // Should log missing lobby + all plot fields including new picture trio
         verify(pluginLogger).error("Arena '%s': %s", "multi", "missing 'lobby'");
         verify(pluginLogger).error("Arena '%s': %s", "multi", "missing 'plots.1.spawn'");
         verify(pluginLogger).error("Arena '%s': %s", "multi", "missing 'plots.1.corner1'");
@@ -340,6 +411,9 @@ class ArenaManagerTest {
         verify(pluginLogger).error("Arena '%s': %s", "multi", "missing 'plots.1.camera1'");
         verify(pluginLogger).error("Arena '%s': %s", "multi", "missing 'plots.1.camera2'");
         verify(pluginLogger).error("Arena '%s': %s", "multi", "missing 'plots.1.camera3'");
+        verify(pluginLogger).error("Arena '%s': %s", "multi", "missing 'plots.1.picture.corner1'");
+        verify(pluginLogger).error("Arena '%s': %s", "multi", "missing 'plots.1.picture.corner2'");
+        verify(pluginLogger).error("Arena '%s': %s", "multi", "missing 'plots.1.picture.face'");
         verify(pluginLogger).error(
                 "Arena '%s' will not be activated due to configuration errors.", "multi");
     }
@@ -426,6 +500,17 @@ class ArenaManagerTest {
                 config.set(p + ".camera" + c + ".yaw", (double) (c * 30));
                 config.set(p + ".camera" + c + ".pitch", 30.0);
             }
+            // Picture region — 2×2 in XY-plane (NORTH-facing), per-plot offset
+            int picX = i * 20 + 10;
+            int picY = 80;
+            int picZ = 20;
+            config.set(p + ".picture.corner1.x", picX);
+            config.set(p + ".picture.corner1.y", picY);
+            config.set(p + ".picture.corner1.z", picZ);
+            config.set(p + ".picture.corner2.x", picX + 1);
+            config.set(p + ".picture.corner2.y", picY + 1);
+            config.set(p + ".picture.corner2.z", picZ);
+            config.set(p + ".picture.face", "NORTH");
         }
         return config;
     }

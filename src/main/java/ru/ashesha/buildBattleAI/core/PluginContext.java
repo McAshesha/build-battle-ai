@@ -12,6 +12,7 @@ import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.ArenaManager;
 import ru.ashesha.buildBattleAI.arena.api.BBAIArenaManager;
 import ru.ashesha.buildBattleAI.commands.ArenaCommand;
+import ru.ashesha.buildBattleAI.commands.MLTestCommand;
 import ru.ashesha.buildBattleAI.config.ConfigService;
 import ru.ashesha.buildBattleAI.config.api.BBAIConfigService;
 import ru.ashesha.buildBattleAI.data.DataService;
@@ -28,6 +29,7 @@ import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
 import ru.ashesha.buildBattleAI.listeners.ArenaSetupListener;
 import ru.ashesha.buildBattleAI.listeners.GameListener;
 import ru.ashesha.buildBattleAI.listeners.ListenerService;
+import ru.ashesha.buildBattleAI.listeners.MLTestListener;
 import ru.ashesha.buildBattleAI.message.MessageService;
 import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.ml.MLService;
@@ -191,8 +193,10 @@ public class PluginContext {
         // the command / listener services (those services only provide the
         // registration mechanism and the bulk-unregistration guarantees).
         commandService.register(new ArenaCommand(plugin));
+        commandService.register(new MLTestCommand(plugin));
         listenerService.register(new ArenaSetupListener(plugin));
         listenerService.register(new GameListener(plugin));
+        listenerService.register(new MLTestListener(plugin));
 
         long elapsed = System.currentTimeMillis() - start;
         plugin.getPluginLogger().debug("PluginContext enabled %d service(s) in %d ms.",

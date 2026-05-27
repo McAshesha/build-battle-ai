@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.block.BlockFace;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
@@ -182,16 +183,50 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
                         cameras.add(cam);
                 }
 
+                // Picture region (required) — corners + cardinal face
+                boolean pictureC1Present = config.contains(p + ".picture.corner1.x");
+                boolean pictureC2Present = config.contains(p + ".picture.corner2.x");
+                String faceRaw = config.getString(p + ".picture.face");
+                if (!pictureC1Present)
+                    errors.add("missing '" + p + ".picture.corner1'");
+                if (!pictureC2Present)
+                    errors.add("missing '" + p + ".picture.corner2'");
+                if (faceRaw == null)
+                    errors.add("missing '" + p + ".picture.face'");
+
+                Arena.PictureRegion picture = null;
+                if (pictureC1Present && pictureC2Present && faceRaw != null) {
+                    BlockFace face = parseFace(faceRaw);
+                    if (face == null)
+                        errors.add("'" + p + ".picture.face' must be NORTH, SOUTH, EAST, or WEST (got '"
+                                + faceRaw + "')");
+                    else
+                        try {
+                            picture = new Arena.PictureRegion(
+                                    config.getInt(p + ".picture.corner1.x"),
+                                    config.getInt(p + ".picture.corner1.y"),
+                                    config.getInt(p + ".picture.corner1.z"),
+                                    config.getInt(p + ".picture.corner2.x"),
+                                    config.getInt(p + ".picture.corner2.y"),
+                                    config.getInt(p + ".picture.corner2.z"),
+                                    face);
+                        } catch (IllegalArgumentException ex) {
+                            errors.add("'" + p + ".picture' " + ex.getMessage());
+                        }
+                }
+
                 // Only build plot if all its fields are present
                 if (spawn != null && config.contains(p + ".corner1.x")
-                        && config.contains(p + ".corner2.x") && allCamerasPresent)
+                        && config.contains(p + ".corner2.x") && allCamerasPresent
+                        && picture != null)
                     plots.add(new Arena.PlotData(
                             spawn,
                             config.getInt(p + ".corner1.x"), config.getInt(p + ".corner1.y"),
                             config.getInt(p + ".corner1.z"),
                             config.getInt(p + ".corner2.x"), config.getInt(p + ".corner2.y"),
                             config.getInt(p + ".corner2.z"),
-                            cameras
+                            cameras,
+                            picture
                     ));
             }
 
@@ -271,9 +306,45 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
             List<Arena.Position> cameras = plot.cameras();
             for (int c = 0; c < cameras.size(); c++)
                 writePosition(config, p + ".camera" + (c + 1), cameras.get(c));
+
+            Arena.PictureRegion picture = plot.picture();
+            config.set(p + ".picture.corner1.x", picture.corner1X());
+            config.set(p + ".picture.corner1.y", picture.corner1Y());
+            config.set(p + ".picture.corner1.z", picture.corner1Z());
+            config.set(p + ".picture.corner2.x", picture.corner2X());
+            config.set(p + ".picture.corner2.y", picture.corner2Y());
+            config.set(p + ".picture.corner2.z", picture.corner2Z());
+            config.set(p + ".picture.face", picture.face().name());
         }
 
         configService.saveArenaConfig(arena.name());
+    }
+
+    /**
+     * Parses a YAML face string to one of the four cardinal {@link BlockFace}
+     * values. Returns {@code null} if the string is missing or names a
+     * non-cardinal face.
+     *
+     * @param raw the raw face string from the config (case-insensitive)
+     * @return the parsed face, or {@code null} on parse failure
+     */
+    private static BlockFace parseFace(String raw) {
+        if (raw == null)
+            return null;
+        try {
+            BlockFace face = BlockFace.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+            switch (face) {
+                case NORTH:
+                case SOUTH:
+                case EAST:
+                case WEST:
+                    return face;
+                default:
+                    return null;
+            }
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     /**
@@ -378,12 +449,127 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
         session.maxPlayers(count);
         session.trimPlotsAbove(count);
 
+        // Default to (or clamp) the active plot tab to a valid slot.
+        if (session.activePlotTab() == null || session.activePlotTab() > count
+                || session.activePlotTab() < 1)
+            session.activePlotTab(1);
+
         Lang lang = plugin.getContext().getConfigService().getDefaultLang();
         plugin.getContext().getMessageService().sendTitle(player,
                 lang.get("arena.setup.title.players"),
                 lang.get("arena.setup.title.players-sub", "%count%", String.valueOf(count)),
                 TITLE_FADE_IN, TITLE_STAY, TITLE_FADE_OUT);
         SoundPalette.SELECT.play(player);
+
+        sendSetupPanel(player, session);
+    }
+
+    @Override
+    public void handleSetTab(@NonNull Player player, int plotIndex) {
+        ArenaSetupSession session = setupSessions.get(player.getUniqueId());
+        if (session == null || !isValidPlot(session, plotIndex))
+            return;
+
+        // Switching to an already-active tab is a no-op (no sound spam).
+        if (session.activePlotTab() != null && session.activePlotTab() == plotIndex) {
+            sendSetupPanel(player, session);
+            return;
+        }
+
+        session.activePlotTab(plotIndex);
+        SoundPalette.SELECT.play(player);
+        sendSetupPanel(player, session);
+    }
+
+    @Override
+    public void handleSetPictureCorner1(@NonNull Player player, int plotIndex) {
+        ArenaSetupSession session = setupSessions.get(player.getUniqueId());
+        if (session == null || !isValidPlot(session, plotIndex))
+            return;
+
+        ArenaSetupSession.PlotSetupData plot = session.getOrCreatePlot(plotIndex);
+
+        if (plot.pictureCorner1Hologram() != null)
+            plugin.getContext().getHologramService().despawn(player, plot.pictureCorner1Hologram());
+
+        Location loc = player.getLocation();
+        plot.pictureCorner1(new int[]{loc.getBlockX(), loc.getBlockY(), loc.getBlockZ()});
+
+        // Reset the face if the new geometry no longer permits the previous choice.
+        if (plot.pictureFace() != null && !plot.isFaceAllowed(plot.pictureFace()))
+            plot.pictureFace(null);
+
+        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+        String idx = String.valueOf(plotIndex);
+        plot.pictureCorner1Hologram(spawnCornerMarkerHologram(player,
+                lang.get("arena.setup.marker.pic-corner1", "%index%", idx),
+                plot.pictureCorner1()));
+
+        plugin.getContext().getMessageService().sendTitle(player,
+                lang.get("arena.setup.title.picture", "%index%", idx),
+                lang.get("arena.setup.title.picture-saved", "%corner%", "1"),
+                TITLE_FADE_IN, TITLE_STAY, TITLE_FADE_OUT);
+        SoundPalette.CONFIRM.play(player);
+
+        sendSetupPanel(player, session);
+    }
+
+    @Override
+    public void handleSetPictureCorner2(@NonNull Player player, int plotIndex) {
+        ArenaSetupSession session = setupSessions.get(player.getUniqueId());
+        if (session == null || !isValidPlot(session, plotIndex))
+            return;
+
+        ArenaSetupSession.PlotSetupData plot = session.getOrCreatePlot(plotIndex);
+
+        if (plot.pictureCorner2Hologram() != null)
+            plugin.getContext().getHologramService().despawn(player, plot.pictureCorner2Hologram());
+
+        Location loc = player.getLocation();
+        plot.pictureCorner2(new int[]{loc.getBlockX(), loc.getBlockY(), loc.getBlockZ()});
+
+        if (plot.pictureFace() != null && !plot.isFaceAllowed(plot.pictureFace()))
+            plot.pictureFace(null);
+
+        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+        String idx = String.valueOf(plotIndex);
+        plot.pictureCorner2Hologram(spawnCornerMarkerHologram(player,
+                lang.get("arena.setup.marker.pic-corner2", "%index%", idx),
+                plot.pictureCorner2()));
+
+        plugin.getContext().getMessageService().sendTitle(player,
+                lang.get("arena.setup.title.picture", "%index%", idx),
+                lang.get("arena.setup.title.picture-saved", "%corner%", "2"),
+                TITLE_FADE_IN, TITLE_STAY, TITLE_FADE_OUT);
+        SoundPalette.CONFIRM.play(player);
+
+        sendSetupPanel(player, session);
+    }
+
+    @Override
+    public void handleSetPictureFace(@NonNull Player player, int plotIndex, @NonNull BlockFace face) {
+        ArenaSetupSession session = setupSessions.get(player.getUniqueId());
+        if (session == null || !isValidPlot(session, plotIndex))
+            return;
+
+        ArenaSetupSession.PlotSetupData plot = session.getOrCreatePlot(plotIndex);
+
+        // Face selection only makes sense once geometry is valid.
+        if (!plot.isFaceAllowed(face)) {
+            SoundPalette.DENY.play(player);
+            sendSetupPanel(player, session);
+            return;
+        }
+
+        plot.pictureFace(face);
+
+        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+        String idx = String.valueOf(plotIndex);
+        plugin.getContext().getMessageService().sendTitle(player,
+                lang.get("arena.setup.title.face", "%index%", idx),
+                lang.get("arena.setup.title.face-saved", "%face%", face.name()),
+                TITLE_FADE_IN, TITLE_STAY, TITLE_FADE_OUT);
+        SoundPalette.CONFIRM_ALT.play(player);
 
         sendSetupPanel(player, session);
     }
@@ -650,17 +836,23 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
             return;
         }
 
-        // Build plot data with 3 cameras each
+        // Build plot data with 3 cameras and the configured picture region
         List<Arena.PlotData> plots = new ArrayList<>();
         for (int i = 1; i <= session.maxPlayers(); i++) {
             ArenaSetupSession.PlotSetupData pd = session.plots().get(i);
             List<Arena.Position> cameras = Arrays.asList(
                     pd.camera1(), pd.camera2(), pd.camera3());
+            Arena.PictureRegion picture = new Arena.PictureRegion(
+                    pd.pictureCorner1()[0], pd.pictureCorner1()[1], pd.pictureCorner1()[2],
+                    pd.pictureCorner2()[0], pd.pictureCorner2()[1], pd.pictureCorner2()[2],
+                    pd.pictureFace()
+            );
             plots.add(new Arena.PlotData(
                     pd.spawn(),
                     pd.corner1()[0], pd.corner1()[1], pd.corner1()[2],
                     pd.corner2()[0], pd.corner2()[1], pd.corner2()[2],
-                    cameras
+                    cameras,
+                    picture
             ));
         }
 
@@ -897,7 +1089,8 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
     }
 
     /**
-     * Despawns all visual markers for a single plot (holograms and camera NPCs).
+     * Despawns all visual markers for a single plot (holograms and camera NPCs),
+     * including the picture-region corner holograms.
      */
     private void cleanupPlotMarkers(Player player, ArenaSetupSession.PlotSetupData plot) {
         BBAIHologramService holoService = plugin.getContext().getHologramService();
@@ -915,12 +1108,19 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
             npcService.despawn(player, plot.cameraNpc2());
         if (plot.cameraNpc3() != null)
             npcService.despawn(player, plot.cameraNpc3());
+        if (plot.pictureCorner1Hologram() != null)
+            holoService.despawn(player, plot.pictureCorner1Hologram());
+        if (plot.pictureCorner2Hologram() != null)
+            holoService.despawn(player, plot.pictureCorner2Hologram());
     }
 
     // ── panel rendering ────────────────────────────────────────────────
     //
-    // Every setting change re-sends the FULL panel. The panel shows all
-    // settings and their current state (set / unset / optional).
+    // Every setting change re-sends the FULL panel. Global settings (Players,
+    // Lobby, Spectator, MinPlayers, BuildTime, GameTime, Countdown) are always
+    // visible at the top. Below them the panel shows a row of plot tabs and
+    // renders only the active plot's section ("browser tab" feel). Other plots
+    // retain all their state in the session even when not displayed.
 
     /**
      * Sends the complete setup panel to the player, reflecting the
@@ -981,11 +1181,14 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
                 "/bbai setup countdown ",
                 lang.get("arena.setup.countdown.hover"));
 
-        // Plot sections — only shown if player count is selected
+        // Plot tab bar + active plot section — only shown once player count is selected
         if (session.maxPlayers() != null) {
-            for (int i = 1; i <= session.maxPlayers(); i++) {
+            msg.sendChat(player, " ");
+            sendPlotTabBar(player, session, lang);
+            Integer activeTab = session.activePlotTab();
+            if (activeTab != null) {
                 msg.sendChat(player, " ");
-                sendPlotSection(player, session, i, lang);
+                sendPlotSection(player, session, activeTab, lang);
             }
         } else {
             msg.sendChat(player, " ");
@@ -995,6 +1198,40 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
         msg.sendChat(player, " ");
         sendConfirmCancelLine(player, session, lang);
         msg.sendChat(player, lang.get("arena.setup.divider"));
+    }
+
+    /**
+     * Sends the plot tab bar — one clickable button per plot 1..maxPlayers.
+     * The active tab is rendered with the {@code active} style, completed
+     * plots with {@code complete}, incomplete plots with {@code incomplete}.
+     * Clicking a tab switches the active plot via {@code /bbai setup tab N}.
+     */
+    private void sendPlotTabBar(Player player, ArenaSetupSession session, Lang lang) {
+        ChatMicroService.ChatMessage line = new ChatMicroService.ChatMessage();
+        line.append(lang.get("arena.setup.tab.label"));
+        Integer activeTab = session.activePlotTab();
+        for (int i = 1; i <= session.maxPlayers(); i++) {
+            if (i > 1)
+                line.append(" ");
+            String idx = String.valueOf(i);
+            boolean active = activeTab != null && activeTab == i;
+            ArenaSetupSession.PlotSetupData plot = session.plots().get(i);
+            boolean complete = plot != null && plot.isComplete();
+
+            String text;
+            if (active)
+                text = lang.get("arena.setup.tab.active", "%index%", idx);
+            else if (complete)
+                text = lang.get("arena.setup.tab.complete", "%index%", idx);
+            else
+                text = lang.get("arena.setup.tab.incomplete", "%index%", idx);
+
+            line.append(text,
+                    ChatMicroService.ClickAction.RUN_COMMAND,
+                    "/bbai setup tab " + i,
+                    lang.get("arena.setup.tab.hover", "%index%", idx));
+        }
+        plugin.getContext().getMessageService().sendChat(player, line);
     }
 
     /**
@@ -1061,7 +1298,8 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
 
     /**
      * Sends the full section for a single plot: header, spawn line,
-     * zone (corners) line, cameras line (3 cameras).
+     * zone (corners) line, cameras line (3 cameras), picture corners
+     * line, and picture face selector.
      */
     private void sendPlotSection(Player player, ArenaSetupSession session, int index, Lang lang) {
         BBAIMessageService msg = plugin.getContext().getMessageService();
@@ -1155,6 +1393,122 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
             }
         }
         msg.sendChat(player, cameraLine);
+
+        // ── Picture corners line ───────────────────────────────────────
+        ChatMicroService.ChatMessage pictureLine = new ChatMicroService.ChatMessage();
+        pictureLine.append(lang.get("arena.setup.plot.picture.label"));
+
+        int[] pc1 = plot != null ? plot.pictureCorner1() : null;
+        if (pc1 != null) {
+            pictureLine.append(lang.get("arena.setup.status.set") + " "
+                    + lang.get("arena.setup.corner.value",
+                    "%x%", String.valueOf(pc1[0]), "%y%", String.valueOf(pc1[1]),
+                    "%z%", String.valueOf(pc1[2])));
+            pictureLine.append(" " + lang.get("arena.setup.plot.picture.c1"),
+                    ChatMicroService.ClickAction.RUN_COMMAND,
+                    "/bbai setup pic-corner1 " + index,
+                    lang.get("arena.setup.plot.picture.c1-hover-change", "%index%", idx));
+        } else {
+            pictureLine.append(lang.get("arena.setup.status.unset"));
+            pictureLine.append(" " + lang.get("arena.setup.plot.picture.c1"),
+                    ChatMicroService.ClickAction.RUN_COMMAND,
+                    "/bbai setup pic-corner1 " + index,
+                    lang.get("arena.setup.plot.picture.c1-hover-set", "%index%", idx));
+        }
+
+        pictureLine.append("  ");
+
+        int[] pc2 = plot != null ? plot.pictureCorner2() : null;
+        if (pc2 != null) {
+            pictureLine.append(lang.get("arena.setup.status.set") + " "
+                    + lang.get("arena.setup.corner.value",
+                    "%x%", String.valueOf(pc2[0]), "%y%", String.valueOf(pc2[1]),
+                    "%z%", String.valueOf(pc2[2])));
+            pictureLine.append(" " + lang.get("arena.setup.plot.picture.c2"),
+                    ChatMicroService.ClickAction.RUN_COMMAND,
+                    "/bbai setup pic-corner2 " + index,
+                    lang.get("arena.setup.plot.picture.c2-hover-change", "%index%", idx));
+        } else {
+            pictureLine.append(lang.get("arena.setup.status.unset"));
+            pictureLine.append(" " + lang.get("arena.setup.plot.picture.c2"),
+                    ChatMicroService.ClickAction.RUN_COMMAND,
+                    "/bbai setup pic-corner2 " + index,
+                    lang.get("arena.setup.plot.picture.c2-hover-set", "%index%", idx));
+        }
+        msg.sendChat(player, pictureLine);
+
+        // ── Picture face selector ──────────────────────────────────────
+        sendPictureFaceLine(player, plot, index, lang);
+    }
+
+    /**
+     * Sends the picture-face selector line. The buttons shown depend on
+     * the geometry described by the current picture corners:
+     * <ul>
+     *   <li>Corners missing → unset hint, no buttons.</li>
+     *   <li>Corners not coplanar → coplanar error, no buttons.</li>
+     *   <li>Corners coplanar but not 1×1/2×2 → size error, no buttons.</li>
+     *   <li>Corners 2×2 in XY-plane → {@code [NORTH] [SOUTH]}.</li>
+     *   <li>Corners 2×2 in YZ-plane → {@code [EAST] [WEST]}.</li>
+     *   <li>Corners 1×1 (ambiguous plane) → all four cardinal options.</li>
+     * </ul>
+     * Each shown button calls {@code /bbai setup pic-face <plot> <FACE>}.
+     */
+    private void sendPictureFaceLine(Player player, ArenaSetupSession.PlotSetupData plot,
+                                     int index, Lang lang) {
+        BBAIMessageService msg = plugin.getContext().getMessageService();
+        ChatMicroService.ChatMessage line = new ChatMicroService.ChatMessage();
+        line.append(lang.get("arena.setup.plot.picture.face.label"));
+
+        ArenaSetupSession.PictureGeometry status = plot != null
+                ? plot.pictureGeometryStatus()
+                : ArenaSetupSession.PictureGeometry.MISSING;
+
+        switch (status) {
+            case MISSING:
+                line.append(lang.get("arena.setup.status.unset"));
+                msg.sendChat(player, line);
+                return;
+            case NOT_COPLANAR:
+                line.append(lang.get("arena.setup.plot.picture.invalid-plane"));
+                msg.sendChat(player, line);
+                return;
+            case INVALID_SIZE:
+                line.append(lang.get("arena.setup.plot.picture.invalid-size"));
+                msg.sendChat(player, line);
+                return;
+            case VALID:
+                break;
+        }
+
+        BlockFace[] allowed;
+        if (plot.isPictureOneByOne())
+            allowed = new BlockFace[]{
+                    BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST};
+        else if (plot.isPictureXYPlane())
+            allowed = new BlockFace[]{BlockFace.NORTH, BlockFace.SOUTH};
+        else if (plot.isPictureYZPlane())
+            allowed = new BlockFace[]{BlockFace.EAST, BlockFace.WEST};
+        else
+            allowed = new BlockFace[0];
+
+        BlockFace current = plot.pictureFace();
+        String idx = String.valueOf(index);
+        for (int i = 0; i < allowed.length; i++) {
+            if (i > 0)
+                line.append(" ");
+            BlockFace face = allowed[i];
+            boolean selected = current == face;
+            String key = selected
+                    ? "arena.setup.plot.picture.face.option-selected"
+                    : "arena.setup.plot.picture.face.option";
+            line.append(lang.get(key, "%face%", face.name()),
+                    ChatMicroService.ClickAction.RUN_COMMAND,
+                    "/bbai setup pic-face " + index + " " + face.name(),
+                    lang.get("arena.setup.plot.picture.face.hover",
+                            "%face%", face.name(), "%index%", idx));
+        }
+        msg.sendChat(player, line);
     }
 
     /**
