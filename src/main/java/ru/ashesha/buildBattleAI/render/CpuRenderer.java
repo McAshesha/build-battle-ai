@@ -91,14 +91,11 @@ public class CpuRenderer {
     public CpuRenderer() {
         this(new ForkJoinPool(
                 Runtime.getRuntime().availableProcessors(),
-                new ForkJoinPool.ForkJoinWorkerThreadFactory() {
-                    @Override
-                    public ForkJoinWorkerThread newThread(ForkJoinPool p) {
-                        ForkJoinWorkerThread t = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(p);
-                        t.setName("bbai-renderer-" + t.getPoolIndex());
-                        t.setDaemon(true);
-                        return t;
-                    }
+                p -> {
+                    ForkJoinWorkerThread t = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(p);
+                    t.setName("bbai-renderer-" + t.getPoolIndex());
+                    t.setDaemon(true);
+                    return t;
                 },
                 null,
                 false));
@@ -361,7 +358,7 @@ public class CpuRenderer {
                         bMaxZ = zHi;
                         cameraInsideShape = true;
                     }
-                } else {
+                } else
                     for (double[] box : startShape) {
                         double xLo = vx + box[0], yLo = vy + box[1], zLo = vz + box[2];
                         double xHi = vx + box[3], yHi = vy + box[4], zHi = vz + box[5];
@@ -378,7 +375,6 @@ public class CpuRenderer {
                             break;
                         }
                     }
-                }
 
                 if (cameraInsideShape) {
                     // We are about to shade the starting voxel here. Mark
@@ -418,20 +414,18 @@ public class CpuRenderer {
 
                     int alpha = BlockPalette.getAlpha(startBlock);
                     double brightness;
+                    // AO is intentionally skipped for inside-voxel
+                    // hits: occlusion from "neighbors on the outward
+                    // side" makes little physical sense when the
+                    // viewer is enclosed by the block itself.
                     if (BlockPalette.isEmissive(startBlock))
                         brightness = 1.0;
-                    else {
-                        if (effectiveExitAxis == 0)
-                            brightness = BRIGHTNESS_X;
-                        else if (effectiveExitAxis == 1)
-                            brightness = idy < 0 ? BRIGHTNESS_Y_TOP : BRIGHTNESS_Y_BOTTOM;
-                        else
-                            brightness = BRIGHTNESS_Z;
-                        // AO is intentionally skipped for inside-voxel
-                        // hits: occlusion from "neighbors on the outward
-                        // side" makes little physical sense when the
-                        // viewer is enclosed by the block itself.
-                    }
+                    else if (effectiveExitAxis == 0)
+                        brightness = BRIGHTNESS_X;
+                    else if (effectiveExitAxis == 1)
+                        brightness = idy < 0 ? BRIGHTNESS_Y_TOP : BRIGHTNESS_Y_BOTTOM;
+                    else
+                        brightness = BRIGHTNESS_Z;
 
                     int shadedColor = BlockPalette.getColor(scene, vx, vy, vz, startBlock,
                             effectiveExitAxis, idx, idy, idz);
