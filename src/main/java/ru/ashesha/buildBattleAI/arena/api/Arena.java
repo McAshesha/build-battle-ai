@@ -1,5 +1,6 @@
 package ru.ashesha.buildBattleAI.arena.api;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
@@ -119,27 +120,19 @@ public class Arena {
      */
     @Getter
     @Accessors(fluent = true)
+    @AllArgsConstructor
     public static class Position {
 
-        private final double x, y, z;
-        private final float yaw, pitch;
-
-        /**
-         * Creates a position.
-         *
-         * @param x     X coordinate
-         * @param y     Y coordinate
-         * @param z     Z coordinate
-         * @param yaw   horizontal rotation (degrees)
-         * @param pitch vertical rotation (degrees)
-         */
-        public Position(double x, double y, double z, float yaw, float pitch) {
-            this.x = x;
-            this.y = y;
-            this.z = z;
-            this.yaw = yaw;
-            this.pitch = pitch;
-        }
+        /** X world coordinate. */
+        private final double x;
+        /** Y world coordinate. */
+        private final double y;
+        /** Z world coordinate. */
+        private final double z;
+        /** Horizontal rotation (degrees). */
+        private final float yaw;
+        /** Vertical rotation (degrees). */
+        private final float pitch;
     }
 
     /**

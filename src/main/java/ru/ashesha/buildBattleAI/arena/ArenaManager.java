@@ -1,6 +1,7 @@
 package ru.ashesha.buildBattleAI.arena;
 
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -41,6 +42,7 @@ import java.util.*;
  * Implements both {@link BBAIArenaManager} (the public API contract) and
  * {@link PluginService} (the internal lifecycle contract) independently.
  */
+@RequiredArgsConstructor
 public class ArenaManager implements BBAIArenaManager, PluginService {
 
     /** World name prefix for arena worlds, avoiding conflicts with user worlds. */
@@ -75,16 +77,6 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
 
     /** Active setup wizard sessions keyed by player UUID. */
     private final Map<UUID, ArenaSetupSession> setupSessions = new HashMap<>();
-
-    /**
-     * Creates the arena manager. No I/O happens here — all initialization
-     * is deferred to {@link #enable()}.
-     *
-     * @param plugin the plugin instance
-     */
-    public ArenaManager(@NonNull BuildBattleAI plugin) {
-        this.plugin = plugin;
-    }
 
     // ── PluginService lifecycle ────────────────────────────────────────
 

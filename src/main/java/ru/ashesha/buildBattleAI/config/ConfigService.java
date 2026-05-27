@@ -1,6 +1,7 @@
 package ru.ashesha.buildBattleAI.config;
 
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.bukkit.configuration.file.YamlConfiguration;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.config.api.BBAIConfigService;
@@ -39,6 +40,7 @@ import java.util.*;
  * @see BBAIConfigService
  * @see Lang
  */
+@RequiredArgsConstructor
 public class ConfigService implements BBAIConfigService, PluginService {
 
     /** Name of the main configuration file. */
@@ -64,6 +66,7 @@ public class ConfigService implements BBAIConfigService, PluginService {
     private static final int BUFFER_SIZE = 4096;
 
     /** The plugin instance, used for resource loading and logging. */
+    @NonNull
     private final BuildBattleAI plugin;
 
     // ── runtime state (populated in enable, cleared in shutdown) ────────────
@@ -91,16 +94,6 @@ public class ConfigService implements BBAIConfigService, PluginService {
 
     /** The default language wrapper, resolved from {@code default-language} in config.yml. */
     private Lang defaultLang;
-
-    /**
-     * Creates the config service. No I/O or resource loading happens here —
-     * all initialization is deferred to {@link #enable()}.
-     *
-     * @param plugin the plugin instance
-     */
-    public ConfigService(@NonNull BuildBattleAI plugin) {
-        this.plugin = plugin;
-    }
 
     // ── PluginService lifecycle ────────────────────────────────────────────
 

@@ -1,6 +1,8 @@
 package ru.ashesha.buildBattleAI.game;
 
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 import org.bukkit.Bukkit;
@@ -30,6 +32,7 @@ import java.util.List;
  */
 @Getter
 @Accessors(fluent = true)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 class PlayerSnapshot {
 
     private final String worldName;
@@ -49,34 +52,6 @@ class PlayerSnapshot {
     private final int fireTicks;
     /** Off-hand item, or {@code null} on 1.8 servers. */
     private final ItemStack offHand;
-
-    private PlayerSnapshot(String worldName, double x, double y, double z,
-                           float yaw, float pitch, GameMode gameMode,
-                           ItemStack[] inventoryContents, ItemStack[] armorContents,
-                           List<PotionEffect> potionEffects, int level, float exp,
-                           double health, int foodLevel, float saturation,
-                           boolean allowFlight, boolean flying, int fireTicks,
-                           ItemStack offHand) {
-        this.worldName = worldName;
-        this.x = x;
-        this.y = y;
-        this.z = z;
-        this.yaw = yaw;
-        this.pitch = pitch;
-        this.gameMode = gameMode;
-        this.inventoryContents = inventoryContents;
-        this.armorContents = armorContents;
-        this.potionEffects = potionEffects;
-        this.level = level;
-        this.exp = exp;
-        this.health = health;
-        this.foodLevel = foodLevel;
-        this.saturation = saturation;
-        this.allowFlight = allowFlight;
-        this.flying = flying;
-        this.fireTicks = fireTicks;
-        this.offHand = offHand;
-    }
 
     /**
      * Captures the player's current state. All mutable values are cloned.

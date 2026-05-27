@@ -2,6 +2,7 @@ package ru.ashesha.buildBattleAI.arena;
 
 import lombok.Getter;
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 import ru.ashesha.buildBattleAI.arena.api.Arena;
@@ -33,6 +34,7 @@ import java.util.UUID;
  */
 @Getter
 @Accessors(fluent = true)
+@RequiredArgsConstructor
 class ArenaSetupSession {
 
     /** UUID of the player running the setup wizard. */
@@ -104,36 +106,6 @@ class ArenaSetupSession {
     /** Hologram marker at the spectator position. */
     @Setter
     private HologramService.Hologram spectatorHologram;
-
-    /**
-     * Creates a new setup session capturing the player's return location.
-     *
-     * @param playerId    the player running the wizard
-     * @param arenaName   name of the arena being created
-     * @param worldName   name of the temporary void world
-     * @param returnWorld world name to return to after setup
-     * @param returnX     return X coordinate
-     * @param returnY     return Y coordinate
-     * @param returnZ     return Z coordinate
-     * @param returnYaw   return yaw rotation
-     * @param returnPitch return pitch rotation
-     * @param wasFlying   whether the player could fly before setup
-     */
-    ArenaSetupSession(@NonNull UUID playerId, @NonNull String arenaName,
-                      @NonNull String worldName, @NonNull String returnWorld,
-                      double returnX, double returnY, double returnZ,
-                      float returnYaw, float returnPitch, boolean wasFlying) {
-        this.playerId = playerId;
-        this.arenaName = arenaName;
-        this.worldName = worldName;
-        this.returnWorld = returnWorld;
-        this.returnX = returnX;
-        this.returnY = returnY;
-        this.returnZ = returnZ;
-        this.returnYaw = returnYaw;
-        this.returnPitch = returnPitch;
-        this.wasFlying = wasFlying;
-    }
 
     /**
      * Returns the setup data for the given plot, creating it if absent.

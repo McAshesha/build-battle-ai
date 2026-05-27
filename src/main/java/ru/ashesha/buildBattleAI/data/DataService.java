@@ -1,6 +1,7 @@
 package ru.ashesha.buildBattleAI.data;
 
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.scheduler.BukkitTask;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
@@ -42,6 +43,7 @@ import java.util.UUID;
  * @see BBAIDataService
  * @see DataProvider
  */
+@RequiredArgsConstructor
 public class DataService implements BBAIDataService, PluginService {
 
     /** Cache/collection name for player data. */
@@ -51,6 +53,7 @@ public class DataService implements BBAIDataService, PluginService {
     private static final String ARENA_STATS_REPO = "arena-stats";
 
     /** The plugin instance, used for config access, logging, and scheduling. */
+    @NonNull
     private final BuildBattleAI plugin;
 
     // ── runtime state (populated in enable, cleared in shutdown) ────────────
@@ -69,16 +72,6 @@ public class DataService implements BBAIDataService, PluginService {
 
     /** Whether the service successfully started. */
     private boolean enabled;
-
-    /**
-     * Creates the data service. No I/O or resource allocation happens
-     * here — all initialization is deferred to {@link #enable()}.
-     *
-     * @param plugin the plugin instance
-     */
-    public DataService(@NonNull BuildBattleAI plugin) {
-        this.plugin = plugin;
-    }
 
     // ── PluginService lifecycle ────────────────────────────────────────────
 

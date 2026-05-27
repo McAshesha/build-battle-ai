@@ -235,9 +235,24 @@
             </plugin>
         </plugins>
         <resources>
+            <!-- Text resources go through Maven resource filtering so that
+                 plugin.yml / config.yml can read ${plugin.*} values from pom.xml.
+                 Binary model files MUST be excluded — Maven filtering reads
+                 through a platform-encoded Reader and would silently corrupt
+                 the ONNX bytes. -->
             <resource>
                 <directory>src/main/resources</directory>
                 <filtering>true</filtering>
+                <excludes>
+                    <exclude>models/**</exclude>
+                </excludes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <includes>
+                    <include>models/**</include>
+                </includes>
             </resource>
         </resources>
     </build>
@@ -325,6 +340,18 @@
             <groupId>org.apache.ignite</groupId>
             <artifactId>ignite-core</artifactId>
             <version>2.16.0</version>
+            <scope>compile</scope>
+        </dependency>
+        <!-- ONNX Runtime for native ResNet50 embedding inference.
+             Ships CPU on all platforms + CoreML on macOS (arm64/x86_64) +
+             DirectML on Windows out of the box. The companion artifact
+             `onnxruntime_gpu` adds CUDA bindings but bloats the JAR by ~600MB
+             and would tie the JAR to a specific CUDA toolkit, so we keep the
+             plain artifact and let CUDA fail gracefully when probing providers. -->
+        <dependency>
+            <groupId>com.microsoft.onnxruntime</groupId>
+            <artifactId>onnxruntime</artifactId>
+            <version>1.20.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>

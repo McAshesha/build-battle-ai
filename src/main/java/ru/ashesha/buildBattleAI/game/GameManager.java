@@ -2,6 +2,7 @@ package ru.ashesha.buildBattleAI.game;
 
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -14,7 +15,9 @@ import ru.ashesha.buildBattleAI.config.api.Lang;
 import ru.ashesha.buildBattleAI.core.PluginService;
 import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
 import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
-import ru.ashesha.buildBattleAI.ml.MLService;
+import ru.ashesha.buildBattleAI.ml.api.BBAIMLService;
+import ru.ashesha.buildBattleAI.ml.api.PredictionResult;
+import ru.ashesha.buildBattleAI.ml.api.TopKEntry;
 import ru.ashesha.buildBattleAI.render.data.ChunkScene;
 
 import java.util.*;
@@ -36,6 +39,7 @@ import org.bukkit.GameMode;
  * @see GamePlayer
  * @see PlayerSnapshot
  */
+@RequiredArgsConstructor
 public class GameManager implements BBAIGameManager, PluginService {
 
     /** Fallback themes used when ML service is unreachable. */
@@ -60,15 +64,6 @@ public class GameManager implements BBAIGameManager, PluginService {
 
     /** Server version, resolved in enable(). */
     private ServerVersion serverVersion;
-
-    /**
-     * Creates the game manager. No resources are allocated until {@link #enable()}.
-     *
-     * @param plugin the plugin instance
-     */
-    public GameManager(@NonNull BuildBattleAI plugin) {
-        this.plugin = plugin;
-    }
 
     // ── PluginService lifecycle ───────────────────────────────────────
 
@@ -333,21 +328,18 @@ public class GameManager implements BBAIGameManager, PluginService {
     }
 
     /**
-     * Fetches the theme list from the ML service, falling back to
-     * the built-in list if the service is unreachable.
+     * Fetches the theme list directly from the ML service's registered class
+     * names. Falls back to the built-in theme set if the ML service didn't
+     * register any classes (e.g. failed to load the ONNX model on startup).
      */
     private List<String> fetchThemes() {
-        try {
-            MLService.HealthInfo health = ((MLService) plugin.getContext().getMlService()).health();
-            List<String> themes = new ArrayList<>(health.classes());
-            Collections.shuffle(themes);
-            return themes;
-        } catch (RuntimeException e) {
-            plugin.getPluginLogger().warn("ML service unavailable for themes, using fallback: %s", e.getMessage());
-            List<String> themes = new ArrayList<>(FALLBACK_THEMES);
-            Collections.shuffle(themes);
-            return themes;
-        }
+        BBAIMLService ml = plugin.getContext().getMlService();
+        List<String> classes = ml.classNames();
+        List<String> themes = classes.isEmpty()
+                ? new ArrayList<>(FALLBACK_THEMES)
+                : new ArrayList<>(classes);
+        Collections.shuffle(themes);
+        return themes;
     }
 
     // ── game tick timer ───────────────────────────────────────────────
@@ -496,14 +488,14 @@ public class GameManager implements BBAIGameManager, PluginService {
                                 byte[] rgb = plugin.getContext().getRenderService()
                                         .render(scene, camX, camY, camZ, camYaw, camPitch);
 
-                                // ML prediction (topK=2)
-                                MLService.PredictionResult result =
-                                        ((MLService) plugin.getContext().getMlService())
-                                                .predict(rgb, 224, 224, 2);
+                                // ML prediction (topK=2) — uses the renderer's
+                                // native 224x224 RGB output without re-encoding.
+                                PredictionResult result = plugin.getContext().getMlService()
+                                        .predictRgb(rgb, 224, 224, 2);
 
                                 // Check if theme is in top-2
                                 boolean matched = false;
-                                for (MLService.TopKEntry entry : result.topK())
+                                for (TopKEntry entry : result.topK())
                                     if (entry.className().equalsIgnoreCase(expectedTheme)) {
                                         matched = true;
                                         break;
