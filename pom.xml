@@ -266,6 +266,11 @@
             <id>codemc-repo</id>
             <url>https://repo.codemc.io/repository/maven-releases/</url>
         </repository>
+        <!-- PaperMC repository hosts paper-api, which MockBukkit needs at test scope. -->
+        <repository>
+            <id>papermc</id>
+            <url>https://repo.papermc.io/repository/maven-public/</url>
+        </repository>
     </repositories>
 
     <profiles>
@@ -307,6 +312,33 @@
     </profiles>
 
     <dependencies>
+        <!-- MockBukkit must appear BEFORE the bukkit provider so its paper-api wins
+             on the test classpath (per MockBukkit README guidance). Test scope only —
+             never reaches the shaded JAR.
+
+             Version pinned to 4.50.0 — paired with paper-api 1.21.5. Newer MockBukkit
+             releases (4.60+) target paper-api 1.21.6+ which introduces the
+             `minecraft:dialog` registry; MockBukkit's bundled registry JSON does not
+             include data for that registry, causing `RegistryAccessMock.<clinit>` to
+             throw `InternalDataLoadException` on any test that touches Bukkit Registry.
+             Older releases (4.70+) also drop JUnit 5 compatibility.
+             4.50.0 + 1.21.5 is the sweet spot for JUnit 5.10 + working RegistryAccess. -->
+        <dependency>
+            <groupId>org.mockbukkit.mockbukkit</groupId>
+            <artifactId>mockbukkit-v1.21</artifactId>
+            <version>4.50.0</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- paper-api MUST match the version MockBukkit was built against. Our main
+             code compiles against spigot-api 1.21.8 (provided), but the Bukkit
+             interface surface is unchanged across 1.21.x patches — only Paper-only
+             extensions differ, and those are not used in main code. -->
+        <dependency>
+            <groupId>io.papermc.paper</groupId>
+            <artifactId>paper-api</artifactId>
+            <version>1.21.5-R0.1-SNAPSHOT</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>

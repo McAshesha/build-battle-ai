@@ -2,6 +2,7 @@ package ru.ashesha.buildBattleAI.world;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.UnsafeValues;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.entity.Player;
@@ -54,6 +55,13 @@ class WorldServiceTest {
 
         bukkitStatic = mockStatic(Bukkit.class);
         bukkitStatic.when(Bukkit::getWorldContainer).thenReturn(worldContainer);
+
+        // paper-api 1.21+ calls Bukkit.getUnsafe().getMainLevelName() from inside
+        // the WorldCreator constructor. Stub it so the WorldCreator can be built
+        // under MockedStatic<Bukkit> without NPE'ing.
+        UnsafeValues mockUnsafe = mock(UnsafeValues.class);
+        when(mockUnsafe.getMainLevelName()).thenReturn("world");
+        bukkitStatic.when(Bukkit::getUnsafe).thenReturn(mockUnsafe);
 
         service = new WorldService(plugin);
         service.enable();

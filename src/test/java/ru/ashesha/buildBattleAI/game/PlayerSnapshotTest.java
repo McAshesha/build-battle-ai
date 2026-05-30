@@ -18,6 +18,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockbukkit.mockbukkit.MockBukkit;
+import org.mockbukkit.mockbukkit.ServerMock;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
@@ -79,6 +81,15 @@ class PlayerSnapshotTest {
         serverField.setAccessible(true);
         originalServer = serverField.get(null);
 
+        // paper-api 1.21+ adds the RegistryAccess SPI which uses ServiceLoader
+        // to discover providers. MockBukkit ships a RegistryAccessMock provider
+        // (via META-INF/services) that throws unless MockBukkit.mock() has run
+        // first. We boot MockBukkit once here so the SPI is properly initialised
+        // before any paper-api Registry static init touches it. After that we
+        // overwrite Bukkit.server with the JDK proxy to keep the rest of the
+        // test's lightweight behaviour intact.
+        MockBukkit.mock();
+
         // Build a JDK proxy for Server — must NOT use Mockito here because
         // at this point Registry.class has not loaded yet, and Mockito's
         // instrumentation of Server would trigger loading of its return types
@@ -98,6 +109,7 @@ class PlayerSnapshotTest {
         Field serverField = Bukkit.class.getDeclaredField("server");
         serverField.setAccessible(true);
         serverField.set(null, originalServer);
+        MockBukkit.unmock();
     }
 
     /**
