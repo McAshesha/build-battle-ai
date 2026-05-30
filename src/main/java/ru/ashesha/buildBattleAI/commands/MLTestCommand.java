@@ -42,6 +42,9 @@ import java.util.Map;
  *     <li>{@code run} — triggered by a clickable chat message after both
  *         corners are selected; captures the region, renders it, feeds the
  *         image to the ML service, and prints the result.</li>
+ *     <li>{@code run -tta} — same flow but uses the TTA-fused predictor
+ *         ({@code predictWithTTA}) so the user can compare speed and
+ *         accuracy against the single-view baseline on real builds.</li>
  * </ul>
  */
 public class MLTestCommand extends CommandService.PluginCommand {
@@ -65,7 +68,7 @@ public class MLTestCommand extends CommandService.PluginCommand {
      */
     public MLTestCommand(@NonNull BuildBattleAI plugin) {
         super(plugin, "bbaitest", "BuildBattleAI ML diagnostic test command",
-                "[run]");
+                "[run [-tta]]");
     }
 
     @Override
@@ -82,12 +85,25 @@ public class MLTestCommand extends CommandService.PluginCommand {
         }
 
         if ("run".equalsIgnoreCase(args[0])) {
-            runMlTest(player);
+            // Parse the optional -tta flag. Anything else after "run" is
+            // rejected so typos like "/bbaitest run tta" don't silently turn
+            // TTA off.
+            boolean tta = false;
+            for (int i = 1; i < args.length; i++) {
+                if ("-tta".equalsIgnoreCase(args[i])) {
+                    tta = true;
+                } else {
+                    plugin.getContext().getMessageService().sendChat(player,
+                            "&cUnknown flag '" + args[i] + "'. Usage: /bbaitest run [-tta]");
+                    return;
+                }
+            }
+            runMlTest(player, tta);
             return;
         }
 
         plugin.getContext().getMessageService().sendChat(player,
-                "&cUsage: /bbaitest  (or /bbaitest run after selecting two corners)");
+                "&cUsage: /bbaitest  (or /bbaitest run [-tta] after selecting two corners)");
     }
 
     @Override
@@ -153,8 +169,13 @@ public class MLTestCommand extends CommandService.PluginCommand {
      * synchronous; everything past capture (render + ML inference + chat
      * reporting) is dispatched to an async task so the main tick is not
      * blocked while the model crunches numbers.
+     *
+     * @param player the player whose viewpoint and selection drive the test
+     * @param useTta {@code true} to route through {@code predictWithTTA}
+     *               instead of the single-view {@code predictRgb} — exposes
+     *               the speed/accuracy trade-off of TTA on real builds
      */
-    private void runMlTest(Player player) {
+    private void runMlTest(Player player, boolean useTta) {
         MLTestListener.Selection selection = MLTestListener.getSelection(player.getUniqueId());
         if (selection == null || !selection.isComplete()) {
             plugin.getContext().getMessageService().sendChat(player,
@@ -203,7 +224,7 @@ public class MLTestCommand extends CommandService.PluginCommand {
 
         // 2) Async — render + ML. We hand off only thread-safe state.
         Bukkit.getScheduler().runTaskAsynchronously(plugin,
-                new RenderAndPredictTask(player, scene, camX, camY, camZ, yaw, pitch, captureMs));
+                new RenderAndPredictTask(player, scene, camX, camY, camZ, yaw, pitch, captureMs, useTta));
     }
 
     // ── async worker ───────────────────────────────────────────────────────
@@ -223,10 +244,11 @@ public class MLTestCommand extends CommandService.PluginCommand {
         private final double camX, camY, camZ;
         private final float yaw, pitch;
         private final long captureMs;
+        private final boolean useTta;
 
         RenderAndPredictTask(Player player, ChunkScene scene,
                              double camX, double camY, double camZ,
-                             float yaw, float pitch, long captureMs) {
+                             float yaw, float pitch, long captureMs, boolean useTta) {
             this.player = player;
             this.scene = scene;
             this.camX = camX;
@@ -235,6 +257,7 @@ public class MLTestCommand extends CommandService.PluginCommand {
             this.yaw = yaw;
             this.pitch = pitch;
             this.captureMs = captureMs;
+            this.useTta = useTta;
         }
 
         @Override
@@ -257,16 +280,20 @@ public class MLTestCommand extends CommandService.PluginCommand {
             byte[] rgb = renderService.render(scene, camX, camY, camZ, yaw, pitch);
             long renderMs = (System.nanoTime() - renderStart) / 1_000_000L;
 
-            // Embed (we want a separate timing line so the user sees the cost
-            // of inference distinctly from the cost of preprocessing + render).
+            // Embed (separate timing so the user sees the cost of inference
+            // distinctly from the cost of preprocessing + render).
             long embedStart = System.nanoTime();
-            float[] embedding = mlService.embedRgb(rgb, 224, 224);
+            float[] embedding = useTta
+                    ? mlService.embedWithTTA(rgb, 224, 224)
+                    : mlService.embedRgb(rgb, 224, 224);
             long embedMs = (System.nanoTime() - embedStart) / 1_000_000L;
 
             // Predict against centroids (this is just nearest-neighbour over
             // the in-memory table; should be sub-millisecond, but measure).
             long predictStart = System.nanoTime();
-            PredictionResult prediction = mlService.predictRgb(rgb, 224, 224, 5);
+            PredictionResult prediction = useTta
+                    ? mlService.predictWithTTA(rgb, 224, 224, 5)
+                    : mlService.predictRgb(rgb, 224, 224, 5);
             long predictMs = (System.nanoTime() - predictStart) / 1_000_000L;
 
             reportResults(mlService, embedding, prediction, renderMs, embedMs, predictMs);
@@ -282,6 +309,11 @@ public class MLTestCommand extends CommandService.PluginCommand {
             // sees output streaming as we build it.
             plugin.getContext().getMessageService().sendChat(player,
                     "&8&m-----&r &6&lML Test Report &8&m-----");
+            String modeLabel = useTta
+                    ? "&dTTA &7(x" + mlService.ttaViews() + " views, fused)"
+                    : "&bsingle &7(no TTA)";
+            plugin.getContext().getMessageService().sendChat(player,
+                    "&7Mode: " + modeLabel);
             plugin.getContext().getMessageService().sendChat(player,
                     "&7Backend: &f" + mlService.backend());
             plugin.getContext().getMessageService().sendChat(player,

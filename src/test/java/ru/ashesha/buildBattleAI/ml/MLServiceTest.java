@@ -73,8 +73,8 @@ class MLServiceTest {
     // ── lifecycle + metadata ────────────────────────────────────────────────
 
     @Test
-    void embeddingDimensionMatchesResNet50() {
-        assertEquals(2048, service.embeddingDim());
+    void embeddingDimensionMatchesConvNeXtTiny() {
+        assertEquals(128, service.embeddingDim());
     }
 
     @Test
@@ -88,13 +88,16 @@ class MLServiceTest {
     }
 
     @Test
-    void classNamesContainsTenDefaultEntries() {
+    void classNamesContainsBundledBuildThemes() {
         List<String> names = service.classNames();
-        assertEquals(10, names.size());
-        assertTrue(names.contains("cat"));
-        assertTrue(names.contains("house"));
+        // The bundled model ships with 15 build themes (mansion was dropped
+        // before packaging because it overlapped with default_house too much).
+        assertEquals(15, names.size());
         assertTrue(names.contains("tree"));
-        assertTrue(names.contains("glasses"));
+        assertTrue(names.contains("sword"));
+        assertTrue(names.contains("default_house"));
+        assertTrue(names.contains("castle"));
+        assertFalse(names.contains("mansion"), "mansion should have been pruned");
     }
 
     @Test
@@ -109,7 +112,7 @@ class MLServiceTest {
         for (String name : service.classNames())
             assertNotNull(centroids.get(name), "Missing centroid for class " + name);
         for (float[] v : centroids.values()) {
-            assertEquals(2048, v.length);
+            assertEquals(128, v.length);
             float norm = norm(v);
             assertEquals(1.0f, norm, 1e-4f, "Centroid not L2-normalized (norm=" + norm + ")");
         }
@@ -117,11 +120,14 @@ class MLServiceTest {
 
     @Test
     void centroidsAreReproducibleAcrossEnableCycles() {
-        // Take a snapshot, hot-reload the service, compare.
-        float[] before = service.centroids().get("cat").clone();
+        // Take a snapshot, hot-reload the service, compare. Centroids are
+        // loaded from a deterministic JSON resource (or the fixed fallback
+        // seed in DISABLED mode), so successive enable cycles must produce
+        // bit-identical vectors.
+        float[] before = service.centroids().get("tree").clone();
         service.shutdown();
         service.enable();
-        float[] after = service.centroids().get("cat");
+        float[] after = service.centroids().get("tree");
         assertArrayEquals(before, after, 1e-7f,
                 "Centroids should be deterministic across enable cycles");
     }
@@ -133,7 +139,7 @@ class MLServiceTest {
         assumeActive();
         BufferedImage img = solidColor(224, 224, Color.MAGENTA);
         float[] v = service.embed(img);
-        assertEquals(2048, v.length);
+        assertEquals(128, v.length);
         assertEquals(1.0f, norm(v), 1e-3f);
     }
 
@@ -144,7 +150,7 @@ class MLServiceTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ImageIO.write(img, "PNG", out);
         float[] v = service.embed(out.toByteArray());
-        assertEquals(2048, v.length);
+        assertEquals(128, v.length);
         assertEquals(1.0f, norm(v), 1e-3f);
     }
 
@@ -153,7 +159,7 @@ class MLServiceTest {
         assumeActive();
         byte[] rgb = solidRgb(224, 224, 100, 150, 200);
         float[] v = service.embedRgb(rgb, 224, 224);
-        assertEquals(2048, v.length);
+        assertEquals(128, v.length);
         assertEquals(1.0f, norm(v), 1e-3f);
     }
 
@@ -162,7 +168,7 @@ class MLServiceTest {
         assumeActive();
         byte[] rgb = solidRgb(64, 64, 200, 50, 50);
         float[] v = service.embedRgb(rgb, 64, 64);
-        assertEquals(2048, v.length);
+        assertEquals(128, v.length);
         assertEquals(1.0f, norm(v), 1e-3f);
     }
 
@@ -222,7 +228,7 @@ class MLServiceTest {
         float[][] batch = service.embedBatchRgb(new byte[][]{r, g}, 224, 224);
         assertEquals(2, batch.length);
         for (float[] row : batch) {
-            assertEquals(2048, row.length);
+            assertEquals(128, row.length);
             assertEquals(1.0f, norm(row), 1e-3f);
         }
     }
@@ -238,8 +244,8 @@ class MLServiceTest {
         assertNotNull(result.predictedClass());
         assertEquals(result.topK().get(0).className(), result.predictedClass());
         assertEquals(result.topK().get(0).score(), result.predictedScore(), 1e-6f);
-        assertEquals(2048, result.embedding().length);
-        assertEquals(2048, result.predictedCentroid().length);
+        assertEquals(128, result.embedding().length);
+        assertEquals(128, result.predictedCentroid().length);
     }
 
     @Test
@@ -465,7 +471,7 @@ class MLServiceTest {
     @Test
     void centroidsViewIsUnmodifiable() {
         assertThrows(UnsupportedOperationException.class,
-                () -> service.centroids().put("nope", new float[2048]));
+                () -> service.centroids().put("nope", new float[128]));
     }
 
     @Test
@@ -512,7 +518,7 @@ class MLServiceTest {
         PredictionResult result = service.predict(out.toByteArray(), 4);
         assertEquals(4, result.topK().size());
         assertNotNull(result.predictedClass());
-        assertEquals(2048, result.embedding().length);
+        assertEquals(128, result.embedding().length);
     }
 
     @Test
@@ -594,6 +600,144 @@ class MLServiceTest {
         assertEquals(1, batch.length);
         assertEquals(single.predictedClass(), batch[0].predictedClass());
         assertEquals(single.predictedScore(), batch[0].predictedScore(), 1e-4f);
+    }
+
+    // ── TTA smoke tests ─────────────────────────────────────────────────────
+
+    @Test
+    void ttaViewsConstantIsExposed() {
+        // Stable contract: every *WithTTA call submits exactly ttaViews()
+        // augmented copies per input. The default training pipeline uses 8.
+        assertEquals(8, service.ttaViews());
+    }
+
+    @Test
+    void embedWithTtaBufferedImageIsNormalized() {
+        assumeActive();
+        BufferedImage img = solidColor(224, 224, Color.MAGENTA);
+        float[] v = service.embedWithTTA(img);
+        assertEquals(128, v.length);
+        assertEquals(1.0f, norm(v), 1e-3f, "TTA-fused embedding must be unit-norm");
+        for (float x : v)
+            assertTrue(!Float.isNaN(x) && !Float.isInfinite(x), "TTA embedding has non-finite element");
+    }
+
+    @Test
+    void embedWithTtaEncodedIsNormalized() throws Exception {
+        assumeActive();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(solidColor(180, 120, Color.CYAN), "PNG", out);
+        float[] v = service.embedWithTTA(out.toByteArray());
+        assertEquals(128, v.length);
+        assertEquals(1.0f, norm(v), 1e-3f);
+    }
+
+    @Test
+    void embedWithTtaRgbIsNormalized() {
+        assumeActive();
+        // Off-size buffer exercises the bilinear resize on the RGB-native path.
+        byte[] rgb = solidRgb(180, 180, 30, 200, 100);
+        float[] v = service.embedWithTTA(rgb, 180, 180);
+        assertEquals(128, v.length);
+        assertEquals(1.0f, norm(v), 1e-3f);
+    }
+
+    @Test
+    void embedWithTtaRgbExact224IsNormalized() {
+        assumeActive();
+        byte[] rgb = solidRgb(224, 224, 200, 50, 150);
+        float[] v = service.embedWithTTA(rgb, 224, 224);
+        assertEquals(128, v.length);
+        assertEquals(1.0f, norm(v), 1e-3f);
+    }
+
+    @Test
+    void embedWithTtaRgbRejectsMismatchedBufferLength() {
+        // Argument validation must fire regardless of backend state — the
+        // same as the non-TTA path.
+        byte[] bad = new byte[100];
+        assertThrows(IllegalArgumentException.class,
+                () -> service.embedWithTTA(bad, 224, 224));
+    }
+
+    @Test
+    void embedBatchWithTtaRgbProducesNormalizedRows() {
+        assumeActive();
+        byte[] a = solidRgb(224, 224, 255, 0, 0);
+        byte[] b = solidRgb(224, 224, 0, 255, 0);
+        byte[] c = solidRgb(224, 224, 0, 0, 255);
+        float[][] batch = service.embedBatchWithTTA(new byte[][]{a, b, c}, 224, 224);
+        assertEquals(3, batch.length);
+        for (float[] row : batch) {
+            assertEquals(128, row.length);
+            assertEquals(1.0f, norm(row), 1e-3f);
+        }
+    }
+
+    @Test
+    void embedBatchWithTtaBufferedImagesProducesNormalizedRows() {
+        assumeActive();
+        BufferedImage a = solidColor(224, 224, Color.RED);
+        BufferedImage b = solidColor(180, 200, Color.BLUE);
+        float[][] batch = service.embedBatchWithTTA(new BufferedImage[]{a, b});
+        assertEquals(2, batch.length);
+        for (float[] row : batch) {
+            assertEquals(128, row.length);
+            assertEquals(1.0f, norm(row), 1e-3f);
+        }
+    }
+
+    @Test
+    void embedBatchWithTtaEmptyArrayReturnsEmpty() {
+        // Empty-input contract must match the non-TTA batch path.
+        assertEquals(0, service.embedBatchWithTTA(new BufferedImage[0]).length);
+        assertEquals(0, service.embedBatchWithTTA(new byte[0][]).length);
+        assertEquals(0, service.embedBatchWithTTA(new byte[0][], 224, 224).length);
+    }
+
+    @Test
+    void predictWithTtaReturnsTopKAgainstSameClassSpace() {
+        assumeActive();
+        BufferedImage img = solidColor(224, 224, Color.GREEN);
+        PredictionResult result = service.predictWithTTA(img, 5);
+        assertEquals(5, result.topK().size());
+        assertEquals(128, result.embedding().length);
+        assertEquals(128, result.predictedCentroid().length);
+        // Predicted class must come from the bundled class list.
+        assertTrue(service.classNames().contains(result.predictedClass()),
+                "Predicted class not in known class list: " + result.predictedClass());
+    }
+
+    @Test
+    void predictBatchWithTtaProducesOneResultPerImage() {
+        assumeActive();
+        BufferedImage a = solidColor(224, 224, Color.YELLOW);
+        BufferedImage b = solidColor(224, 224, Color.PINK);
+        PredictionResult[] batch = service.predictBatchWithTTA(new BufferedImage[]{a, b}, 3);
+        assertEquals(2, batch.length);
+        for (PredictionResult r : batch) {
+            assertNotNull(r);
+            assertEquals(3, r.topK().size());
+        }
+    }
+
+    @Test
+    void ttaEmbeddingsAreStochasticAcrossCalls() {
+        // The augmentation pipeline is intentionally non-deterministic — two
+        // back-to-back calls on the same image should differ by a measurable
+        // amount. (They will still be cosine-similar but not bit-identical.)
+        assumeActive();
+        BufferedImage img = solidColor(224, 224, Color.GRAY);
+        float[] a = service.embedWithTTA(img);
+        float[] b = service.embedWithTTA(img);
+        boolean differ = false;
+        for (int i = 0; i < a.length; i++) {
+            if (Math.abs(a[i] - b[i]) > 1e-6f) {
+                differ = true;
+                break;
+            }
+        }
+        assertTrue(differ, "TTA embeddings must vary across calls (stochastic augmentations)");
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────

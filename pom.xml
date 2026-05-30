@@ -362,10 +362,22 @@
             <artifactId>XSeries</artifactId>
             <version>13.6.0</version>
         </dependency>
+        <!-- Force adventure-api 4.25.0 to win dependency mediation:
+             PacketEvents transitively pulls 4.21.0, but
+             net.kyori.adventure.text.object.ObjectContents was only added in
+             4.25.0. Without it the plugin fails to enable on MC 1.21.6+ with
+             NoClassDefFoundError when PacketEvents decodes item components
+             (e.g. minecraft:item_name). -->
+        <dependency>
+            <groupId>net.kyori</groupId>
+            <artifactId>adventure-api</artifactId>
+            <version>4.25.0</version>
+            <scope>compile</scope>
+        </dependency>
         <dependency>
             <groupId>net.kyori</groupId>
             <artifactId>adventure-text-serializer-legacy</artifactId>
-            <version>4.17.0</version>
+            <version>4.25.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>

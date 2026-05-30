@@ -13,6 +13,7 @@ import ru.ashesha.buildBattleAI.arena.ArenaManager;
 import ru.ashesha.buildBattleAI.arena.api.BBAIArenaManager;
 import ru.ashesha.buildBattleAI.commands.ArenaCommand;
 import ru.ashesha.buildBattleAI.commands.MLTestCommand;
+import ru.ashesha.buildBattleAI.commands.WorldTpCommand;
 import ru.ashesha.buildBattleAI.config.ConfigService;
 import ru.ashesha.buildBattleAI.config.api.BBAIConfigService;
 import ru.ashesha.buildBattleAI.data.DataService;
@@ -194,6 +195,7 @@ public class PluginContext {
         // registration mechanism and the bulk-unregistration guarantees).
         commandService.register(new ArenaCommand(plugin));
         commandService.register(new MLTestCommand(plugin));
+        commandService.register(new WorldTpCommand(plugin));
         listenerService.register(new ArenaSetupListener(plugin));
         listenerService.register(new GameListener(plugin));
         listenerService.register(new MLTestListener(plugin));
