@@ -24,7 +24,7 @@ import java.util.*;
 @Getter
 @Accessors(fluent = true)
 @RequiredArgsConstructor
-class GameSession {
+public class GameSession {
 
     /** The arena definition this session belongs to. */
     @NonNull
