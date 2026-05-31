@@ -15,6 +15,7 @@ import ru.ashesha.buildBattleAI.data.DataService;
 import ru.ashesha.buildBattleAI.entity.hologram.HologramService;
 import ru.ashesha.buildBattleAI.entity.npc.NPCService;
 import ru.ashesha.buildBattleAI.entity.picture.PictureService;
+import ru.ashesha.buildBattleAI.evaluation.EvaluationService;
 import ru.ashesha.buildBattleAI.game.GameManager;
 import ru.ashesha.buildBattleAI.listeners.ArenaSetupListener;
 import ru.ashesha.buildBattleAI.listeners.GameListener;
@@ -75,6 +76,7 @@ class PluginContextLifecycleTest {
              MockedConstruction<PictureService> pic = mockConstruction(PictureService.class);
              MockedConstruction<MLService> mls = mockConstruction(MLService.class);
              MockedConstruction<RenderService> rnd = mockConstruction(RenderService.class);
+             MockedConstruction<EvaluationService> evl = mockConstruction(EvaluationService.class);
              MockedConstruction<CommandService> cmd = mockConstruction(CommandService.class);
              MockedConstruction<ListenerService> lst = mockConstruction(ListenerService.class);
              MockedConstruction<ArenaCommand> arenaCmd = mockConstruction(ArenaCommand.class);
@@ -97,12 +99,13 @@ class PluginContextLifecycleTest {
             PictureService picMock = pic.constructed().get(0);
             MLService mlsMock = mls.constructed().get(0);
             RenderService rndMock = rnd.constructed().get(0);
+            EvaluationService evlMock = evl.constructed().get(0);
             CommandService cmdMock = cmd.constructed().get(0);
             ListenerService lstMock = lst.constructed().get(0);
 
             InOrder order = inOrder(configMock, dataMock, worldMock, arenaMock,
                     gameMock, msgMock, npcMock, holoMock, picMock, mlsMock,
-                    rndMock, cmdMock, lstMock);
+                    rndMock, evlMock, cmdMock, lstMock);
 
             order.verify(configMock).enable();
             order.verify(dataMock).enable();
@@ -115,6 +118,7 @@ class PluginContextLifecycleTest {
             order.verify(picMock).enable();
             order.verify(mlsMock).enable();
             order.verify(rndMock).enable();
+            order.verify(evlMock).enable();
             order.verify(cmdMock).enable();
             order.verify(lstMock).enable();
         }
@@ -135,6 +139,7 @@ class PluginContextLifecycleTest {
              MockedConstruction<PictureService> pic = mockConstruction(PictureService.class);
              MockedConstruction<MLService> mls = mockConstruction(MLService.class);
              MockedConstruction<RenderService> rnd = mockConstruction(RenderService.class);
+             MockedConstruction<EvaluationService> evl = mockConstruction(EvaluationService.class);
              MockedConstruction<CommandService> cmd = mockConstruction(CommandService.class);
              MockedConstruction<ListenerService> lst = mockConstruction(ListenerService.class);
              MockedConstruction<ArenaCommand> arenaCmd = mockConstruction(ArenaCommand.class);
@@ -177,17 +182,19 @@ class PluginContextLifecycleTest {
              MockedConstruction<PictureService> pic = mockConstruction(PictureService.class);
              MockedConstruction<MLService> mls = mockConstruction(MLService.class);
              MockedConstruction<RenderService> rnd = mockConstruction(RenderService.class);
+             MockedConstruction<EvaluationService> evl = mockConstruction(EvaluationService.class);
              MockedConstruction<CommandService> cmd = mockConstruction(CommandService.class);
              MockedConstruction<ListenerService> lst = mockConstruction(ListenerService.class)) {
 
             PluginContext ctx = new PluginContext(plugin);
             ctx.shutdown();
 
-            // Reverse order: listener → command → render → ml → picture → hologram
-            // → npc → message → game → arena → world → data → config.
+            // Reverse order: listener → command → evaluation → render → ml → picture
+            // → hologram → npc → message → game → arena → world → data → config.
             InOrder order = inOrder(
                     lst.constructed().get(0),
                     cmd.constructed().get(0),
+                    evl.constructed().get(0),
                     rnd.constructed().get(0),
                     mls.constructed().get(0),
                     pic.constructed().get(0),
@@ -202,6 +209,7 @@ class PluginContextLifecycleTest {
 
             order.verify(lst.constructed().get(0)).shutdown();
             order.verify(cmd.constructed().get(0)).shutdown();
+            order.verify(evl.constructed().get(0)).shutdown();
             order.verify(rnd.constructed().get(0)).shutdown();
             order.verify(mls.constructed().get(0)).shutdown();
             order.verify(pic.constructed().get(0)).shutdown();
@@ -231,6 +239,7 @@ class PluginContextLifecycleTest {
              MockedConstruction<PictureService> pic = mockConstruction(PictureService.class);
              MockedConstruction<MLService> mls = mockConstruction(MLService.class);
              MockedConstruction<RenderService> rnd = mockConstruction(RenderService.class);
+             MockedConstruction<EvaluationService> evl = mockConstruction(EvaluationService.class);
              MockedConstruction<CommandService> cmd = mockConstruction(CommandService.class);
              MockedConstruction<ListenerService> lst = mockConstruction(ListenerService.class);
              MockedConstruction<ArenaCommand> arenaCmd = mockConstruction(ArenaCommand.class);
@@ -274,6 +283,7 @@ class PluginContextLifecycleTest {
              MockedConstruction<PictureService> pic = mockConstruction(PictureService.class);
              MockedConstruction<MLService> mls = mockConstruction(MLService.class);
              MockedConstruction<RenderService> rnd = mockConstruction(RenderService.class);
+             MockedConstruction<EvaluationService> evl = mockConstruction(EvaluationService.class);
              MockedConstruction<CommandService> cmd = mockConstruction(CommandService.class);
              MockedConstruction<ListenerService> lst = mockConstruction(ListenerService.class)) {
 
@@ -290,6 +300,7 @@ class PluginContextLifecycleTest {
             assertNotNull(ctx.getPictureService());
             assertNotNull(ctx.getMlService());
             assertNotNull(ctx.getRenderService());
+            assertNotNull(ctx.getEvaluationService());
             assertNotNull(ctx.getCommandService());
             assertNotNull(ctx.getListenerService());
         }
@@ -310,6 +321,7 @@ class PluginContextLifecycleTest {
              MockedConstruction<PictureService> pic = mockConstruction(PictureService.class);
              MockedConstruction<MLService> mls = mockConstruction(MLService.class);
              MockedConstruction<RenderService> rnd = mockConstruction(RenderService.class);
+             MockedConstruction<EvaluationService> evl = mockConstruction(EvaluationService.class);
              MockedConstruction<CommandService> cmd = mockConstruction(CommandService.class);
              MockedConstruction<ListenerService> lst = mockConstruction(ListenerService.class);
              MockedConstruction<ArenaCommand> arenaCmd = mockConstruction(ArenaCommand.class);
@@ -347,6 +359,7 @@ class PluginContextLifecycleTest {
              MockedConstruction<PictureService> pic = mockConstruction(PictureService.class);
              MockedConstruction<MLService> mls = mockConstruction(MLService.class);
              MockedConstruction<RenderService> rnd = mockConstruction(RenderService.class);
+             MockedConstruction<EvaluationService> evl = mockConstruction(EvaluationService.class);
              MockedConstruction<CommandService> cmd = mockConstruction(CommandService.class);
              MockedConstruction<ListenerService> lst = mockConstruction(ListenerService.class)) {
 

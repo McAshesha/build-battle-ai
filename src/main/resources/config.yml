@@ -54,3 +54,39 @@ data:
     # Connection addresses for thin-client mode
     thin-client-addresses:
       - "127.0.0.1:10800"
+
+# ── Evaluation Pipeline ────────────────────────────────────────────────
+# Centralised render + ML inference scheduling. Spreads load evenly
+# across time and enables ML batching. Replaces the legacy per-arena
+# render timer.
+evaluation:
+  # Minimum interval (ms) between two evaluations of the same player.
+  # Under load the effective cadence stretches automatically via queue
+  # backpressure (target <= 10 s).
+  min-cadence-ms: 5000
+
+  # Coordinator scan period in Bukkit ticks (1 tick = 50 ms).
+  coordinator-tick-period: 5
+
+  # Render worker thread count. The renderer's internal ForkJoinPool
+  # already saturates all CPU cores; 1 worker is usually optimal.
+  render-workers: 1
+
+  # Render queue capacity. When full, the coordinator drops the job
+  # (player stays dirty and is re-considered next tick).
+  render-queue-capacity: 64
+
+  # Maximum images per ML batch.
+  ml-batch-max-size: 8
+
+  # Maximum wait (ms) for the ML worker to gather a batch.
+  ml-batch-max-wait-ms: 200
+
+  # ML queue capacity.
+  ml-queue-capacity: 64
+
+  # ML topK — number of top predictions to check against the theme.
+  ml-top-k: 2
+
+  # Period (seconds) for the DEBUG metrics summary log line. 0 = off.
+  metrics-log-period-seconds: 60

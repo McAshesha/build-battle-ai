@@ -26,6 +26,8 @@ import ru.ashesha.buildBattleAI.entity.npc.NPCService;
 import ru.ashesha.buildBattleAI.entity.npc.api.BBAINPCService;
 import ru.ashesha.buildBattleAI.entity.picture.PictureService;
 import ru.ashesha.buildBattleAI.entity.picture.api.BBAIPictureService;
+import ru.ashesha.buildBattleAI.evaluation.EvaluationService;
+import ru.ashesha.buildBattleAI.evaluation.api.BBAIEvaluationService;
 import ru.ashesha.buildBattleAI.game.GameManager;
 import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
 import ru.ashesha.buildBattleAI.listeners.ArenaSetupListener;
@@ -88,6 +90,13 @@ public class PluginContext {
     private final CommandService commandService;
     private final ListenerService listenerService;
     private final RenderService renderService;
+    /**
+     * Centralised render + ML evaluation pipeline. Replaces per-arena
+     * render timers — coordinator scans dirty players across all active
+     * sessions, dispatches render jobs and ML inference with batching
+     * and bounded queues.
+     */
+    private final BBAIEvaluationService evaluationService;
 
     /**
      * Ordered list of every service, used to drive the uniform lifecycle.
@@ -128,6 +137,7 @@ public class PluginContext {
         PictureService pictureServiceImpl = new PictureService(plugin);
         MLService mlServiceImpl = new MLService(plugin);
         RenderService renderServiceImpl = new RenderService(plugin);
+        EvaluationService evaluationServiceImpl = new EvaluationService(plugin);
         CommandService commandServiceImpl = new CommandService(plugin);
         ListenerService listenerServiceImpl = new ListenerService(plugin);
 
@@ -142,6 +152,7 @@ public class PluginContext {
         this.pictureService = pictureServiceImpl;
         this.mlService = mlServiceImpl;
         this.renderService = renderServiceImpl;
+        this.evaluationService = evaluationServiceImpl;
         this.commandService = commandServiceImpl;
         this.listenerService = listenerServiceImpl;
 
@@ -159,6 +170,7 @@ public class PluginContext {
                 pictureServiceImpl,
                 mlServiceImpl,
                 renderServiceImpl,
+                evaluationServiceImpl,
                 commandServiceImpl,
                 listenerServiceImpl
         ));
