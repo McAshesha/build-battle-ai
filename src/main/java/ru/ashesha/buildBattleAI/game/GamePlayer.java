@@ -104,7 +104,7 @@ public class GamePlayer {
     }
 
     /** Marks the zone as clean (after zone clear). */
-    void clearZoneDirty() {
+    public void clearZoneDirty() {
         zoneDirty = false;
     }
 }

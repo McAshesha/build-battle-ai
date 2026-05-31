@@ -77,10 +77,12 @@ final class EvaluationCoordinator {
 
         Arena.Position cam = cameras.get(cameraIdx % cameras.size());
 
-        // Note: zone-dirty flag is not cleared here — the dirty flag is owned by
-        // GamePlayer (package-private mutator). Rate-limiting is enforced by the
-        // cadence guard (lastEvalAtNanos) above; the dirty flag is cleared
-        // elsewhere (e.g. on score award or session reset).
+        // Eager dirty-flag clear matches the legacy GameManager.startRenderTimer
+        // semantics: writes during the in-flight render land in the NEXT eval
+        // cycle, not double-counted into this one. Without this, the flag would
+        // stay set forever and we'd re-render unchanged builds on every cadence
+        // window.
+        gp.clearZoneDirty();
         EvalJob job = EvalJob.builder()
                 .arenaName(arena.name())
                 .playerId(gp.playerId())
