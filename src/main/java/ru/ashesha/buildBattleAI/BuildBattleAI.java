@@ -55,6 +55,7 @@ public final class BuildBattleAI extends JavaPlugin {
         // Create the plugin logger early so all services can use it
         pluginLogger = new PluginLogger(getLogger());
 
+
         // Integrity gate — must run before any other initialisation.
         if (!JarIntegrityVerifier.verify(getClass(), getLogger())) {
             integrityVerified = false;
