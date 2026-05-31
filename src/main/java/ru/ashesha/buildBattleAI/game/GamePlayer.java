@@ -17,7 +17,7 @@ import java.util.UUID;
  */
 @Getter
 @Accessors(fluent = true)
-class GamePlayer {
+public class GamePlayer {
 
     /** The player's UUID. */
     @NonNull

@@ -141,7 +141,7 @@ public class GameSession {
      * @param index the theme index
      * @return the theme string
      */
-    String getTheme(int index) {
+    public String getTheme(int index) {
         if (themes.isEmpty())
             return "unknown";
         return themes.get(index % themes.size());
@@ -175,7 +175,7 @@ public class GameSession {
      * @param plotIndex the 0-based plot index
      * @return the installed mirror or {@code null}
      */
-    MutablePlotScene mirror(int plotIndex) {
+    public MutablePlotScene mirror(int plotIndex) {
         return mirrors.get(plotIndex);
     }
 
