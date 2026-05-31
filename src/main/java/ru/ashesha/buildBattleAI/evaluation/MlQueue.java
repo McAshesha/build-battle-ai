@@ -30,12 +30,19 @@ final class MlQueue {
     }
 
     /**
-     * Blocks up to {@code waitMs} for the first frame, then opportunistically
-     * drains whatever else is already queued, up to {@code maxSize - 1} more.
-     * Returns an empty list (without exception) if no frame arrives within
-     * the wait window.
+     * Blocks up to {@code waitMs} milliseconds for the first frame, then
+     * opportunistically drains whatever else is already queued.
+     * <p>
+     * Returns at least 1 and at most {@code maxSize} frames when a frame
+     * arrives within the wait window; returns an empty list (without
+     * throwing) when the wait expires with no frame available.
+     *
+     * @param maxSize maximum total batch size, must be {@code >= 1}
+     * @param waitMs  maximum wait for the first frame, milliseconds
      */
     @NonNull List<EvalFrame> drainBatch(int maxSize, long waitMs) throws InterruptedException {
+        if (maxSize <= 0)
+            throw new IllegalArgumentException("maxSize must be positive: " + maxSize);
         EvalFrame first = queue.poll(waitMs, TimeUnit.MILLISECONDS);
         if (first == null)
             return Collections.emptyList();

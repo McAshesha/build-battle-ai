@@ -58,6 +58,25 @@ class MlQueueTest {
         assertEquals(2, q.size());
     }
 
+    @Test
+    void clear_emptiesQueue() {
+        MlQueue q = new MlQueue(4);
+        q.offer(frame());
+        q.offer(frame());
+        assertEquals(2, q.size());
+        q.clear();
+        assertEquals(0, q.size());
+    }
+
+    @Test
+    void drainBatch_propagatesInterrupt() throws Exception {
+        MlQueue q = new MlQueue(4);
+        Thread.currentThread().interrupt();
+        assertThrows(InterruptedException.class, () -> q.drainBatch(4, 1_000L));
+        // clear any residual interrupt flag for the rest of the test suite
+        Thread.interrupted();
+    }
+
     private static EvalFrame frame() {
         EvalJob j = EvalJob.builder()
                 .arenaName("a").playerId(UUID.randomUUID()).playerName("p")
