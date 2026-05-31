@@ -8,6 +8,7 @@ import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.api.Arena;
 import ru.ashesha.buildBattleAI.arena.api.BBAIArenaManager;
 import ru.ashesha.buildBattleAI.config.api.Lang;
+import ru.ashesha.buildBattleAI.evaluation.api.EvaluationStats;
 import ru.ashesha.buildBattleAI.game.ArenaState;
 import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
 import ru.ashesha.buildBattleAI.message.micro.ChatMicroService;
@@ -45,7 +46,7 @@ public class ArenaCommand extends CommandService.PluginCommand {
 
     /** Subcommands exposed in tab completion. */
     private static final List<String> PUBLIC_SUBCOMMANDS =
-            Arrays.asList("create", "list", "delete", "join", "leave");
+            Arrays.asList("create", "list", "delete", "join", "leave", "stats");
 
     /**
      * Creates the arena command.
@@ -54,7 +55,7 @@ public class ArenaCommand extends CommandService.PluginCommand {
      */
     public ArenaCommand(@NonNull BuildBattleAI plugin) {
         super(plugin, "bbai", "BuildBattleAI arena management",
-                "<create|list|delete|join|leave> [name]");
+                "<create|list|delete|join|leave|stats> [name]");
     }
 
     @Override
@@ -80,6 +81,9 @@ public class ArenaCommand extends CommandService.PluginCommand {
                 break;
             case "leave":
                 handleLeave(sender);
+                break;
+            case "stats":
+                handleStatsCommand(sender);
                 break;
             case "setup":
                 handleSetup(sender, args);
@@ -444,6 +448,45 @@ public class ArenaCommand extends CommandService.PluginCommand {
         am.handleSetCountdown(player, seconds);
     }
 
+    /**
+     * Prints a snapshot of the evaluation-pipeline metrics. Admin-only
+     * diagnostic command; output is read-only and safe to invoke from
+     * any context.
+     */
+    private void handleStatsCommand(@NonNull CommandSender sender) {
+        EvaluationStats s = plugin.getContext().getEvaluationService().stats();
+        sendStatsLine(sender, "&7── &eEvaluation Pipeline Stats &7──");
+        sendStatsLine(sender, "&7Sessions: &f" + s.registeredSessions()
+                + "  &7Players: &f" + s.activePlayers());
+        sendStatsLine(sender, "&7Rendered: &f" + s.rendersCompleted()
+                + "  &7ML batches: &f" + s.mlBatchesCompleted()
+                + "  &7Matches: &f" + s.matchesDispatched());
+        sendStatsLine(sender, "&7Avg render: &f" + s.renderLatencyAvgMicros() + "us"
+                + "  &7Avg ML: &f" + s.mlLatencyAvgMicros() + "us");
+        sendStatsLine(sender, "&7Dropped (R/M): &f" + s.droppedRenderJobs() + "&7/&f" + s.droppedMlJobs()
+                + "  &7Errors (R/M): &f" + s.renderErrors() + "&7/&f" + s.mlErrors());
+        sendStatsLine(sender, "&7Queue depth (R/M): &f" + s.renderQueueDepth()
+                + "&7/&f" + s.mlQueueDepth());
+        StringBuilder hist = new StringBuilder("&7Batch sizes: &f");
+        long[] h = s.batchSizeHistogram();
+        for (int i = 1; i < h.length; i++)
+            hist.append("[").append(i).append(":").append(h[i]).append("]");
+        sendStatsLine(sender, hist.toString());
+    }
+
+    /**
+     * Sends a stats line through {@code MessageService} for players (to
+     * preserve packet-based chat dispatch) and via the raw console sink
+     * otherwise. The {@code &}-to-{@code §} substitution mirrors what
+     * Bukkit's legacy color handler does for console output.
+     */
+    private void sendStatsLine(@NonNull CommandSender sender, @NonNull String line) {
+        if (sender instanceof Player)
+            plugin.getContext().getMessageService().sendChat((Player) sender, line);
+        else
+            sender.sendMessage(line.replace("&", "§"));
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────
 
     private void sendUsage(CommandSender sender) {
@@ -452,7 +495,7 @@ public class ArenaCommand extends CommandService.PluginCommand {
             plugin.getContext().getMessageService().sendChat((Player) sender,
                     lang.get("arena.usage"));
         } else
-            sender.sendMessage("Usage: /bbai <create|list|delete> [name]");
+            sender.sendMessage("Usage: /bbai <create|list|delete|stats> [name]");
     }
 
     private void sendPlayerOnly(CommandSender sender) {

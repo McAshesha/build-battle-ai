@@ -39,6 +39,7 @@ public class EvaluationService implements PluginService, BBAIEvaluationService {
     private Thread mlThread;
     private MlCoalescerWorker mlWorker;
     private BukkitTask coordinatorTask;
+    private BukkitTask metricsLogTask;
 
     public EvaluationService(@NonNull BuildBattleAI plugin) {
         this.plugin = plugin;
@@ -93,6 +94,26 @@ public class EvaluationService implements PluginService, BBAIEvaluationService {
                 () -> coordinator.tick(System.nanoTime()),
                 config.coordinatorTickPeriod(), config.coordinatorTickPeriod());
 
+        // Periodic metrics dump on the async scheduler — disabled when the
+        // configured period is non-positive. Runs strictly off the main thread
+        // because logging is the only side-effect (no Bukkit-state reads).
+        if (config.metricsLogPeriodSeconds() > 0) {
+            long ticks = config.metricsLogPeriodSeconds() * 20L; // 20 ticks per second
+            metricsLogTask = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
+                EvaluationStats s = stats();
+                plugin.getPluginLogger().debug(
+                        "[Evaluation] rendered=%d mlBatches=%d matches=%d dropped(r/m)=%d/%d "
+                                + "errors(r/m)=%d/%d avgRender=%dus avgMl=%dus "
+                                + "queueDepth(r/m)=%d/%d sessions=%d players=%d",
+                        s.rendersCompleted(), s.mlBatchesCompleted(), s.matchesDispatched(),
+                        s.droppedRenderJobs(), s.droppedMlJobs(),
+                        s.renderErrors(), s.mlErrors(),
+                        s.renderLatencyAvgMicros(), s.mlLatencyAvgMicros(),
+                        s.renderQueueDepth(), s.mlQueueDepth(),
+                        s.registeredSessions(), s.activePlayers());
+            }, ticks, ticks);
+        }
+
         logger.info("EvaluationService enabled (render-workers=" + config.renderWorkers()
                 + ", ml-batch-max=" + config.mlBatchMaxSize()
                 + ", cadence-ms=" + config.minCadenceMs() + ")");
@@ -106,6 +127,10 @@ public class EvaluationService implements PluginService, BBAIEvaluationService {
         if (coordinatorTask != null) {
             coordinatorTask.cancel();
             coordinatorTask = null;
+        }
+        if (metricsLogTask != null) {
+            metricsLogTask.cancel();
+            metricsLogTask = null;
         }
 
         if (renderWorkers != null)

@@ -36,6 +36,8 @@ class EvaluationServiceLifecycleTest {
         BukkitScheduler sched = mock(BukkitScheduler.class);
         when(sched.runTaskTimer(any(), any(Runnable.class), anyLong(), anyLong()))
                 .thenReturn(mock(BukkitTask.class));
+        when(sched.runTaskTimerAsynchronously(any(), any(Runnable.class), anyLong(), anyLong()))
+                .thenReturn(mock(BukkitTask.class));
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
             bukkit.when(Bukkit::getScheduler).thenReturn(sched);
