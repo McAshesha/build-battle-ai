@@ -6,6 +6,7 @@ import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.bukkit.Bukkit;
 import ru.ashesha.buildBattleAI.arena.api.Arena;
+import ru.ashesha.buildBattleAI.render.data.MutablePlotScene;
 
 import java.util.*;
 
@@ -69,6 +70,14 @@ class GameSession {
     /** Ending delay task ID, or -1 if not active. */
     @Setter
     private int endingTaskId = -1;
+
+    /**
+     * Per-plot block-state mirrors used by the async renderer.
+     * <p>
+     * Keys are plot indices; entries are populated when the session enters
+     * {@link ArenaState#PLAYING} and removed wholesale at game end.
+     */
+    private final Map<Integer, MutablePlotScene> mirrors = new HashMap<>();
 
     /**
      * Creates a new game session for the given arena.
@@ -165,6 +174,33 @@ class GameSession {
         gameTickTaskId = -1;
         renderTaskId = -1;
         endingTaskId = -1;
+    }
+
+    /**
+     * Returns the mirror for the given plot index, or {@code null} if not installed.
+     *
+     * @param plotIndex the 0-based plot index
+     * @return the installed mirror or {@code null}
+     */
+    MutablePlotScene mirror(int plotIndex) {
+        return mirrors.get(plotIndex);
+    }
+
+    /**
+     * Installs the mirror for the given plot index. Replaces any existing mapping.
+     *
+     * @param plotIndex the 0-based plot index
+     * @param scene     the mirror to install
+     */
+    void installMirror(int plotIndex, @NonNull MutablePlotScene scene) {
+        mirrors.put(plotIndex, scene);
+    }
+
+    /**
+     * Drops all installed mirrors. Called on game end.
+     */
+    void clearMirrors() {
+        mirrors.clear();
     }
 
     /**

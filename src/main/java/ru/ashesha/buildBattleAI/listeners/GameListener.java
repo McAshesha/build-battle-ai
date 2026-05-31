@@ -5,8 +5,10 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
+import org.bukkit.block.BlockState;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
+import org.bukkit.event.block.BlockMultiPlaceEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
@@ -82,6 +84,19 @@ public class GameListener extends ListenerService.PluginListener {
 
         // Mark zone as dirty for the render pipeline
         markZoneDirty(player, gameManager, arenaName);
+
+        // Update the per-plot mirror so the next render reflects this placement.
+        // BlockMultiPlaceEvent extends BlockPlaceEvent (single firing) — for
+        // doors/beds we must iterate the per-half replaced states.
+        if (event instanceof BlockMultiPlaceEvent) {
+            BlockMultiPlaceEvent multi = (BlockMultiPlaceEvent) event;
+            for (BlockState blockState : multi.getReplacedBlockStates())
+                gameManager.applyMirrorPlace(player.getUniqueId(),
+                        arenaName, blockState.getBlock());
+        } else {
+            gameManager.applyMirrorPlace(player.getUniqueId(),
+                    arenaName, event.getBlockPlaced());
+        }
     }
 
     /**
@@ -123,6 +138,8 @@ public class GameListener extends ListenerService.PluginListener {
         }
 
         markZoneDirty(player, gameManager, arenaName);
+        gameManager.applyMirrorBreak(player.getUniqueId(),
+                arenaName, event.getBlock());
     }
 
     /**

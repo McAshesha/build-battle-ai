@@ -1,5 +1,6 @@
 package ru.ashesha.buildBattleAI.game;
 
+import com.cryptomorin.xseries.XMaterial;
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -7,6 +8,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.ArenaManager;
@@ -18,7 +20,7 @@ import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.ml.api.BBAIMLService;
 import ru.ashesha.buildBattleAI.ml.api.PredictionResult;
 import ru.ashesha.buildBattleAI.ml.api.TopKEntry;
-import ru.ashesha.buildBattleAI.render.data.ChunkScene;
+import ru.ashesha.buildBattleAI.render.data.MutablePlotScene;
 
 import java.util.*;
 
@@ -65,11 +67,20 @@ public class GameManager implements BBAIGameManager, PluginService {
     /** Server version, resolved in enable(). */
     private ServerVersion serverVersion;
 
+    /**
+     * Cached legacy flag — {@code true} on pre-1.13 servers where blocks
+     * carry a {@code byte} data value instead of a {@code BlockData}.
+     * Resolved once in {@link #enable()}.
+     */
+    private boolean legacy;
+
     // ── PluginService lifecycle ───────────────────────────────────────
 
     @Override
     public void enable() {
         serverVersion = plugin.getContext().getServerVersion();
+        // Pre-1.13 blocks use byte data values; 1.13+ uses BlockData strings.
+        this.legacy = !serverVersion.isNewerThanOrEquals(ServerVersion.V_1_13);
         plugin.getPluginLogger().info("GameManager enabled.");
     }
 
@@ -100,7 +111,7 @@ public class GameManager implements BBAIGameManager, PluginService {
         }
 
         // Arena exists and is enabled?
-        Arena arena = ((ArenaManager) plugin.getContext().getArenaManager()).getArena(arenaName);
+        Arena arena = plugin.getContext().getArenaManager().getArena(arenaName);
         if (arena == null) {
             msg.sendChat(player, lang.get("game.join.arena-not-found", "%arena%", arenaName));
             return false;
@@ -237,28 +248,25 @@ public class GameManager implements BBAIGameManager, PluginService {
         session.state(ArenaState.COUNTDOWN);
         final int[] countdown = {session.arena().countdownTime()};
 
-        int taskId = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
-            @Override
-            public void run() {
-                // Check if session is still in COUNTDOWN (might have been cancelled)
-                if (session.state() != ArenaState.COUNTDOWN) {
-                    Bukkit.getScheduler().cancelTask(session.countdownTaskId());
-                    session.countdownTaskId(-1);
-                    return;
-                }
-
-                if (countdown[0] <= 0) {
-                    Bukkit.getScheduler().cancelTask(session.countdownTaskId());
-                    session.countdownTaskId(-1);
-                    startGame(session);
-                    return;
-                }
-
-                Lang lang = plugin.getContext().getConfigService().getDefaultLang();
-                broadcastToSession(session, lang.get("game.countdown.starting",
-                        "%seconds%", String.valueOf(countdown[0])));
-                countdown[0]--;
+        int taskId = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            // Check if session is still in COUNTDOWN (might have been cancelled)
+            if (session.state() != ArenaState.COUNTDOWN) {
+                Bukkit.getScheduler().cancelTask(session.countdownTaskId());
+                session.countdownTaskId(-1);
+                return;
             }
+
+            if (countdown[0] <= 0) {
+                Bukkit.getScheduler().cancelTask(session.countdownTaskId());
+                session.countdownTaskId(-1);
+                startGame(session);
+                return;
+            }
+
+            Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+            broadcastToSession(session, lang.get("game.countdown.starting",
+                    "%seconds%", String.valueOf(countdown[0])));
+            countdown[0]--;
         }, 0L, 20L).getTaskId();
 
         session.countdownTaskId(taskId);
@@ -312,6 +320,11 @@ public class GameManager implements BBAIGameManager, PluginService {
             gp.resetBuildTime(arena.buildTime());
             gp.clearZoneDirty();
 
+            // Install the per-plot mirror that will be updated by Bukkit
+            // block events for the rest of this session.
+            session.installMirror(gp.plotIndex(),
+                    MutablePlotScene.forPlot(plot, legacy));
+
             String theme = session.getTheme(gp.themeIndex());
             plugin.getContext().getMessageService().sendChat(player,
                     lang.get("game.playing.theme-assigned", "%theme%", theme));
@@ -353,60 +366,57 @@ public class GameManager implements BBAIGameManager, PluginService {
      * </ul>
      */
     private void startGameTickTimer(GameSession session) {
-        int taskId = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
-            @Override
-            public void run() {
-                if (session.state() != ArenaState.PLAYING)
-                    return;
+        int taskId = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (session.state() != ArenaState.PLAYING)
+                return;
 
-                // Global timer
-                session.gameTimeRemaining(session.gameTimeRemaining() - 1);
+            // Global timer
+            session.gameTimeRemaining(session.gameTimeRemaining() - 1);
 
-                // Game time warnings
-                int remaining = session.gameTimeRemaining();
-                if (remaining == 60 || remaining == 30 || remaining == 10) {
-                    Lang lang = plugin.getContext().getConfigService().getDefaultLang();
-                    broadcastToSession(session, lang.get("game.playing.game-time-warning",
-                            "%minutes%", String.valueOf(remaining / 60),
-                            "%seconds%", String.valueOf(remaining % 60)));
-                }
-
-                if (remaining <= 0) {
-                    endGame(session);
-                    return;
-                }
-
-                // Per-player build timers
+            // Game time warnings
+            int remaining = session.gameTimeRemaining();
+            if (remaining == 60 || remaining == 30 || remaining == 10) {
                 Lang lang = plugin.getContext().getConfigService().getDefaultLang();
-                Arena arena = session.arena();
-                for (GamePlayer gp : new ArrayList<>(session.players().values())) {
-                    gp.decrementBuildTime();
+                broadcastToSession(session, lang.get("game.playing.game-time-warning",
+                        "%minutes%", String.valueOf(remaining / 60),
+                        "%seconds%", String.valueOf(remaining % 60)));
+            }
 
-                    // Build time warnings (last 10s, 30s, 60s)
-                    if (gp.buildTimeRemaining() == 30 || gp.buildTimeRemaining() == 10) {
-                        Player player = Bukkit.getPlayer(gp.playerId());
-                        if (player != null)
-                            plugin.getContext().getMessageService().sendChat(player,
-                                    lang.get("game.playing.build-time-warning",
-                                            "%seconds%", String.valueOf(gp.buildTimeRemaining())));
-                    }
+            if (remaining <= 0) {
+                endGame(session);
+                return;
+            }
 
-                    if (gp.buildTimeRemaining() <= 0) {
-                        // Build time expired
-                        Player player = Bukkit.getPlayer(gp.playerId());
-                        World arenaWorld = ensureWorldLoaded(arena);
-                        if (arenaWorld != null)
-                            clearZone(arenaWorld, arena.plots().get(gp.plotIndex()));
-                        gp.clearZoneDirty();
-                        gp.advanceTheme(session.themes().size());
-                        gp.resetBuildTime(arena.buildTime());
-                        if (player != null) {
-                            plugin.getContext().getMessageService().sendChat(player,
-                                    lang.get("game.playing.build-time-expired"));
-                            String newTheme = session.getTheme(gp.themeIndex());
-                            plugin.getContext().getMessageService().sendChat(player,
-                                    lang.get("game.playing.new-theme", "%theme%", newTheme));
-                        }
+            // Per-player build timers
+            Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+            Arena arena = session.arena();
+            for (GamePlayer gp : new ArrayList<>(session.players().values())) {
+                gp.decrementBuildTime();
+
+                // Build time warnings (last 10s, 30s, 60s)
+                if (gp.buildTimeRemaining() == 30 || gp.buildTimeRemaining() == 10) {
+                    Player player = Bukkit.getPlayer(gp.playerId());
+                    if (player != null)
+                        plugin.getContext().getMessageService().sendChat(player,
+                                lang.get("game.playing.build-time-warning",
+                                        "%seconds%", String.valueOf(gp.buildTimeRemaining())));
+                }
+
+                if (gp.buildTimeRemaining() <= 0) {
+                    // Build time expired
+                    Player player = Bukkit.getPlayer(gp.playerId());
+                    World arenaWorld = ensureWorldLoaded(arena);
+                    if (arenaWorld != null)
+                        clearZone(arenaWorld, arena.plots().get(gp.plotIndex()));
+                    gp.clearZoneDirty();
+                    gp.advanceTheme(session.themes().size());
+                    gp.resetBuildTime(arena.buildTime());
+                    if (player != null) {
+                        plugin.getContext().getMessageService().sendChat(player,
+                                lang.get("game.playing.build-time-expired"));
+                        String newTheme = session.getTheme(gp.themeIndex());
+                        plugin.getContext().getMessageService().sendChat(player,
+                                lang.get("game.playing.new-theme", "%theme%", newTheme));
                     }
                 }
             }
@@ -423,101 +433,92 @@ public class GameManager implements BBAIGameManager, PluginService {
      * rendering and ML prediction asynchronously.
      */
     private void startRenderTimer(GameSession session) {
-        int taskId = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
-            @Override
-            public void run() {
-                if (session.state() != ArenaState.PLAYING)
-                    return;
+        int taskId = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (session.state() != ArenaState.PLAYING)
+                return;
 
-                Arena arena = session.arena();
-                World arenaWorld = ensureWorldLoaded(arena);
-                if (arenaWorld == null)
-                    return;
+            Arena arena = session.arena();
+            World arenaWorld = ensureWorldLoaded(arena);
+            if (arenaWorld == null)
+                return;
 
-                int cameraIdx = session.currentCameraIndex();
-                session.advanceCamera();
+            int cameraIdx = session.currentCameraIndex();
+            session.advanceCamera();
 
-                for (GamePlayer gp : new ArrayList<>(session.players().values())) {
-                    if (!gp.zoneDirty())
-                        continue;
+            for (GamePlayer gp : new ArrayList<>(session.players().values())) {
+                if (!gp.zoneDirty())
+                    continue;
 
-                    Arena.PlotData plot = arena.plots().get(gp.plotIndex());
-                    List<Arena.Position> cameras = plot.cameras();
-                    if (cameras.isEmpty())
-                        continue;
-                    Arena.Position camera = cameras.get(cameraIdx % cameras.size());
+                Arena.PlotData plot = arena.plots().get(gp.plotIndex());
+                List<Arena.Position> cameras = plot.cameras();
+                if (cameras.isEmpty())
+                    continue;
+                Arena.Position camera = cameras.get(cameraIdx % cameras.size());
 
-                    // Build region from plot corners
-                    int minX = Math.min(plot.corner1X(), plot.corner2X());
-                    int minY = Math.min(plot.corner1Y(), plot.corner2Y());
-                    int minZ = Math.min(plot.corner1Z(), plot.corner2Z());
-                    int maxX = Math.max(plot.corner1X(), plot.corner2X());
-                    int maxY = Math.max(plot.corner1Y(), plot.corner2Y());
-                    int maxZ = Math.max(plot.corner1Z(), plot.corner2Z());
-
-                    ChunkScene.RenderRegion region = new ChunkScene.RenderRegion.Cuboid(
-                            minX, minY, minZ, maxX, maxY, maxZ, arenaWorld);
-
-                    // Capture on main thread
-                    final ChunkScene scene;
-                    try {
-                        scene = plugin.getContext().getRenderService().capture(region);
-                    } catch (Exception e) {
-                        plugin.getPluginLogger().warn("Failed to capture scene for %s: %s",
-                                gp.playerName(), e.getMessage());
-                        continue;
-                    }
-
-                    // Save context for async use
-                    final UUID playerId = gp.playerId();
-                    final String expectedTheme = session.getTheme(gp.themeIndex());
-                    final int savedThemeIndex = gp.themeIndex();
-                    final double camX = camera.x();
-                    final double camY = camera.y();
-                    final double camZ = camera.z();
-                    final float camYaw = camera.yaw();
-                    final float camPitch = camera.pitch();
-                    final String arenaName = arena.name();
-
-                    // Async render + ML chain
-                    Bukkit.getScheduler().runTaskAsynchronously(plugin, new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                // Render
-                                byte[] rgb = plugin.getContext().getRenderService()
-                                        .render(scene, camX, camY, camZ, camYaw, camPitch);
-
-                                // ML prediction (topK=2) — uses the renderer's
-                                // native 224x224 RGB output without re-encoding.
-                                PredictionResult result = plugin.getContext().getMlService()
-                                        .predictRgb(rgb, 224, 224, 2);
-
-                                // Check if theme is in top-2
-                                boolean matched = false;
-                                for (TopKEntry entry : result.topK())
-                                    if (entry.className().equalsIgnoreCase(expectedTheme)) {
-                                        matched = true;
-                                        break;
-                                    }
-
-                                if (matched) {
-                                    // Schedule score handling on main thread
-                                    Bukkit.getScheduler().runTask(plugin, new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            handleScore(arenaName, playerId, savedThemeIndex);
-                                        }
-                                    });
-                                }
-                            } catch (Exception e) {
-                                plugin.getPluginLogger().debug(
-                                        "Render/ML pipeline error for %s: %s",
-                                        playerId, e.getMessage());
-                            }
-                        }
-                    });
+                // Pull the live per-plot mirror — the renderer reads it
+                // directly inside the async task under a shared read-lock.
+                MutablePlotScene mirror = session.mirror(gp.plotIndex());
+                if (mirror == null) {
+                    plugin.getPluginLogger().debug(
+                            "Render-tick skipped for %s: no mirror installed for plot %d",
+                            gp.playerName(), gp.plotIndex());
+                    continue;
                 }
+
+                // Clear dirty *eagerly* so a place/break that fires during
+                // the async render is captured by the NEXT tick rather than
+                // double-counted. Confirmed semantics from the design spec.
+                gp.clearZoneDirty();
+
+                // Save context for async use.
+                final UUID playerId = gp.playerId();
+                final String expectedTheme = session.getTheme(gp.themeIndex());
+                final int savedThemeIndex = gp.themeIndex();
+                final double camX = camera.x();
+                final double camY = camera.y();
+                final double camZ = camera.z();
+                final float camYaw = camera.yaw();
+                final float camPitch = camera.pitch();
+                final String arenaName = arena.name();
+                final MutablePlotScene asyncMirror = mirror;
+                final String playerName = gp.playerName();
+
+                // Async render + ML chain. Read-lock is taken inside the
+                // async body so the main thread never blocks here.
+                Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+                    try {
+                        final byte[] rgb;
+                        java.util.concurrent.locks.Lock readLock = asyncMirror.readLock();
+                        readLock.lock();
+                        try {
+                            // Render against the live mirror — clearAll on
+                            // the writer side is excluded by this read-lock.
+                            rgb = plugin.getContext().getRenderService()
+                                    .render(asyncMirror, camX, camY, camZ, camYaw, camPitch);
+                        } finally {
+                            readLock.unlock();
+                        }
+
+                        // ML inference works on the rendered byte[] — no lock needed.
+                        PredictionResult result = plugin.getContext().getMlService()
+                                .predictRgb(rgb, 224, 224, 2);
+
+                        boolean matched = false;
+                        for (TopKEntry entry : result.topK())
+                            if (entry.className().equalsIgnoreCase(expectedTheme)) {
+                                matched = true;
+                                break;
+                            }
+
+                        if (matched)
+                            Bukkit.getScheduler().runTask(plugin,
+                                    () -> handleScore(arenaName, playerId, savedThemeIndex));
+                    } catch (Exception e) {
+                        plugin.getPluginLogger().debug(
+                                "Render/ML pipeline error for %s: %s",
+                                playerName, e.getMessage());
+                    }
+                });
             }
         }, RENDER_INTERVAL_TICKS, RENDER_INTERVAL_TICKS).getTaskId();
 
@@ -558,6 +559,12 @@ public class GameManager implements BBAIGameManager, PluginService {
             clearZone(arenaWorld, arena.plots().get(gp.plotIndex()));
         gp.clearZoneDirty();
 
+        // World is wiped — sync the mirror to match so the next render-tick
+        // sees an empty scene without re-capturing from the world.
+        MutablePlotScene mirror = session.mirror(gp.plotIndex());
+        if (mirror != null)
+            mirror.clearAll();
+
         // Advance theme
         gp.advanceTheme(session.themes().size());
         gp.resetBuildTime(arena.buildTime());
@@ -590,6 +597,9 @@ public class GameManager implements BBAIGameManager, PluginService {
         if (arenaWorld != null)
             for (GamePlayer gp : session.players().values())
                 clearZone(arenaWorld, arena.plots().get(gp.plotIndex()));
+
+        // Mirrors are session-scoped — drop them now that the world is wiped.
+        session.clearMirrors();
 
         // Teleport all to spectator and set Adventure mode
         Arena.Position specPos = arena.effectiveSpectator();
@@ -675,6 +685,9 @@ public class GameManager implements BBAIGameManager, PluginService {
         if (arenaWorld != null)
             for (GamePlayer gp : session.players().values())
                 clearZone(arenaWorld, arena.plots().get(gp.plotIndex()));
+
+        // Mirrors are session-scoped — drop them now that the world is wiped.
+        session.clearMirrors();
 
         // Restore all players immediately
         for (GamePlayer gp : new ArrayList<>(session.players().values())) {
@@ -892,5 +905,64 @@ public class GameManager implements BBAIGameManager, PluginService {
         int minZ = Math.min(plot.corner1Z(), plot.corner2Z());
         int maxZ = Math.max(plot.corner1Z(), plot.corner2Z());
         return x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ && z <= maxZ;
+    }
+
+    /**
+     * Called by {@link ru.ashesha.buildBattleAI.listeners.GameListener} after
+     * a {@code BlockPlaceEvent} (or multi-place) has passed the zone check.
+     * Updates the per-plot mirror so the next render reflects the placement.
+     * <p>
+     * No-op if the player has no session, no mirror, or the block is out of
+     * the plot bounds (the mirror does its own bounds check).
+     *
+     * @param playerId    the player UUID
+     * @param arenaName   the arena name
+     * @param placedBlock the block whose state was placed
+     */
+    public void applyMirrorPlace(@NonNull UUID playerId,
+                                 @NonNull String arenaName,
+                                 @NonNull Block placedBlock) {
+        GameSession session = sessions.get(arenaName);
+        if (session == null)
+            return;
+        GamePlayer gp = session.getPlayer(playerId);
+        if (gp == null)
+            return;
+        MutablePlotScene mirror = session.mirror(gp.plotIndex());
+        if (mirror == null)
+            return;
+
+        XMaterial mat = XMaterial.matchXMaterial(placedBlock.getType());
+        int x = placedBlock.getX(), y = placedBlock.getY(), z = placedBlock.getZ();
+        if (legacy) {
+            // Block.getData() is deprecated on modern Bukkit but valid on 1.8–1.12.
+            //noinspection deprecation
+            mirror.setBlock(x, y, z, mat, placedBlock.getData());
+        } else {
+            mirror.setBlock(x, y, z, mat, placedBlock.getBlockData().getAsString());
+        }
+    }
+
+    /**
+     * Called by {@link ru.ashesha.buildBattleAI.listeners.GameListener} after
+     * a {@code BlockBreakEvent} has passed the zone check.
+     *
+     * @param playerId    the player UUID
+     * @param arenaName   the arena name
+     * @param brokenBlock the block that was broken
+     */
+    public void applyMirrorBreak(@NonNull UUID playerId,
+                                 @NonNull String arenaName,
+                                 @NonNull Block brokenBlock) {
+        GameSession session = sessions.get(arenaName);
+        if (session == null)
+            return;
+        GamePlayer gp = session.getPlayer(playerId);
+        if (gp == null)
+            return;
+        MutablePlotScene mirror = session.mirror(gp.plotIndex());
+        if (mirror == null)
+            return;
+        mirror.clearBlock(brokenBlock.getX(), brokenBlock.getY(), brokenBlock.getZ());
     }
 }

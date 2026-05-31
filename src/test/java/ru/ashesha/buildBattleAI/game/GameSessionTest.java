@@ -1,11 +1,13 @@
 package ru.ashesha.buildBattleAI.game;
 
 import org.bukkit.Bukkit;
+import org.bukkit.block.BlockFace;
 import org.bukkit.scheduler.BukkitScheduler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import ru.ashesha.buildBattleAI.arena.api.Arena;
+import ru.ashesha.buildBattleAI.render.data.MutablePlotScene;
 
 import java.util.Arrays;
 import java.util.UUID;
@@ -258,6 +260,40 @@ class GameSessionTest {
 
         session.endingTaskId(35);
         assertEquals(35, session.endingTaskId());
+    }
+
+    // ── mirror management ────────────────────────────────────────────
+
+    @Test
+    void mirrorLifecycleHappyPath() {
+        // Build a minimal arena with two identical plots.
+        Arena.Position spawn = new Arena.Position(0.5, 64.5, 0.5, 0f, 0f);
+        Arena.Position cam = new Arena.Position(0.5, 70.5, 0.5, 0f, 0f);
+        // 1×1 picture region — both corners the same block, any cardinal face is valid.
+        Arena.PictureRegion picture = new Arena.PictureRegion(
+                0, 64, 0, 0, 64, 0, BlockFace.NORTH);
+        Arena.PlotData plot = new Arena.PlotData(spawn,
+                0, 60, 0, 7, 67, 7,
+                Arrays.asList(cam, cam, cam),
+                picture);
+        Arena realArena = new Arena("test", "bbai_test", 2, true,
+                spawn, null, 2, 60, 120, 5,
+                Arrays.asList(plot, plot));
+
+        GameSession realSession = new GameSession(realArena);
+
+        // No mirror installed yet.
+        assertNull(realSession.mirror(0));
+
+        // Install one and read it back.
+        MutablePlotScene m0 = MutablePlotScene.forPlot(plot, false);
+        realSession.installMirror(0, m0);
+        assertSame(m0, realSession.mirror(0));
+        assertNull(realSession.mirror(1));
+
+        // Clear and verify both gone.
+        realSession.clearMirrors();
+        assertNull(realSession.mirror(0));
     }
 
     // ── helpers ───────────────────────────────────────────────────────
