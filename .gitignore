@@ -20,3 +20,6 @@ Thumbs.db
 # Keystores (JAR signing)
 *.jks
 *.p12
+
+# Large ML models (exceed GitHub 100 MB limit)
+src/main/resources/models/custom_convnext_embeddings.onnx
