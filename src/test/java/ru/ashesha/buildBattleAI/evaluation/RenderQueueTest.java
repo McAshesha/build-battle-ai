@@ -58,6 +58,23 @@ class RenderQueueTest {
         assertEquals(2, q.size());
     }
 
+    @Test
+    void clear_emptiesQueueAndDedupIndex() {
+        RenderQueue q = new RenderQueue(8);
+        UUID pid = UUID.randomUUID();
+        q.offer(jobFor(pid));
+        q.offer(jobFor(UUID.randomUUID()));
+        assertEquals(2, q.size());
+
+        q.clear();
+
+        assertEquals(0, q.size());
+        // Re-offering for the same player must succeed cleanly (not be blocked
+        // by a stale dedup entry from the cleared state).
+        assertTrue(q.offer(jobFor(pid)));
+        assertEquals(1, q.size());
+    }
+
     private static EvalJob jobFor(UUID playerId) {
         return EvalJob.builder()
                 .arenaName("a").playerId(playerId).playerName("p")

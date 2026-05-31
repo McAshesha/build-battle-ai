@@ -15,8 +15,13 @@ import java.util.concurrent.LinkedBlockingQueue;
  * useful work slightly — that's by design and bounded by the dedup map's
  * cardinality.
  * <p>
- * Thread-safety: many producers (in practice one — the coordinator on the
- * main thread), one or more consumers (render workers).
+ * <b>Threading contract:</b> exactly one producer (the
+ * {@code EvaluationCoordinator}, running on the Bukkit main thread) and
+ * one or more consumers (render workers). Concurrent {@code offer()}
+ * calls from multiple producers are NOT supported — the two-step
+ * {@code pending.put} → {@code queue.offer} sequence is non-atomic and a
+ * race would either duplicate a player's job or silently lose one.
+ * {@code take()} is safe to call from multiple consumers concurrently.
  */
 final class RenderQueue {
 
@@ -30,6 +35,8 @@ final class RenderQueue {
     /**
      * Non-blocking offer. Returns {@code false} if the underlying queue is
      * full — the caller should treat that as backpressure.
+     * <p>
+     * <b>Precondition:</b> must be called from a single producer thread (see class Javadoc).
      */
     boolean offer(@NonNull EvalJob job) {
         // Atomically replace any prior pending job for this player; the
