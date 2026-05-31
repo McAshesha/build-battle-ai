@@ -6,10 +6,13 @@ import ru.ashesha.buildBattleAI.render.RenderService;
 import ru.ashesha.buildBattleAI.render.data.MutablePlotScene;
 
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyFloat;
@@ -31,8 +34,9 @@ class RenderWorkerTest {
     void happyPath_renderAndEmitFrame() throws Exception {
         RenderService render = mock(RenderService.class);
         byte[] rgb = new byte[224 * 224 * 3];
+        CountDownLatch rendered = new CountDownLatch(1);
         when(render.render(any(MutablePlotScene.class), anyDouble(), anyDouble(), anyDouble(), anyFloat(), anyFloat()))
-                .thenReturn(rgb);
+                .thenAnswer(inv -> { rendered.countDown(); return rgb; });
 
         RenderQueue rq = new RenderQueue(4);
         MlQueue mq = new MlQueue(4);
@@ -54,7 +58,12 @@ class RenderWorkerTest {
         RenderWorker worker = new RenderWorker(0, rq, mq, render, metrics, mock(PluginLogger.class));
         Thread t = new Thread(worker, "test-render-worker");
         t.start();
-        Thread.sleep(100);
+        assertTrue(rendered.await(5, TimeUnit.SECONDS), "render not invoked in time");
+        // Allow the worker to finish offering to mlQueue + record metrics before we stop it.
+        // Wait until mlQueue has the frame OR a short timeout.
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        while (mq.size() == 0 && System.nanoTime() < deadline)
+            Thread.sleep(1);
         worker.stop();
         t.interrupt();
         t.join(1000);
@@ -67,8 +76,9 @@ class RenderWorkerTest {
     @Test
     void renderException_isSwallowed_andCounted() throws Exception {
         RenderService render = mock(RenderService.class);
+        CountDownLatch thrown = new CountDownLatch(1);
         when(render.render(any(MutablePlotScene.class), anyDouble(), anyDouble(), anyDouble(), anyFloat(), anyFloat()))
-                .thenThrow(new RuntimeException("boom"));
+                .thenAnswer(inv -> { thrown.countDown(); throw new RuntimeException("boom"); });
 
         RenderQueue rq = new RenderQueue(4);
         MlQueue mq = new MlQueue(4);
@@ -88,7 +98,11 @@ class RenderWorkerTest {
         RenderWorker worker = new RenderWorker(0, rq, mq, render, metrics, mock(PluginLogger.class));
         Thread t = new Thread(worker, "test-render-worker");
         t.start();
-        Thread.sleep(100);
+        assertTrue(thrown.await(5, TimeUnit.SECONDS), "render not invoked in time");
+        // Allow the worker to update metrics in the catch path before we stop it.
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        while (metrics.snapshot(0, 0, 0, 0).renderErrors() == 0 && System.nanoTime() < deadline)
+            Thread.sleep(1);
         worker.stop();
         t.interrupt();
         t.join(1000);

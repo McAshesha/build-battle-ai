@@ -105,11 +105,15 @@ final class RenderWorker implements Runnable {
                         job.cameraX(), job.cameraY(), job.cameraZ(),
                         job.cameraYaw(), job.cameraPitch());
             } catch (Exception e) {
-                // Swallow + count: a single bad job must not stall the
-                // pipeline. The lock is released by the finally block
-                // before this continue jumps back to the loop header.
-                logger.debug("Render failed for %s: %s", job.playerName(), e.getMessage());
-                metrics.incRenderErrors();
+                // Defensive nesting: a throwing logger or metrics impl must NOT
+                // kill the worker thread. The outer try ensures the read-lock
+                // is released either way (finally below).
+                try {
+                    logger.debug("Render failed for %s: %s", job.playerName(), e.getMessage());
+                    metrics.incRenderErrors();
+                } catch (Exception suppressed) {
+                    // Worker survival is mandatory; swallow.
+                }
                 continue;
             } finally {
                 readLock.unlock();
