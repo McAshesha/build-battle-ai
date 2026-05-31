@@ -61,4 +61,14 @@ class EvaluationMetricsTest {
         long[] h = s.batchSizeHistogram();
         assertEquals(1, h[4]); // clamped to max
     }
+
+    @Test
+    void mlLatencyAverageIsComputed() {
+        EvaluationMetrics m = new EvaluationMetrics(8);
+        m.recordMlLatencyNanos(50_000_000L); // 50 ms
+        m.recordMlLatencyNanos(100_000_000L); // 100 ms
+
+        EvaluationStats s = m.snapshot(0, 0, 0, 0);
+        assertEquals(75_000L, s.mlLatencyAvgMicros()); // average 75 ms = 75000 µs
+    }
 }

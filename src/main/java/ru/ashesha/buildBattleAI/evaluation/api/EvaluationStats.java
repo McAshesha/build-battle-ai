@@ -26,4 +26,13 @@ public class EvaluationStats {
     int registeredSessions;
     int activePlayers;
     long[] batchSizeHistogram;
+
+    /**
+     * Returns a defensive copy of the batch-size histogram. The internal
+     * array is never exposed to callers — this preserves the immutability
+     * contract advertised in the class Javadoc.
+     */
+    public long[] batchSizeHistogram() {
+        return batchSizeHistogram.clone();
+    }
 }

@@ -52,11 +52,17 @@ public final class EvaluationMetrics {
     public void incMlErrors()          { mlErrors.increment(); }
 
     public void recordRenderLatencyNanos(long nanos) {
+        // The sum and count are updated non-atomically; a snapshot taken between
+        // the two stores can briefly report a slightly inflated average. Accepted
+        // for monitoring metrics.
         renderLatencySumNanos.addAndGet(nanos);
         renderLatencyCount.incrementAndGet();
     }
 
     public void recordMlLatencyNanos(long nanos) {
+        // The sum and count are updated non-atomically; a snapshot taken between
+        // the two stores can briefly report a slightly inflated average. Accepted
+        // for monitoring metrics.
         mlLatencySumNanos.addAndGet(nanos);
         mlLatencyCount.incrementAndGet();
     }
