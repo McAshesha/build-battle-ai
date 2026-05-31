@@ -22,6 +22,7 @@ class EvaluationCoordinatorTest {
     void dirtyPlayer_beyondMinCadence_isEnqueued() {
         UUID pid = UUID.randomUUID();
         SessionHandle h = handleWith(pid, true);
+        GamePlayer gp = gpMock(h);
         Map<String, SessionHandle> registry = singleton("a1", h);
 
         RenderQueue rq = new RenderQueue(8);
@@ -30,12 +31,16 @@ class EvaluationCoordinatorTest {
 
         coord.tick(nanos(0));
         assertEquals(1, rq.size());
+        // The eager-clear contract: once a job is enqueued, the dirty flag is
+        // cleared so writes during the in-flight render land in the NEXT cycle.
+        verify(gp).clearZoneDirty();
     }
 
     @Test
     void dirtyPlayer_withinMinCadence_isSkipped() {
         UUID pid = UUID.randomUUID();
         SessionHandle h = handleWith(pid, true);
+        GamePlayer gp = gpMock(h);
         // Record at a non-zero baseline: the SessionHandle returns 0L as the
         // sentinel for "never recorded", so a real prior attempt must be
         // non-zero to be distinguishable from the never-recorded state.
@@ -48,27 +53,33 @@ class EvaluationCoordinatorTest {
 
         coord.tick(nanos(3000));
         assertEquals(0, rq.size());
+        // Skipped before reaching the dirty-clear step.
+        verify(gp, never()).clearZoneDirty();
     }
 
     @Test
     void notDirty_isSkipped() {
         SessionHandle h = handleWith(UUID.randomUUID(), false);
+        GamePlayer gp = gpMock(h);
         RenderQueue rq = new RenderQueue(8);
         EvaluationCoordinator c = new EvaluationCoordinator(
                 singleton("a1", h), rq, new EvaluationMetrics(8), 5000L);
         c.tick(nanos(0));
         assertEquals(0, rq.size());
+        verify(gp, never()).clearZoneDirty();
     }
 
     @Test
     void notInPlayingState_isSkipped() {
         SessionHandle h = handleWith(UUID.randomUUID(), true);
+        GamePlayer gp = gpMock(h);
         when(h.session().state()).thenReturn(ArenaState.COUNTDOWN);
         RenderQueue rq = new RenderQueue(8);
         EvaluationCoordinator c = new EvaluationCoordinator(
                 singleton("a1", h), rq, new EvaluationMetrics(8), 5000L);
         c.tick(nanos(0));
         assertEquals(0, rq.size());
+        verify(gp, never()).clearZoneDirty();
     }
 
     @Test
@@ -100,6 +111,15 @@ class EvaluationCoordinatorTest {
         ConcurrentHashMap<String, SessionHandle> m = new ConcurrentHashMap<>();
         m.put(name, h);
         return m;
+    }
+
+    /**
+     * Pulls the single {@link GamePlayer} mock out of the given session's
+     * players map. Each {@code handleWith(...)} call puts exactly one
+     * GamePlayer mock into the session, so the first (and only) entry is it.
+     */
+    private static GamePlayer gpMock(SessionHandle h) {
+        return h.session().players().values().iterator().next();
     }
 
     private static SessionHandle handleWith(UUID pid, boolean dirty) {

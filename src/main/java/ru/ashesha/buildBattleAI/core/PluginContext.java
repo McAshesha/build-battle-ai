@@ -130,14 +130,17 @@ public class PluginContext {
         DataService dataServiceImpl = new DataService(plugin);
         WorldService worldServiceImpl = new WorldService(plugin);
         ArenaManager arenaManagerImpl = new ArenaManager(plugin);
+        // EvaluationService must come before GameManager — GameManager.enable()
+        // and runtime hooks register/unregister sessions via the evaluation
+        // pipeline, so the pipeline has to be online first.
+        MLService mlServiceImpl = new MLService(plugin);
+        RenderService renderServiceImpl = new RenderService(plugin);
+        EvaluationService evaluationServiceImpl = new EvaluationService(plugin);
         GameManager gameManagerImpl = new GameManager(plugin);
         MessageService messageServiceImpl = new MessageService(plugin);
         NPCService npcServiceImpl = new NPCService(plugin);
         HologramService hologramServiceImpl = new HologramService(plugin);
         PictureService pictureServiceImpl = new PictureService(plugin);
-        MLService mlServiceImpl = new MLService(plugin);
-        RenderService renderServiceImpl = new RenderService(plugin);
-        EvaluationService evaluationServiceImpl = new EvaluationService(plugin);
         CommandService commandServiceImpl = new CommandService(plugin);
         ListenerService listenerServiceImpl = new ListenerService(plugin);
 
@@ -163,14 +166,14 @@ public class PluginContext {
                 dataServiceImpl,
                 worldServiceImpl,
                 arenaManagerImpl,
+                mlServiceImpl,
+                renderServiceImpl,
+                evaluationServiceImpl,
                 gameManagerImpl,
                 messageServiceImpl,
                 npcServiceImpl,
                 hologramServiceImpl,
                 pictureServiceImpl,
-                mlServiceImpl,
-                renderServiceImpl,
-                evaluationServiceImpl,
                 commandServiceImpl,
                 listenerServiceImpl
         ));

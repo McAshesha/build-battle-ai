@@ -111,14 +111,14 @@ class PluginContextLifecycleTest {
             order.verify(dataMock).enable();
             order.verify(worldMock).enable();
             order.verify(arenaMock).enable();
+            order.verify(mlsMock).enable();
+            order.verify(rndMock).enable();
+            order.verify(evlMock).enable();
             order.verify(gameMock).enable();
             order.verify(msgMock).enable();
             order.verify(npcMock).enable();
             order.verify(holoMock).enable();
             order.verify(picMock).enable();
-            order.verify(mlsMock).enable();
-            order.verify(rndMock).enable();
-            order.verify(evlMock).enable();
             order.verify(cmdMock).enable();
             order.verify(lstMock).enable();
         }
@@ -189,19 +189,20 @@ class PluginContextLifecycleTest {
             PluginContext ctx = new PluginContext(plugin);
             ctx.shutdown();
 
-            // Reverse order: listener → command → evaluation → render → ml → picture
-            // → hologram → npc → message → game → arena → world → data → config.
+            // Reverse order: listener → command → picture → hologram → npc →
+            // message → game → evaluation → render → ml → arena → world →
+            // data → config.
             InOrder order = inOrder(
                     lst.constructed().get(0),
                     cmd.constructed().get(0),
-                    evl.constructed().get(0),
-                    rnd.constructed().get(0),
-                    mls.constructed().get(0),
                     pic.constructed().get(0),
                     hol.constructed().get(0),
                     npc.constructed().get(0),
                     msg.constructed().get(0),
                     gam.constructed().get(0),
+                    evl.constructed().get(0),
+                    rnd.constructed().get(0),
+                    mls.constructed().get(0),
                     arn.constructed().get(0),
                     wld.constructed().get(0),
                     dat.constructed().get(0),
@@ -209,14 +210,14 @@ class PluginContextLifecycleTest {
 
             order.verify(lst.constructed().get(0)).shutdown();
             order.verify(cmd.constructed().get(0)).shutdown();
-            order.verify(evl.constructed().get(0)).shutdown();
-            order.verify(rnd.constructed().get(0)).shutdown();
-            order.verify(mls.constructed().get(0)).shutdown();
             order.verify(pic.constructed().get(0)).shutdown();
             order.verify(hol.constructed().get(0)).shutdown();
             order.verify(npc.constructed().get(0)).shutdown();
             order.verify(msg.constructed().get(0)).shutdown();
             order.verify(gam.constructed().get(0)).shutdown();
+            order.verify(evl.constructed().get(0)).shutdown();
+            order.verify(rnd.constructed().get(0)).shutdown();
+            order.verify(mls.constructed().get(0)).shutdown();
             order.verify(arn.constructed().get(0)).shutdown();
             order.verify(wld.constructed().get(0)).shutdown();
             order.verify(dat.constructed().get(0)).shutdown();

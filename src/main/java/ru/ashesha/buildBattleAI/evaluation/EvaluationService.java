@@ -185,12 +185,22 @@ public class EvaluationService implements PluginService, BBAIEvaluationService {
 
     @Override
     public @NonNull EvaluationStats stats() {
-        if (!enabled.get())
+        // Snapshot the live references locally. shutdown() nulls these fields
+        // after flipping `enabled` to false; the async metrics logger may be
+        // mid-invocation when that happens, and Bukkit's task cancel offers
+        // no happens-before guarantee. Treat any-null as "service no longer
+        // available" and return the zero snapshot.
+        EvaluationMetrics m = this.metrics;
+        RenderQueue rq = this.renderQueue;
+        MlQueue mq = this.mlQueue;
+        ConcurrentHashMap<String, SessionHandle> reg = this.registry;
+        if (!enabled.get() || m == null || rq == null || mq == null || reg == null)
             return new EvaluationStats(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, new long[0]);
+
         int players = 0;
-        for (SessionHandle h : registry.values())
+        for (SessionHandle h : reg.values())
             players += h.session().players().size();
-        return metrics.snapshot(renderQueue.size(), mlQueue.size(), registry.size(), players);
+        return m.snapshot(rq.size(), mq.size(), reg.size(), players);
     }
 
     private static void joinQuietly(Thread t, long millis) {
