@@ -13,6 +13,10 @@ import java.util.function.BiConsumer;
  * <p>
  * Lifecycle is owned by {@code PluginService} (internal); callers only see
  * the runtime API below.
+ * <p>
+ * <b>Threading:</b> {@code registerSession} and {@code unregisterSession}
+ * must be called from the Bukkit main thread. {@code stats()} is safe to
+ * call from any thread.
  */
 public interface BBAIEvaluationService {
 
