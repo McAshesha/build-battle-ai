@@ -20,11 +20,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * {@code RenderQueue} dedup index invalidate older queued copies when a
  * newer request for the same player arrives.
  */
-@Builder
+@Builder(access = AccessLevel.PACKAGE)
 @Getter
 @Accessors(fluent = true)
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-public final class EvalJob {
+final class EvalJob {
 
     @NonNull private final String arenaName;
     @NonNull private final UUID playerId;

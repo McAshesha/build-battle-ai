@@ -48,6 +48,10 @@ class EvalJobTest {
         assertEquals("castle", job.expectedTheme());
         assertSame(mirror, job.mirror());
         assertEquals(1.5, job.cameraX());
+        assertEquals(64.0, job.cameraY());
+        assertEquals(2.5, job.cameraZ());
+        assertEquals(90f, job.cameraYaw());
+        assertEquals(0f, job.cameraPitch());
         assertEquals(123_456L, job.enqueuedAtNanos());
     }
 

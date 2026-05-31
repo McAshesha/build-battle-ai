@@ -11,7 +11,7 @@ import lombok.experimental.Accessors;
  */
 @Value
 @Accessors(fluent = true)
-public class EvalFrame {
+class EvalFrame {
 
     @NonNull EvalJob job;
     /** Row-major 224x224 RGB, layout matching {@code MLService.predictRgb}. */
