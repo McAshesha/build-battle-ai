@@ -13,13 +13,13 @@ class EvaluationMetricsTest {
         m.incRendersCompleted();
         m.incRendersCompleted();
         m.incMlBatchesCompleted();
-        m.incScoresAwarded();
+        m.incMatchesDispatched();
         m.incDroppedRenderJobs();
 
         EvaluationStats s = m.snapshot(3, 1, 2, 16);
         assertEquals(2, s.rendersCompleted());
         assertEquals(1, s.mlBatchesCompleted());
-        assertEquals(1, s.scoresAwarded());
+        assertEquals(1, s.matchesDispatched());
         assertEquals(1, s.droppedRenderJobs());
         assertEquals(3, s.renderQueueDepth());
         assertEquals(1, s.mlQueueDepth());

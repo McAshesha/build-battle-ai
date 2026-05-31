@@ -14,7 +14,7 @@ public class EvaluationStats {
 
     long rendersCompleted;
     long mlBatchesCompleted;
-    long scoresAwarded;
+    long matchesDispatched;
     long droppedRenderJobs;
     long droppedMlJobs;
     long renderErrors;

@@ -567,13 +567,13 @@ class EvaluationMetricsTest {
         m.incRendersCompleted();
         m.incRendersCompleted();
         m.incMlBatchesCompleted();
-        m.incScoresAwarded();
+        m.incMatchesDispatched();
         m.incDroppedRenderJobs();
 
         EvaluationStats s = m.snapshot(3, 1, 2, 16);
         assertEquals(2, s.rendersCompleted());
         assertEquals(1, s.mlBatchesCompleted());
-        assertEquals(1, s.scoresAwarded());
+        assertEquals(1, s.matchesDispatched());
         assertEquals(1, s.droppedRenderJobs());
         assertEquals(3, s.renderQueueDepth());
         assertEquals(1, s.mlQueueDepth());
@@ -645,7 +645,7 @@ public class EvaluationStats {
 
     long rendersCompleted;
     long mlBatchesCompleted;
-    long scoresAwarded;
+    long matchesDispatched;
     long droppedRenderJobs;
     long droppedMlJobs;
     long renderErrors;
@@ -690,7 +690,7 @@ public final class EvaluationMetrics {
 
     private final LongAdder rendersCompleted   = new LongAdder();
     private final LongAdder mlBatchesCompleted = new LongAdder();
-    private final LongAdder scoresAwarded      = new LongAdder();
+    private final LongAdder matchesDispatched  = new LongAdder();
     private final LongAdder droppedRenderJobs  = new LongAdder();
     private final LongAdder droppedMlJobs      = new LongAdder();
     private final LongAdder renderErrors       = new LongAdder();
@@ -710,7 +710,7 @@ public final class EvaluationMetrics {
 
     public void incRendersCompleted()  { rendersCompleted.increment(); }
     public void incMlBatchesCompleted(){ mlBatchesCompleted.increment(); }
-    public void incScoresAwarded()     { scoresAwarded.increment(); }
+    public void incMatchesDispatched() { matchesDispatched.increment(); }
     public void incDroppedRenderJobs() { droppedRenderJobs.increment(); }
     public void incDroppedMlJobs()     { droppedMlJobs.increment(); }
     public void incRenderErrors()      { renderErrors.increment(); }
@@ -746,7 +746,7 @@ public final class EvaluationMetrics {
         return new EvaluationStats(
                 rendersCompleted.sum(),
                 mlBatchesCompleted.sum(),
-                scoresAwarded.sum(),
+                matchesDispatched.sum(),
                 droppedRenderJobs.sum(),
                 droppedMlJobs.sum(),
                 renderErrors.sum(),
@@ -1569,7 +1569,7 @@ class MlCoalescerWorkerTest {
         t.join(1000);
 
         assertEquals(1, calls.get());
-        assertEquals(1, metrics.snapshot(0, 0, 0, 0).scoresAwarded());
+        assertEquals(1, metrics.snapshot(0, 0, 0, 0).matchesDispatched());
         assertEquals(1, metrics.snapshot(0, 0, 0, 0).mlBatchesCompleted());
     }
 
@@ -1716,7 +1716,7 @@ public final class MlCoalescerWorker implements Runnable {
                 UUID pid = frame.job().playerId();
                 int themeIndex = frame.job().themeIndex();
                 dispatcher.dispatch(() -> cb.accept(pid, themeIndex));
-                metrics.incScoresAwarded();
+                metrics.incMatchesDispatched();
             }
         }
     }
@@ -2519,10 +2519,10 @@ if (config.metricsLogPeriodSeconds() > 0) {
     metricsLogTask = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
         EvaluationStats s = stats();
         plugin.getPluginLogger().debug(
-                "[Evaluation] rendered=%d mlBatches=%d scores=%d dropped(r/m)=%d/%d "
+                "[Evaluation] rendered=%d mlBatches=%d matches=%d dropped(r/m)=%d/%d "
                         + "errors(r/m)=%d/%d avgRender=%dµs avgMl=%dµs "
                         + "queueDepth(r/m)=%d/%d sessions=%d players=%d",
-                s.rendersCompleted(), s.mlBatchesCompleted(), s.scoresAwarded(),
+                s.rendersCompleted(), s.mlBatchesCompleted(), s.matchesDispatched(),
                 s.droppedRenderJobs(), s.droppedMlJobs(),
                 s.renderErrors(), s.mlErrors(),
                 s.renderLatencyAvgMicros(), s.mlLatencyAvgMicros(),
@@ -2569,7 +2569,7 @@ private void handleStatsCommand(CommandSender sender) {
     EvaluationStats s = plugin.getContext().getEvaluationService().stats();
     sendStatsLine(sender, "&7── &eEvaluation Pipeline Stats &7──");
     sendStatsLine(sender, "&7Sessions: &f" + s.registeredSessions() + "  &7Players: &f" + s.activePlayers());
-    sendStatsLine(sender, "&7Rendered: &f" + s.rendersCompleted() + "  &7ML batches: &f" + s.mlBatchesCompleted() + "  &7Scores: &f" + s.scoresAwarded());
+    sendStatsLine(sender, "&7Rendered: &f" + s.rendersCompleted() + "  &7ML batches: &f" + s.mlBatchesCompleted() + "  &7Matches: &f" + s.matchesDispatched());
     sendStatsLine(sender, "&7Avg render: &f" + s.renderLatencyAvgMicros() + "µs  &7Avg ML: &f" + s.mlLatencyAvgMicros() + "µs");
     sendStatsLine(sender, "&7Dropped (R/M): &f" + s.droppedRenderJobs() + "&7/&f" + s.droppedMlJobs() + "  &7Errors (R/M): &f" + s.renderErrors() + "&7/&f" + s.mlErrors());
     sendStatsLine(sender, "&7Queue depth (R/M): &f" + s.renderQueueDepth() + "&7/&f" + s.mlQueueDepth());

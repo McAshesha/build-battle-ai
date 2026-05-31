@@ -2,6 +2,7 @@ package ru.ashesha.buildBattleAI.evaluation;
 
 import org.junit.jupiter.api.Test;
 import ru.ashesha.buildBattleAI.core.PluginLogger;
+import ru.ashesha.buildBattleAI.evaluation.api.EvaluationStats;
 import ru.ashesha.buildBattleAI.ml.api.BBAIMLService;
 import ru.ashesha.buildBattleAI.ml.api.PredictionResult;
 import ru.ashesha.buildBattleAI.ml.api.TopKEntry;
@@ -19,6 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -79,7 +82,7 @@ class MlCoalescerWorkerTest {
         t.join(1000);
 
         assertEquals(1, calls.get(), "exactly one matched callback expected");
-        assertEquals(1, metrics.snapshot(0, 0, 0, 0).scoresAwarded());
+        assertEquals(1, metrics.snapshot(0, 0, 0, 0).matchesDispatched());
         assertEquals(1, metrics.snapshot(0, 0, 0, 0).mlBatchesCompleted());
     }
 
@@ -122,7 +125,7 @@ class MlCoalescerWorkerTest {
         t.join(1000);
 
         assertEquals(0, calls.get(), "no dispatch when arena unregistered");
-        assertEquals(0, metrics.snapshot(0, 0, 0, 0).scoresAwarded());
+        assertEquals(0, metrics.snapshot(0, 0, 0, 0).matchesDispatched());
         assertEquals(1, metrics.snapshot(0, 0, 0, 0).mlBatchesCompleted());
     }
 
@@ -154,7 +157,31 @@ class MlCoalescerWorkerTest {
         assertEquals(0, metrics.snapshot(0, 0, 0, 0).mlBatchesCompleted(),
                 "failed batch must not increment success counter");
         assertEquals(1, metrics.snapshot(0, 0, 0, 0).mlErrors());
-        assertEquals(0, metrics.snapshot(0, 0, 0, 0).scoresAwarded());
+        assertEquals(0, metrics.snapshot(0, 0, 0, 0).matchesDispatched());
+    }
+
+    @Test
+    void emptyBatch_doesNotIncrementAnyCounter() throws Exception {
+        BBAIMLService ml = mock(BBAIMLService.class);
+        MlQueue mq = new MlQueue(4); // nothing offered
+
+        EvaluationMetrics metrics = new EvaluationMetrics(8);
+        MlCoalescerWorker worker = new MlCoalescerWorker(
+                mq, ml, arena -> null, new SyncDispatcher(), metrics,
+                mock(PluginLogger.class), 8, 30L, 2);
+
+        Thread t = new Thread(worker, "test-ml-empty");
+        t.start();
+        Thread.sleep(100); // give the worker at least one full wait window
+        worker.stop();
+        t.interrupt();
+        t.join(1000);
+
+        EvaluationStats s = metrics.snapshot(0, 0, 0, 0);
+        assertEquals(0, s.mlBatchesCompleted());
+        assertEquals(0, s.matchesDispatched());
+        assertEquals(0, s.mlErrors());
+        verify(ml, never()).predictBatchRgb(any(), anyInt(), anyInt(), anyInt());
     }
 
     /**

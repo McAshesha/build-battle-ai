@@ -23,7 +23,7 @@ public final class EvaluationMetrics {
 
     private final LongAdder rendersCompleted   = new LongAdder();
     private final LongAdder mlBatchesCompleted = new LongAdder();
-    private final LongAdder scoresAwarded      = new LongAdder();
+    private final LongAdder matchesDispatched  = new LongAdder();
     private final LongAdder droppedRenderJobs  = new LongAdder();
     private final LongAdder droppedMlJobs      = new LongAdder();
     private final LongAdder renderErrors       = new LongAdder();
@@ -45,7 +45,7 @@ public final class EvaluationMetrics {
 
     public void incRendersCompleted()  { rendersCompleted.increment(); }
     public void incMlBatchesCompleted(){ mlBatchesCompleted.increment(); }
-    public void incScoresAwarded()     { scoresAwarded.increment(); }
+    public void incMatchesDispatched() { matchesDispatched.increment(); }
     public void incDroppedRenderJobs() { droppedRenderJobs.increment(); }
     public void incDroppedMlJobs()     { droppedMlJobs.increment(); }
     public void incRenderErrors()      { renderErrors.increment(); }
@@ -101,7 +101,7 @@ public final class EvaluationMetrics {
         return new EvaluationStats(
                 rendersCompleted.sum(),
                 mlBatchesCompleted.sum(),
-                scoresAwarded.sum(),
+                matchesDispatched.sum(),
                 droppedRenderJobs.sum(),
                 droppedMlJobs.sum(),
                 renderErrors.sum(),

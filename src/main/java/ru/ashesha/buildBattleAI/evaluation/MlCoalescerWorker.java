@@ -172,7 +172,7 @@ final class MlCoalescerWorker implements Runnable {
                 final UUID pid = frame.job().playerId();
                 final int themeIndex = frame.job().themeIndex();
                 dispatcher.dispatch(() -> cb.accept(pid, themeIndex));
-                metrics.incScoresAwarded();
+                metrics.incMatchesDispatched();
             }
         }
     }
