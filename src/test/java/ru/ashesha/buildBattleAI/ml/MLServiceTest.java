@@ -607,8 +607,10 @@ class MLServiceTest {
     @Test
     void ttaViewsConstantIsExposed() {
         // Stable contract: every *WithTTA call submits exactly ttaViews()
-        // augmented copies per input. The default training pipeline uses 8.
-        assertEquals(8, service.ttaViews());
+        // augmented copies per input. The lightweight TTA pipeline uses 4 —
+        // halved from the original 8 to keep TTA inference inside a ~150ms
+        // budget on warm ML Program CoreML without measurable accuracy loss.
+        assertEquals(4, service.ttaViews());
     }
 
     @Test

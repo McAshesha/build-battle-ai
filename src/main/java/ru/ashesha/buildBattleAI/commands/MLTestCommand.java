@@ -18,9 +18,16 @@ import ru.ashesha.buildBattleAI.render.RenderService;
 import ru.ashesha.buildBattleAI.render.data.ChunkScene;
 import ru.ashesha.buildBattleAI.util.SoundPalette;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -280,31 +287,32 @@ public class MLTestCommand extends CommandService.PluginCommand {
             byte[] rgb = renderService.render(scene, camX, camY, camZ, yaw, pitch);
             long renderMs = (System.nanoTime() - renderStart) / 1_000_000L;
 
-            // Embed (separate timing so the user sees the cost of inference
-            // distinctly from the cost of preprocessing + render).
-            long embedStart = System.nanoTime();
-            float[] embedding = useTta
-                    ? mlService.embedWithTTA(rgb, 224, 224)
-                    : mlService.embedRgb(rgb, 224, 224);
-            long embedMs = (System.nanoTime() - embedStart) / 1_000_000L;
+            // Snapshot the rendered frame to disk so the player can inspect
+            // what the ML pipeline actually sees. Runs on the async thread —
+            // safe to do I/O. Failures are non-fatal: the test still proceeds.
+            File savedRender = saveRenderToFile(rgb);
 
-            // Predict against centroids (this is just nearest-neighbour over
-            // the in-memory table; should be sub-millisecond, but measure).
-            long predictStart = System.nanoTime();
+            // Single ML call — predict* already runs the embed step
+            // internally and exposes the embedding through PredictionResult,
+            // so calling embed* separately would double the inference cost
+            // (cold-batched recompile on CoreML + full TTA preprocessing)
+            // for no extra information.
+            long mlStart = System.nanoTime();
             PredictionResult prediction = useTta
                     ? mlService.predictWithTTA(rgb, 224, 224, 5)
                     : mlService.predictRgb(rgb, 224, 224, 5);
-            long predictMs = (System.nanoTime() - predictStart) / 1_000_000L;
+            long mlMs = (System.nanoTime() - mlStart) / 1_000_000L;
+            float[] embedding = prediction.embedding();
 
-            reportResults(mlService, embedding, prediction, renderMs, embedMs, predictMs);
+            reportResults(mlService, embedding, prediction, renderMs, mlMs, savedRender);
         }
 
         private void reportResults(BBAIMLService mlService,
                                    float[] embedding,
                                    PredictionResult prediction,
                                    long renderMs,
-                                   long embedMs,
-                                   long predictMs) {
+                                   long mlMs,
+                                   File savedRender) {
             // Layout the report. Each line is sent independently so the player
             // sees output streaming as we build it.
             plugin.getContext().getMessageService().sendChat(player,
@@ -321,7 +329,13 @@ public class MLTestCommand extends CommandService.PluginCommand {
                             + " &8(showing first 4) &f" + formatFirst(embedding, 4));
             plugin.getContext().getMessageService().sendChat(player,
                     "&7Capture: &a" + captureMs + "ms&7  Render: &a" + renderMs
-                            + "ms&7  Embed: &a" + embedMs + "ms&7  Predict: &a" + predictMs + "ms");
+                            + "ms&7  ML: &a" + mlMs + "ms &8(embed + classify)");
+            if (savedRender != null)
+                plugin.getContext().getMessageService().sendChat(player,
+                        "&7Render saved to &f" + savedRender.getPath());
+            else
+                plugin.getContext().getMessageService().sendChat(player,
+                        "&7Render snapshot: &cfailed to save &8(check console)");
 
             // Centroid summary — names + scalar magnitude. Magnitudes should
             // all be ~1.0 (L2-normalized) but printing them makes accidental
@@ -355,6 +369,40 @@ public class MLTestCommand extends CommandService.PluginCommand {
             plugin.getContext().getMessageService().sendChat(player,
                     "&8&m--------------------------------");
             SoundPalette.SCORE.play(player);
+        }
+
+        /**
+         * Writes the raw 224×224 RGB frame to a timestamped PNG under
+         * {@code <plugin-data>/renders/}, returning the resulting file (or
+         * {@code null} on I/O failure). Used for visual debugging of the
+         * voxel renderer + ML pipeline: lets the operator open the exact
+         * image that was fed into the classifier.
+         */
+        private File saveRenderToFile(byte[] rgb) {
+            try {
+                BufferedImage image = new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB);
+                for (int y = 0; y < 224; y++) {
+                    for (int x = 0; x < 224; x++) {
+                        int i = (y * 224 + x) * 3;
+                        int r = rgb[i] & 0xFF;
+                        int g = rgb[i + 1] & 0xFF;
+                        int b = rgb[i + 2] & 0xFF;
+                        image.setRGB(x, y, (r << 16) | (g << 8) | b);
+                    }
+                }
+                File dir = new File(plugin.getDataFolder(), "renders");
+                if (!dir.exists() && !dir.mkdirs())
+                    plugin.getPluginLogger().warn("Could not create renders directory at %s",
+                            dir.getAbsolutePath());
+                String stamp = new SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.ROOT).format(new Date());
+                String suffix = useTta ? "-tta" : "";
+                File out = new File(dir, "render-" + player.getName() + "-" + stamp + suffix + ".png");
+                ImageIO.write(image, "PNG", out);
+                return out;
+            } catch (IOException e) {
+                plugin.getPluginLogger().warn("Failed to save render snapshot: %s", e.getMessage());
+                return null;
+            }
         }
     }
 
