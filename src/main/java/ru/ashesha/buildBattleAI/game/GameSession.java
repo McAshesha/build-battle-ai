@@ -15,11 +15,14 @@ import java.util.*;
  * Manages the runtime state of a single game session within an arena.
  * <p>
  * Each session tracks connected players, the state machine, shuffled themes,
- * rotating camera index, remaining game time, and Bukkit scheduler task IDs
- * for cleanup on shutdown.
+ * remaining game time, and Bukkit scheduler task IDs for cleanup on shutdown.
  * <p>
  * Created when the first player joins an arena, destroyed when the game ends
  * and all players have been restored.
+ * <p>
+ * <b>Note:</b> the render/ML pipeline (including camera rotation) lives in
+ * {@code EvaluationService} / {@code SessionHandle}; this class no longer
+ * exposes any render-tick state.
  */
 @Getter
 @Accessors(fluent = true)
@@ -43,14 +46,6 @@ public class GameSession {
     /** Shuffled theme list for this game (populated at game start). */
     private List<String> themes = Collections.emptyList();
 
-    /**
-     * Camera index that rotates across render ticks.
-     * Shared across the session — all players rotate cameras together.
-     * Cycles 0 → 1 → 2 → 0 → ...
-     */
-    @Setter
-    private int currentCameraIndex;
-
     /** Seconds remaining in the entire game session. */
     @Setter
     private int gameTimeRemaining;
@@ -64,10 +59,6 @@ public class GameSession {
     /** Game tick timer task ID, or -1 if not active. */
     @Setter
     private int gameTickTaskId = -1;
-
-    /** Render/ML pipeline timer task ID, or -1 if not active. */
-    @Setter
-    private int renderTaskId = -1;
 
     /** Ending delay task ID, or -1 if not active. */
     @Setter
@@ -148,24 +139,15 @@ public class GameSession {
     }
 
     /**
-     * Advances the camera index, wrapping at 3 (since each plot has 3 cameras).
-     */
-    void advanceCamera() {
-        currentCameraIndex = (currentCameraIndex + 1) % 3;
-    }
-
-    /**
      * Cancels all active Bukkit scheduler tasks associated with this session.
      * Safe to call multiple times.
      */
     void cancelAllTasks() {
         cancelTask(countdownTaskId);
         cancelTask(gameTickTaskId);
-        cancelTask(renderTaskId);
         cancelTask(endingTaskId);
         countdownTaskId = -1;
         gameTickTaskId = -1;
-        renderTaskId = -1;
         endingTaskId = -1;
     }
 

@@ -18,8 +18,6 @@ import ru.ashesha.buildBattleAI.core.PluginService;
 import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
 import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.ml.api.BBAIMLService;
-import ru.ashesha.buildBattleAI.ml.api.PredictionResult;
-import ru.ashesha.buildBattleAI.ml.api.TopKEntry;
 import ru.ashesha.buildBattleAI.render.data.MutablePlotScene;
 
 import java.util.*;
@@ -51,9 +49,6 @@ public class GameManager implements BBAIGameManager, PluginService {
 
     /** Duration of results display before returning players. */
     private static final int ENDING_DURATION_TICKS = 200; // 10 seconds
-
-    /** Render/ML pipeline interval in ticks (5 seconds). */
-    private static final int RENDER_INTERVAL_TICKS = 100;
 
     @NonNull
     private final BuildBattleAI plugin;
@@ -299,7 +294,6 @@ public class GameManager implements BBAIGameManager, PluginService {
         List<String> themes = fetchThemes();
         session.setThemes(themes);
         session.gameTimeRemaining(arena.gameTime());
-        session.currentCameraIndex(0);
 
         Lang lang = plugin.getContext().getConfigService().getDefaultLang();
         broadcastToSession(session, lang.get("game.countdown.go"));
@@ -333,8 +327,14 @@ public class GameManager implements BBAIGameManager, PluginService {
         // Start game tick timer (every second)
         startGameTickTimer(session);
 
-        // Start render/ML pipeline timer (every 5 seconds)
-        startRenderTimer(session);
+        // Register session with the centralized evaluation pipeline. From now
+        // on, render + ML inference for this arena is coordinated by the
+        // EvaluationService (bounded queues, ML batching, per-player cadence).
+        // The score callback is marshalled back to the Bukkit main thread by
+        // the service, so calling handleScore directly is safe.
+        plugin.getContext().getEvaluationService().registerSession(
+                session,
+                (playerId, themeIndex) -> handleScore(session.arena().name(), playerId, themeIndex));
 
         plugin.getPluginLogger().info("Game started in arena '%s' with %d player(s).",
                 arena.name(), session.players().size());
@@ -425,110 +425,15 @@ public class GameManager implements BBAIGameManager, PluginService {
         session.gameTickTaskId(taskId);
     }
 
-    // ── render/ML pipeline ────────────────────────────────────────────
-
-    /**
-     * Starts the render/ML pipeline that fires every 5 seconds.
-     * Captures each player's zone on the main thread, then runs
-     * rendering and ML prediction asynchronously.
-     */
-    private void startRenderTimer(GameSession session) {
-        int taskId = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            if (session.state() != ArenaState.PLAYING)
-                return;
-
-            Arena arena = session.arena();
-            World arenaWorld = ensureWorldLoaded(arena);
-            if (arenaWorld == null)
-                return;
-
-            int cameraIdx = session.currentCameraIndex();
-            session.advanceCamera();
-
-            for (GamePlayer gp : new ArrayList<>(session.players().values())) {
-                if (!gp.zoneDirty())
-                    continue;
-
-                Arena.PlotData plot = arena.plots().get(gp.plotIndex());
-                List<Arena.Position> cameras = plot.cameras();
-                if (cameras.isEmpty())
-                    continue;
-                Arena.Position camera = cameras.get(cameraIdx % cameras.size());
-
-                // Pull the live per-plot mirror — the renderer reads it
-                // directly inside the async task under a shared read-lock.
-                MutablePlotScene mirror = session.mirror(gp.plotIndex());
-                if (mirror == null) {
-                    plugin.getPluginLogger().debug(
-                            "Render-tick skipped for %s: no mirror installed for plot %d",
-                            gp.playerName(), gp.plotIndex());
-                    continue;
-                }
-
-                // Clear dirty *eagerly* so a place/break that fires during
-                // the async render is captured by the NEXT tick rather than
-                // double-counted. Confirmed semantics from the design spec.
-                gp.clearZoneDirty();
-
-                // Save context for async use.
-                final UUID playerId = gp.playerId();
-                final String expectedTheme = session.getTheme(gp.themeIndex());
-                final int savedThemeIndex = gp.themeIndex();
-                final double camX = camera.x();
-                final double camY = camera.y();
-                final double camZ = camera.z();
-                final float camYaw = camera.yaw();
-                final float camPitch = camera.pitch();
-                final String arenaName = arena.name();
-                final MutablePlotScene asyncMirror = mirror;
-                final String playerName = gp.playerName();
-
-                // Async render + ML chain. Read-lock is taken inside the
-                // async body so the main thread never blocks here.
-                Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-                    try {
-                        final byte[] rgb;
-                        java.util.concurrent.locks.Lock readLock = asyncMirror.readLock();
-                        readLock.lock();
-                        try {
-                            // Render against the live mirror — clearAll on
-                            // the writer side is excluded by this read-lock.
-                            rgb = plugin.getContext().getRenderService()
-                                    .render(asyncMirror, camX, camY, camZ, camYaw, camPitch);
-                        } finally {
-                            readLock.unlock();
-                        }
-
-                        // ML inference works on the rendered byte[] — no lock needed.
-                        PredictionResult result = plugin.getContext().getMlService()
-                                .predictRgb(rgb, 224, 224, 2);
-
-                        boolean matched = false;
-                        for (TopKEntry entry : result.topK())
-                            if (entry.className().equalsIgnoreCase(expectedTheme)) {
-                                matched = true;
-                                break;
-                            }
-
-                        if (matched)
-                            Bukkit.getScheduler().runTask(plugin,
-                                    () -> handleScore(arenaName, playerId, savedThemeIndex));
-                    } catch (Exception e) {
-                        plugin.getPluginLogger().debug(
-                                "Render/ML pipeline error for %s: %s",
-                                playerName, e.getMessage());
-                    }
-                });
-            }
-        }, RENDER_INTERVAL_TICKS, RENDER_INTERVAL_TICKS).getTaskId();
-
-        session.renderTaskId(taskId);
-    }
+    // ── score handling ────────────────────────────────────────────────
 
     /**
      * Handles a successful ML match on the main thread. Verifies the
      * player is still in the session and on the same theme before
      * applying the score.
+     * <p>
+     * Invoked by the {@code EvaluationService} score callback (already
+     * marshalled to the Bukkit main thread).
      */
     private void handleScore(String arenaName, UUID playerId, int expectedThemeIndex) {
         GameSession session = sessions.get(arenaName);
@@ -585,6 +490,9 @@ public class GameManager implements BBAIGameManager, PluginService {
      * to spectator, announces results, then schedules player restoration.
      */
     private void endGame(GameSession session) {
+        // Detach from the evaluation pipeline before we start tearing the
+        // session down so no in-flight render/ML job races with restoration.
+        plugin.getContext().getEvaluationService().unregisterSession(session.arena().name());
         session.cancelAllTasks();
         session.state(ArenaState.ENDING);
 
@@ -676,6 +584,9 @@ public class GameManager implements BBAIGameManager, PluginService {
      * Used during shutdown to clean up all sessions.
      */
     private void forceEndSession(GameSession session) {
+        // Detach from the evaluation pipeline before tearing the session down
+        // so no in-flight render/ML job tries to score a session being wiped.
+        plugin.getContext().getEvaluationService().unregisterSession(session.arena().name());
         session.cancelAllTasks();
 
         Arena arena = session.arena();
@@ -730,7 +641,10 @@ public class GameManager implements BBAIGameManager, PluginService {
                 break;
             case PLAYING:
                 if (count == 0) {
-                    // All left — skip ending, clean up immediately
+                    // All left — skip ending, clean up immediately. Detach
+                    // from the evaluation pipeline first so it stops scanning
+                    // this (now empty) session.
+                    plugin.getContext().getEvaluationService().unregisterSession(arena.name());
                     session.cancelAllTasks();
                     World arenaWorld = ensureWorldLoaded(arena);
                     if (arenaWorld != null)

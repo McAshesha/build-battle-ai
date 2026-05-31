@@ -19,9 +19,13 @@ import static org.mockito.Mockito.*;
  * Tests for {@link GameSession}.
  * <p>
  * Covers construction, player add/remove/lookup, plot assignment,
- * theme management with wrapping, camera cycling, state transitions,
- * and task cancellation. Arena is mocked with maxPlayers=2 unless
- * otherwise specified.
+ * theme management with wrapping, state transitions, and task
+ * cancellation. Arena is mocked with maxPlayers=2 unless otherwise
+ * specified.
+ * <p>
+ * Camera rotation moved to {@code SessionHandle} (covered by
+ * {@code SessionHandleTest}); render-task lifecycle moved to
+ * {@code EvaluationService}.
  */
 class GameSessionTest {
 
@@ -41,11 +45,9 @@ class GameSessionTest {
     void constructorInitializesState() {
         assertEquals(ArenaState.WAITING, session.state());
         assertTrue(session.players().isEmpty());
-        assertEquals(0, session.currentCameraIndex());
         assertEquals(0, session.gameTimeRemaining());
         assertEquals(-1, session.countdownTaskId());
         assertEquals(-1, session.gameTickTaskId());
-        assertEquals(-1, session.renderTaskId());
         assertEquals(-1, session.endingTaskId());
     }
 
@@ -153,27 +155,6 @@ class GameSessionTest {
         assertEquals("unknown", session.getTheme(0));
     }
 
-    // ── camera cycling ───────────────────────────────────────────────
-
-    @Test
-    void advanceCameraCycles() {
-        assertEquals(0, session.currentCameraIndex());
-
-        session.advanceCamera();
-        assertEquals(1, session.currentCameraIndex());
-
-        session.advanceCamera();
-        assertEquals(2, session.currentCameraIndex());
-
-        // Wraps back to 0
-        session.advanceCamera();
-        assertEquals(0, session.currentCameraIndex());
-
-        // Continues cycling
-        session.advanceCamera();
-        assertEquals(1, session.currentCameraIndex());
-    }
-
     // ── state transitions ────────────────────────────────────────────
 
     @Test
@@ -210,7 +191,6 @@ class GameSessionTest {
 
         session.countdownTaskId(10);
         session.gameTickTaskId(20);
-        session.renderTaskId(30);
         session.endingTaskId(40);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
@@ -220,14 +200,12 @@ class GameSessionTest {
 
             verify(scheduler).cancelTask(10);
             verify(scheduler).cancelTask(20);
-            verify(scheduler).cancelTask(30);
             verify(scheduler).cancelTask(40);
         }
 
         // Task IDs should be reset to -1
         assertEquals(-1, session.countdownTaskId());
         assertEquals(-1, session.gameTickTaskId());
-        assertEquals(-1, session.renderTaskId());
         assertEquals(-1, session.endingTaskId());
     }
 
@@ -254,9 +232,6 @@ class GameSessionTest {
 
         session.gameTickTaskId(15);
         assertEquals(15, session.gameTickTaskId());
-
-        session.renderTaskId(25);
-        assertEquals(25, session.renderTaskId());
 
         session.endingTaskId(35);
         assertEquals(35, session.endingTaskId());
