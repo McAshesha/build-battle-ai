@@ -1,5 +1,7 @@
 package ru.ashesha.buildBattleAI.data.ignite;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.apache.ignite.IgniteCache;
 import org.apache.ignite.cache.query.QueryCursor;
 import org.apache.ignite.cache.query.ScanQuery;
@@ -25,19 +27,11 @@ import java.util.List;
  * @param <K> key type
  * @param <V> value type
  */
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class IgniteCacheRepository<K, V> implements DataRepository<K, V> {
 
     /** The underlying Ignite cache. */
     private final IgniteCache<K, V> cache;
-
-    /**
-     * Creates a repository wrapping the given Ignite cache.
-     *
-     * @param cache the Ignite cache to delegate to
-     */
-    IgniteCacheRepository(IgniteCache<K, V> cache) {
-        this.cache = cache;
-    }
 
     @Override
     public V get(K key) {

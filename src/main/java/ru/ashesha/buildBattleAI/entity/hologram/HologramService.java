@@ -10,6 +10,8 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDe
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import net.kyori.adventure.text.Component;
@@ -482,21 +484,13 @@ public class HologramService implements BBAIHologramService, PluginService {
      * <p>
      * Create instances via {@link BBAIHologramService#createHologram(int)}.
      */
+    @AllArgsConstructor(access = AccessLevel.PACKAGE)
     public static final class Hologram {
 
         /**
          * Synthetic entity IDs for each line's armor stand, indexed top-to-bottom.
          */
         int[] entityIds;
-
-        /**
-         * Package-private constructor — instances are created by {@link HologramService}.
-         *
-         * @param entityIds the synthetic entity IDs (one per line)
-         */
-        Hologram(int[] entityIds) {
-            this.entityIds = entityIds;
-        }
 
         /**
          * Returns the number of lines in this hologram.

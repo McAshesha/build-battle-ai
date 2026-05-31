@@ -1,6 +1,8 @@
 package ru.ashesha.buildBattleAI.util;
 
 import com.cryptomorin.xseries.XSound;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.experimental.UtilityClass;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -257,17 +259,12 @@ public class SoundPalette {
      * <p>
      * Instances are immutable and reusable — shared safely across threads.
      */
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     public static final class SoundEffect {
 
         private final XSound sound;
         private final float volume;
         private final float pitch;
-
-        SoundEffect(XSound sound, float volume, float pitch) {
-            this.sound = sound;
-            this.volume = volume;
-            this.pitch = pitch;
-        }
 
         /**
          * Plays this sound effect for a single player at their location.

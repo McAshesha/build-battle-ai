@@ -1,7 +1,6 @@
 package ru.ashesha.buildBattleAI.ml.api;
 
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import lombok.Value;
 import lombok.experimental.Accessors;
 
 import java.util.List;
@@ -16,12 +15,15 @@ import java.util.List;
  * The caller is responsible for ensuring {@code topK} is immutable and that
  * {@code embedding} / {@code predictedCentroid} are not shared with another
  * aliased reference.
+ * <p>
+ * Note: equals/hashCode use reference equality on float[] arrays — do not rely
+ * on content equality for {@code embedding} or {@code predictedCentroid}.
  */
-@Getter
+@Value
 @Accessors(fluent = true)
-@RequiredArgsConstructor
 public final class PredictionResult {
 
+    // equals/hashCode use reference equality on float[] arrays — do not rely on content equality
     /**
      * L2-normalized embedding vector produced by the model for the input image.
      * Length equals {@link BBAIMLService#embeddingDim()}.

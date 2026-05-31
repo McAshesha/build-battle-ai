@@ -15,6 +15,7 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDe
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerMapData;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -580,6 +581,7 @@ public class PictureService implements BBAIPictureService, PluginService {
      * <p>
      * Create instances via {@link BBAIPictureService#createPicture(int, int)}.
      */
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     public static final class Picture {
 
         /**
@@ -603,21 +605,6 @@ public class PictureService implements BBAIPictureService, PluginService {
          */
         @Getter
         final int height;
-
-        /**
-         * Package-private constructor — instances are created by {@link PictureService}.
-         *
-         * @param entityIds the synthetic entity IDs (one per tile)
-         * @param mapIds    the map IDs (one per tile)
-         * @param width     number of tile columns
-         * @param height    number of tile rows
-         */
-        Picture(int[] entityIds, int[] mapIds, int width, int height) {
-            this.entityIds = entityIds;
-            this.mapIds = mapIds;
-            this.width = width;
-            this.height = height;
-        }
 
         /**
          * Returns the total number of tiles (frames) in the picture.

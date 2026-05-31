@@ -2,6 +2,7 @@ package ru.ashesha.buildBattleAI.game;
 
 import lombok.Getter;
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.bukkit.Bukkit;
@@ -22,6 +23,7 @@ import java.util.*;
  */
 @Getter
 @Accessors(fluent = true)
+@RequiredArgsConstructor
 class GameSession {
 
     /** The arena definition this session belongs to. */
@@ -78,15 +80,6 @@ class GameSession {
      * {@link ArenaState#PLAYING} and removed wholesale at game end.
      */
     private final Map<Integer, MutablePlotScene> mirrors = new HashMap<>();
-
-    /**
-     * Creates a new game session for the given arena.
-     *
-     * @param arena the arena definition
-     */
-    GameSession(@NonNull Arena arena) {
-        this.arena = arena;
-    }
 
     /**
      * Adds a player to this session.

@@ -1,7 +1,6 @@
 package ru.ashesha.buildBattleAI.ml.api;
 
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import lombok.Value;
 import lombok.experimental.Accessors;
 
 /**
@@ -9,9 +8,8 @@ import lombok.experimental.Accessors;
  * {@link BBAIMLService}. Each entry pairs a candidate class name with the
  * cosine similarity score between the input embedding and that class centroid.
  */
-@Getter
+@Value
 @Accessors(fluent = true)
-@RequiredArgsConstructor
 public final class TopKEntry {
 
     /** Class name for this candidate. */

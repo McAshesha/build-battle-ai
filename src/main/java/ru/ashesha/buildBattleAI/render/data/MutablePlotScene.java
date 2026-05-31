@@ -1,7 +1,9 @@
 package ru.ashesha.buildBattleAI.render.data;
 
 import com.cryptomorin.xseries.XMaterial;
+import lombok.Getter;
 import lombok.NonNull;
+import lombok.experimental.Accessors;
 import ru.ashesha.buildBattleAI.arena.api.Arena;
 import ru.ashesha.buildBattleAI.render.BlockPalette;
 
@@ -42,9 +44,13 @@ public final class MutablePlotScene implements SceneData {
     static final int MAX_AXIS = 512;
 
     // Geometry — immutable after construction.
-    private final int minX, minY, minZ;
+    @Getter @Accessors(fluent = true) private final int minX;
+    @Getter @Accessors(fluent = true) private final int minY;
+    @Getter @Accessors(fluent = true) private final int minZ;
     private final int sizeX, sizeY, sizeZ;
-    private final int maxX, maxY, maxZ;
+    @Getter @Accessors(fluent = true) private final int maxX;
+    @Getter @Accessors(fluent = true) private final int maxY;
+    @Getter @Accessors(fluent = true) private final int maxZ;
     private final int sizeYZ;
     private final boolean legacy;
 
@@ -134,31 +140,7 @@ public final class MutablePlotScene implements SceneData {
         return lx * sizeYZ + ly * sizeZ + lz;
     }
 
-    // ── SceneData ─────────────────────────────────────────────────────
-
-    /** {@inheritDoc} */
-    @Override
-    public int minX() { return minX; }
-
-    /** {@inheritDoc} */
-    @Override
-    public int minY() { return minY; }
-
-    /** {@inheritDoc} */
-    @Override
-    public int minZ() { return minZ; }
-
-    /** {@inheritDoc} */
-    @Override
-    public int maxX() { return maxX; }
-
-    /** {@inheritDoc} */
-    @Override
-    public int maxY() { return maxY; }
-
-    /** {@inheritDoc} */
-    @Override
-    public int maxZ() { return maxZ; }
+    // ── SceneData ──
 
     /**
      * Returns the block material at the given world coordinates.

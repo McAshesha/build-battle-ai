@@ -2,7 +2,9 @@ package ru.ashesha.buildBattleAI.data.local;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import lombok.AccessLevel;
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import ru.ashesha.buildBattleAI.data.DataRepository;
 
 import java.io.*;
@@ -35,18 +37,23 @@ import java.util.concurrent.ConcurrentHashMap;
  * @param <K> key type (typically {@code String})
  * @param <V> value type (e.g. {@code PlayerData})
  */
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class LocalRepository<K, V> implements DataRepository<K, V> {
 
     /** The JSON file this repository persists to. */
+    @NonNull
     private final File file;
 
     /** Shared Gson instance (thread-safe, reusable). */
+    @NonNull
     private final Gson gson;
 
     /** Runtime type of the key class, needed for Gson deserialization. */
+    @NonNull
     private final Class<K> keyType;
 
     /** Runtime type of the value class, needed for Gson deserialization. */
+    @NonNull
     private final Class<V> valueType;
 
     /**
@@ -61,22 +68,6 @@ class LocalRepository<K, V> implements DataRepository<K, V> {
      * and the auto-save thread (reads).
      */
     private volatile boolean dirty;
-
-    /**
-     * Creates a local repository backed by the given JSON file.
-     *
-     * @param file      the JSON file to persist to (may not exist yet)
-     * @param gson      the shared Gson instance
-     * @param keyType   runtime key class
-     * @param valueType runtime value class
-     */
-    LocalRepository(@NonNull File file, @NonNull Gson gson,
-                    @NonNull Class<K> keyType, @NonNull Class<V> valueType) {
-        this.file = file;
-        this.gson = gson;
-        this.keyType = keyType;
-        this.valueType = valueType;
-    }
 
     /**
      * Loads existing data from the JSON file into the in-memory cache.

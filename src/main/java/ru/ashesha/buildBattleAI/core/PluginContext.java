@@ -5,6 +5,7 @@ import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import com.github.retrooper.packetevents.protocol.player.User;
 import com.github.retrooper.packetevents.protocol.player.UserProfile;
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NonNull;
 import org.bukkit.entity.Player;
@@ -67,36 +68,25 @@ import java.util.List;
  * subsequent {@code enable} the plugin is running exactly as it would after
  * a fresh server start.
  */
+@Getter
 public class PluginContext {
 
+    @Getter(AccessLevel.NONE)
     @NonNull
     private final BuildBattleAI plugin;
 
-    @Getter
     private final BBAIConfigService configService;
-    @Getter
     private final BBAIDataService dataService;
-    @Getter
     private final BBAIWorldService worldService;
-    @Getter
     private final BBAIArenaManager arenaManager;
-    @Getter
     private final BBAIGameManager gameManager;
-    @Getter
     private final BBAIMessageService messageService;
-    @Getter
     private final BBAINPCService npcService;
-    @Getter
     private final BBAIHologramService hologramService;
-    @Getter
     private final BBAIPictureService pictureService;
-    @Getter
     private final BBAIMLService mlService;
-    @Getter
     private final CommandService commandService;
-    @Getter
     private final ListenerService listenerService;
-    @Getter
     private final RenderService renderService;
 
     /**
@@ -105,6 +95,7 @@ public class PluginContext {
      * this list up-front avoids hand-maintaining two mirrored sequences
      * and guarantees {@code enable}/{@code shutdown} are exact inverses.
      */
+    @Getter(AccessLevel.NONE)
     private final List<PluginService> services;
 
     /**

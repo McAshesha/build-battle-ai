@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
+import lombok.Value;
 import lombok.experimental.Accessors;
 import org.bukkit.block.BlockFace;
 
@@ -119,9 +120,8 @@ public class Arena {
      * A precise world position with rotation, used for spawn points,
      * camera angles, lobby, and spectator locations.
      */
-    @Getter
+    @Value
     @Accessors(fluent = true)
-    @AllArgsConstructor
     public static class Position {
 
         /** X world coordinate. */

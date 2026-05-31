@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
  * The {@link #render} method is thread-safe: multiple concurrent calls share
  * the pool safely because each invocation operates on independent pixel buffers.
  */
+@RequiredArgsConstructor
 public class CpuRenderer {
 
     /**
@@ -77,6 +78,7 @@ public class CpuRenderer {
      * which is used by CompletableFuture, parallel streams, and Bukkit scheduler internals.
      * Created once in the constructor, released in {@link #shutdown()}.
      */
+    @NonNull
     private final ForkJoinPool pool;
 
     /**
@@ -99,16 +101,6 @@ public class CpuRenderer {
                 },
                 null,
                 false));
-    }
-
-    /**
-     * Creates a renderer backed by the given pool.
-     * Useful for testing with controlled parallelism.
-     *
-     * @param pool the thread pool to use for parallel rendering
-     */
-    public CpuRenderer(@NonNull ForkJoinPool pool) {
-        this.pool = pool;
     }
 
     // ===== Ray tracing algorithm (private static — pure functions) =====

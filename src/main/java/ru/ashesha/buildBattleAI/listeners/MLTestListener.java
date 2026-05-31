@@ -1,6 +1,8 @@
 package ru.ashesha.buildBattleAI.listeners;
 
+import lombok.AccessLevel;
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Block;
@@ -196,15 +198,12 @@ public class MLTestListener extends ListenerService.PluginListener {
      * the read-only {@link #minX()}/{@link #maxX()} accessors that already
      * normalize the cuboid into min/max form.
      */
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     public static class Selection {
 
         private final String worldName;
         private Integer c1x, c1y, c1z;
         private Integer c2x, c2y, c2z;
-
-        Selection(String worldName) {
-            this.worldName = worldName;
-        }
 
         void setCorner1(int x, int y, int z) {
             this.c1x = x;

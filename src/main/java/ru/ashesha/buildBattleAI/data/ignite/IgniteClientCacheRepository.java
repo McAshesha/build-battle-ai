@@ -1,5 +1,7 @@
 package ru.ashesha.buildBattleAI.data.ignite;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.apache.ignite.cache.query.QueryCursor;
 import org.apache.ignite.cache.query.ScanQuery;
 import org.apache.ignite.client.ClientCache;
@@ -26,19 +28,11 @@ import java.util.List;
  * @param <K> key type
  * @param <V> value type
  */
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class IgniteClientCacheRepository<K, V> implements DataRepository<K, V> {
 
     /** The underlying thin-client cache. */
     private final ClientCache<K, V> cache;
-
-    /**
-     * Creates a repository wrapping the given thin-client cache.
-     *
-     * @param cache the thin-client cache to delegate to
-     */
-    IgniteClientCacheRepository(ClientCache<K, V> cache) {
-        this.cache = cache;
-    }
 
     @Override
     public V get(K key) {

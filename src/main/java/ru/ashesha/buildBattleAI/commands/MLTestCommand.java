@@ -2,6 +2,7 @@ package ru.ashesha.buildBattleAI.commands;
 
 import com.cryptomorin.xseries.XMaterial;
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -244,6 +245,7 @@ public class MLTestCommand extends CommandService.PluginCommand {
      * APIs that touch player state aren't safe off-thread, but
      * {@code MessageService} is packet-based and tolerates async sends.
      */
+    @RequiredArgsConstructor
     private class RenderAndPredictTask implements Runnable {
 
         private final Player player;
@@ -252,20 +254,6 @@ public class MLTestCommand extends CommandService.PluginCommand {
         private final float yaw, pitch;
         private final long captureMs;
         private final boolean useTta;
-
-        RenderAndPredictTask(Player player, ChunkScene scene,
-                             double camX, double camY, double camZ,
-                             float yaw, float pitch, long captureMs, boolean useTta) {
-            this.player = player;
-            this.scene = scene;
-            this.camX = camX;
-            this.camY = camY;
-            this.camZ = camZ;
-            this.yaw = yaw;
-            this.pitch = pitch;
-            this.captureMs = captureMs;
-            this.useTta = useTta;
-        }
 
         @Override
         public void run() {

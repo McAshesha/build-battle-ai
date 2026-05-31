@@ -515,23 +515,19 @@ public class ConfigService implements BBAIConfigService, PluginService {
      * key is still not found, the raw key name is returned so the player sees
      * a visible placeholder instead of a blank or {@code null} message.
      */
+    @RequiredArgsConstructor
     private static final class ConfigLang implements Lang {
 
         /** Language name (e.g. "en", "ru"). */
+        @NonNull
         private final String name;
 
         /** This language's YAML config. */
+        @NonNull
         private final YamlConfiguration config;
 
         /** Default language config for fallback, or {@code null} if this IS the default. */
         private final YamlConfiguration fallback;
-
-        ConfigLang(@NonNull String name, @NonNull YamlConfiguration config,
-                   YamlConfiguration fallback) {
-            this.name = name;
-            this.config = config;
-            this.fallback = fallback;
-        }
 
         @Override
         public String name() {

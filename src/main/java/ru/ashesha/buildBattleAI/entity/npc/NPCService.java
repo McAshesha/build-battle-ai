@@ -12,6 +12,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.github.retrooper.packetevents.util.SpigotConversionUtil;
+import lombok.AccessLevel;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.bukkit.Location;
@@ -543,6 +544,7 @@ public class NPCService implements BBAINPCService, PluginService {
      * <p>
      * Create instances via the {@link BBAINPCService} create methods.
      */
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     public static final class NPC {
 
         /**
@@ -555,17 +557,6 @@ public class NPCService implements BBAINPCService, PluginService {
          * and skin texture properties.
          */
         private final UserProfile profile;
-
-        /**
-         * Package-private constructor — instances are created by {@link NPCService}.
-         *
-         * @param entityId the synthetic entity ID
-         * @param profile  the user profile with skin textures
-         */
-        NPC(int entityId, UserProfile profile) {
-            this.entityId = entityId;
-            this.profile = profile;
-        }
 
         /**
          * Returns the synthetic entity ID used in packets for this NPC.

@@ -1,5 +1,6 @@
 package ru.ashesha.buildBattleAI.data.ignite;
 
+import lombok.RequiredArgsConstructor;
 import org.apache.ignite.Ignition;
 import org.apache.ignite.client.ClientCache;
 import org.apache.ignite.client.ClientCacheConfiguration;
@@ -32,6 +33,7 @@ import java.util.Map;
  *
  * @see IgniteEmbeddedProvider
  */
+@RequiredArgsConstructor
 public class IgniteThinProvider implements DataProvider {
 
     /** Remote server addresses for the thin-client connection. */
@@ -42,15 +44,6 @@ public class IgniteThinProvider implements DataProvider {
 
     /** Lazily created repositories, keyed by cache name. */
     private final Map<String, IgniteClientCacheRepository<?, ?>> repositories = new HashMap<>();
-
-    /**
-     * Creates a thin-client Ignite provider targeting the given addresses.
-     *
-     * @param addresses server addresses (e.g. {@code "127.0.0.1:10800"})
-     */
-    public IgniteThinProvider(List<String> addresses) {
-        this.addresses = addresses;
-    }
 
     /**
      * Opens a thin-client TCP connection to the Ignite cluster. Tries each
