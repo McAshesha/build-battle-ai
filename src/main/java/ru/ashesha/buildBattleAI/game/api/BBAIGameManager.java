@@ -67,4 +67,16 @@ public interface BBAIGameManager {
      * @return the player count, or 0 if no session exists
      */
     int getPlayerCount(String arenaName);
+
+    /**
+     * Skips the player's current theme. Clears their build zone, mirrors,
+     * resets the build timer, and advances to the next theme. No-op if the
+     * player is not in a PLAYING session.
+     * <p>
+     * Triggered by right-clicking the skip-theme feather in slot 8.
+     *
+     * @param player the player skipping their theme
+     * @return {@code true} if the skip was applied
+     */
+    boolean skipTheme(Player player);
 }

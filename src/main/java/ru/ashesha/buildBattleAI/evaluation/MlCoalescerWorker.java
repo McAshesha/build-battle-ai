@@ -2,21 +2,22 @@ package ru.ashesha.buildBattleAI.evaluation;
 
 import lombok.NonNull;
 import ru.ashesha.buildBattleAI.core.PluginLogger;
+import ru.ashesha.buildBattleAI.evaluation.api.EvaluationCallback;
 import ru.ashesha.buildBattleAI.ml.api.BBAIMLService;
 import ru.ashesha.buildBattleAI.ml.api.PredictionResult;
 import ru.ashesha.buildBattleAI.ml.api.TopKEntry;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 /**
  * ML-stage worker. Drains a batch from the {@link MlQueue} (size K or
  * wait T ms), runs {@link BBAIMLService#predictBatchRgb} once across the
- * whole batch, and for every frame whose top-K predictions contain its
- * expected theme dispatches the per-arena score callback onto the Bukkit
- * main thread via the injected {@link MainThreadDispatcher}.
+ * whole batch, and dispatches the per-arena {@link EvaluationCallback}
+ * onto the Bukkit main thread for <i>every</i> frame — not only matches.
+ * Match detection is delegated to the callback recipient (it inspects the
+ * {@code matched} flag and the {@code topK} list).
  * <p>
  * Single-threaded by design — the ONNX session is concurrency-safe, but
  * keeping batch assembly serial removes a class of synchronisation bugs
@@ -48,7 +49,7 @@ final class MlCoalescerWorker implements Runnable {
 
     private final MlQueue mlQueue;
     private final BBAIMLService mlService;
-    private final Function<String, BiConsumer<UUID, Integer>> callbackRegistry;
+    private final Function<String, EvaluationCallback> callbackRegistry;
     private final MainThreadDispatcher dispatcher;
     private final EvaluationMetrics metrics;
     private final PluginLogger logger;
@@ -65,7 +66,7 @@ final class MlCoalescerWorker implements Runnable {
 
     MlCoalescerWorker(@NonNull MlQueue mlQueue,
                       @NonNull BBAIMLService mlService,
-                      @NonNull Function<String, BiConsumer<UUID, Integer>> callbackRegistry,
+                      @NonNull Function<String, EvaluationCallback> callbackRegistry,
                       @NonNull MainThreadDispatcher dispatcher,
                       @NonNull EvaluationMetrics metrics,
                       @NonNull PluginLogger logger,
@@ -93,24 +94,11 @@ final class MlCoalescerWorker implements Runnable {
 
     /**
      * Worker loop. Renames the current thread for log diagnostics, then
-     * repeatedly:
-     * <ol>
-     *   <li>Drains up to {@code maxBatchSize} frames via
-     *       {@link MlQueue#drainBatch(int, long)} (blocking up to
-     *       {@code waitMs} ms for the first frame).</li>
-     *   <li>Packs the buffers into a {@code byte[][]} and calls
-     *       {@link BBAIMLService#predictBatchRgb}.</li>
-     *   <li>For each frame whose top-K ranking contains its expected
-     *       theme name (case-insensitive), looks up the arena callback
-     *       and dispatches it via {@link MainThreadDispatcher#dispatch}
-     *       with {@code (playerId, themeIndex)}.</li>
-     *   <li>Records ML latency, batch-size histogram bucket, and
-     *       success/error counters.</li>
-     * </ol>
-     * Exceptions raised by {@link BBAIMLService#predictBatchRgb} are
-     * swallowed and counted via {@link EvaluationMetrics#incMlErrors()} —
-     * the worker must survive a single bad batch so a transient ONNX
-     * failure for one set of frames does not stall the pipeline.
+     * repeatedly drains a batch, runs ML inference, and dispatches the
+     * per-arena callback for each frame with the full top-K ranking and
+     * a match flag. Errors are counted and the worker survives any
+     * single bad batch so a transient ONNX failure does not stall the
+     * pipeline.
      */
     @Override
     public void run() {
@@ -161,18 +149,21 @@ final class MlCoalescerWorker implements Runnable {
             for (int i = 0; i < batch.size(); i++) {
                 EvalFrame frame = batch.get(i);
                 PredictionResult r = results[i];
-                if (!themeMatched(r, frame.job().expectedTheme()))
-                    continue;
-                // Look up the arena's score callback lazily: arenas that have
+                // Look up the arena's callback lazily: arenas that have
                 // been unregistered between enqueue and drain return null here.
-                BiConsumer<UUID, Integer> cb = callbackRegistry.apply(frame.job().arenaName());
+                EvaluationCallback cb = callbackRegistry.apply(frame.job().arenaName());
                 if (cb == null)
                     continue;
 
+                final boolean matched = themeMatched(r, frame.job().expectedTheme());
                 final UUID pid = frame.job().playerId();
                 final int themeIndex = frame.job().themeIndex();
-                dispatcher.dispatch(() -> cb.accept(pid, themeIndex));
-                metrics.incMatchesDispatched();
+                // r.topK() is the immutable list produced by PredictionResult —
+                // safe to retain and forward across the dispatch boundary.
+                final List<TopKEntry> topKList = r.topK();
+                dispatcher.dispatch(() -> cb.onEvaluated(pid, themeIndex, topKList, matched));
+                if (matched)
+                    metrics.incMatchesDispatched();
             }
         }
     }

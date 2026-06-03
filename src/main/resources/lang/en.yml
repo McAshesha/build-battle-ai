@@ -5,6 +5,16 @@
 test-join-message: "Welcome to the server, %player%!"
 test-leave-message: "Goodbye, %player%! See you next time!"
 
+# ── Language Command ─────────────────────────────────────────────────
+# Strings shown by /bbailang.
+lang:
+  current: "&7Current language: &e%lang%"
+  available: "&7Available: &f%list%"
+  usage: "&7Usage: &f/bbailang <code>"
+  unknown: "&c  Unknown language '&f%lang%&c'. Available: &7%list%"
+  disabled: "&c  Data storage is disabled, cannot persist language preference."
+  switched: "&a  Language switched to &f%lang%&a."
+
 # ── Arena ────────────────────────────────────────────────────────────
 arena:
 
@@ -247,6 +257,7 @@ game:
     build-time-expired: "&c  Time's up! Theme changed."
     new-theme: "&e  New theme: &b&l%theme%"
     score: "&a  Correct! +1 point! &7(Total: &f%score%&7)"
+    skipped: "&7  Theme skipped."
     game-time-warning: "&7  Game time remaining: &e%minutes%m %seconds%s"
     zone-cleared: "&7  Your zone has been cleared."
 
@@ -259,3 +270,163 @@ game:
     draw: "&e  It's a draw between: &f%players%"
     no-winner: "&7  No one scored this round."
     returning: "&7  Returning to spawn in &e%seconds%s&7..."
+
+  # ── AI Feedback ────────────────────────────────────────────────────
+  # Lines below are SAMPLED RANDOMLY at runtime (the renderer picks a
+  # different entry each tick and avoids repeating the last one). Add
+  # as many variants as you like — more variety = livelier AI persona.
+  #
+  # Placeholders:
+  #   %guess%      — top-1 class name the AI sees (also %guess1%, %guess2%)
+  #   %confidence% — top-1 similarity as percent (0–100), no '%' sign
+  #   %theme%      — the player's actual theme
+  #   %player%     — player name (for broadcasts)
+  ai:
+
+    # Theme display names — maps centroids.json class names to readable
+    # English nouns (with an article where it reads naturally). Keys NOT
+    # found here fall back to the raw class name with underscores → spaces.
+    theme-names:
+      candles: "a Candle"
+      cube: "a Cube"
+      sword: "a Sword"
+      tree: "a Tree"
+      barrel: "a Barrel"
+      castle: "a Castle"
+      castle_tower: "a Castle Tower"
+      church: "a Church"
+      default_house: "a House"
+      desert_modern_villa: "a Desert Villa"
+      house_from_hell: "a Cursed House"
+      modern_house: "a Modern House"
+      overgrown_house: "an Overgrown House"
+      ship: "a Ship"
+      skyscraper: "a Skyscraper"
+
+    # Action bar — updated every ML tick (~5 s) while AI is unsure.
+    thinking:
+      - "&8[&b🤖 AI&8] &7Hmm... I think I see &f%guess%&7?"
+      - "&8[&b🤖 AI&8] &7Squinting... is that &f%guess%&7?"
+      - "&8[&b🤖 AI&8] &7Looks suspiciously like &f%guess%&7 to me."
+      - "&8[&b🤖 AI&8] &7Could it be &f%guess%&7?"
+      - "&8[&b🤖 AI&8] &7My best guess: &f%guess% &8(&7%confidence%%&8)"
+      - "&8[&b🤖 AI&8] &7Maybe... &f%guess%&7?"
+      - "&8[&b🤖 AI&8] &7Wait, &f%guess%&7?"
+      - "&8[&b🤖 AI&8] &7I want to say &f%guess%&7..."
+      - "&8[&b🤖 AI&8] &7Hmm. &f%guess%&7? Not sure yet."
+      - "&8[&b🤖 AI&8] &7Looking at it... &f%guess%&7, maybe?"
+      - "&8[&b🤖 AI&8] &7Tilting head... &f%guess%&7?"
+      - "&8[&b🤖 AI&8] &7That has &f%guess% &7vibes."
+      - "&8[&b🤖 AI&8] &7Working on it... &f%guess%&7 perhaps?"
+
+    # When top-1 and top-2 are nearly tied — AI is genuinely torn.
+    confused:
+      - "&8[&b🤖 AI&8] &7Could be &f%guess1%&7... or maybe &f%guess2%&7?"
+      - "&8[&b🤖 AI&8] &7I'm torn — &f%guess1% &7or &f%guess2%&7?"
+      - "&8[&b🤖 AI&8] &7Either &f%guess1% &7or &f%guess2%&7. Help!"
+      - "&8[&b🤖 AI&8] &7Looks like &f%guess1%&7... but also like &f%guess2%&7."
+      - "&8[&b🤖 AI&8] &7Cross between &f%guess1% &7and &f%guess2%&7?"
+
+    # Chat — occasional thoughts (sampled by chat-thoughts-chance, ~15%).
+    thinking-chat:
+      - "&8[&bAI&8] &7Hmm, that almost looks like &f%guess%&7..."
+      - "&8[&bAI&8] &7Wait, am I seeing &f%guess%&7?"
+      - "&8[&bAI&8] &7I'd bet good money this is &f%guess%&7."
+      - "&8[&bAI&8] &7Hold on — &f%guess%&7?"
+      - "&8[&bAI&8] &7You know what, I think it's &f%guess%&7."
+      - "&8[&bAI&8] &7No way... is that &f%guess%&7?"
+      - "&8[&bAI&8] &7Squinting harder... yeah, &f%guess%&7."
+      - "&8[&bAI&8] &7Putting on my glasses... &f%guess%&7?"
+      - "&8[&bAI&8] &7That's giving me &f%guess% &7energy."
+
+    # Big title when the AI finally GOT IT — shown to the builder only.
+    correct-title:
+      - "&a&lI GOT IT!"
+      - "&a&lAHA!"
+      - "&a&lEUREKA!"
+      - "&a&lYES!"
+      - "&a&lFINALLY!"
+      - "&a&lTHAT'S IT!"
+      - "&a&lNAILED IT!"
+      - "&a&lOH! OH!"
+
+    # Subtitle paired with the title above. Builder sees this.
+    correct-subtitle:
+      - "&fIt's &b&l%theme%&f!"
+      - "&fThat's &b&l%theme%&f!"
+      - "&fDefinitely &b&l%theme%&f!"
+      - "&fOf course — &b&l%theme%&f!"
+      - "&fHow did I miss it? &b&l%theme%&f!"
+
+    # Action-bar variant for builder right after the title — celebratory.
+    correct-actionbar:
+      - "&a✓ AI thinks: &b&l%theme% &a— +1 point!"
+      - "&a✓ Got it! &b&l%theme% &7(+1 point)"
+      - "&a✓ &b&l%theme% &a— nice build!"
+
+    # Broadcast to the entire arena when SOMEONE scores. Goes to chat.
+    correct-broadcast:
+      - "&8[&bAI&8] &aOH! &f%player% &abuilt &b&l%theme%&a! Nice one!"
+      - "&8[&bAI&8] &aGOT IT! &f%player%&a's build is &b&l%theme%&a!"
+      - "&8[&bAI&8] &aI see it now — &f%player% &amade &b&l%theme%&a!"
+      - "&8[&bAI&8] &aAha! &f%player% &acrafted &b&l%theme%&a!"
+      - "&8[&bAI&8] &aBeautiful &b&l%theme% &aby &f%player%&a!"
+
+    # Sidebar scoreboard. Each line is a separate key. Three layouts are
+    # used depending on session state: WAITING / COUNTDOWN / PLAYING.
+    scoreboard:
+      title: "&6&l⚡ BuildBattleAI ⚡"
+      sep: "&8&m                    "
+      arena: "&7Arena: &f%arena%"
+
+      # ── WAITING layout ──
+      status-label: "&7Status:"
+      status-waiting: " &eWaiting..."
+      players-line: "&7Players: &e%count%&7/&e%max%"
+      min-to-start: "&7Need &e%needed% &7more"
+
+      # ── COUNTDOWN layout ──
+      status-countdown: " &6Starting!"
+      countdown-line: "&7Starts in: &e&l%seconds%s"
+
+      # ── PLAYING layout ──
+      theme-label: "&7Your theme:"
+      theme-value: " &b&l%theme%"
+      score: "&7Score: &e%score%"
+      build-time: "&7Build time: &e%time%"
+      game-time: "&7Game time: &e%time%"
+      ai-label: "&7AI sees:"
+      ai-value: " &f%guess% &8(&7%confidence%%&8)"
+      ai-thinking: " &8still thinking..."
+
+    # Tab list header/footer. Newlines (\n) are honoured. Three layouts
+    # mirror the scoreboard's WAITING / COUNTDOWN / PLAYING variants.
+    tab:
+      header: "&6&l⚡ BuildBattleAI ⚡\n&7Arena &f%arena% &8| &7Round &f%round%"
+      footer: "&8&m                    \n&7Players: &f%count%&7/&f%max%  &8|  &7Time: &f%time%"
+      header-waiting: "&6&l⚡ BuildBattleAI ⚡\n&7Arena &f%arena% &8| &eWaiting"
+      footer-waiting: "&8&m                    \n&7Players: &f%count%&7/&f%max%"
+      header-countdown: "&6&l⚡ BuildBattleAI ⚡\n&7Arena &f%arena% &8| &6Starting in &e&l%seconds%s"
+      footer-countdown: "&8&m                    \n&7Players: &f%count%&7/&f%max%"
+
+    # Skip-theme feather. Right-click in PLAYING state to clear the zone
+    # and advance to the next theme.
+    skip-item:
+      name: "&e&l⚡ Skip Theme"
+      lore:
+        - "&7Right-click to skip"
+        - "&7your current theme."
+        - ""
+        - "&8Useful when stuck or"
+        - "&8the build went wrong."
+      # Hidden marker line appended to lore — used to identify our item
+      # across pickup/drop without relying on the localised name (admin
+      # may translate). Color codes make it visually invisible; the magic
+      # text is what the listener matches against.
+      marker: "&0&k|&r&8&o#bbai-skip"
+
+    # Chat line shown to the player after they skip a theme.
+    skip-feedback:
+      - "&7Theme skipped. Better luck next time!"
+      - "&7Theme skipped — let's try a new one."
+      - "&7Skipped! The AI was just as confused as you."

@@ -13,13 +13,18 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.api.Arena;
 import ru.ashesha.buildBattleAI.game.ArenaState;
 import ru.ashesha.buildBattleAI.game.GameManager;
 import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
+import ru.ashesha.buildBattleAI.game.feedback.SkipThemeItem;
 
 /**
  * Handles game-related events: block protection, damage cancellation,
@@ -173,6 +178,72 @@ public class GameListener extends ListenerService.PluginListener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPlayerDropItem(PlayerDropItemEvent event) {
         if (plugin.getContext().getGameManager().isInGame(event.getPlayer().getUniqueId()))
+            event.setCancelled(true);
+    }
+
+    /**
+     * Detects right-clicks (air or block) on the skip-theme feather and invokes
+     * {@link BBAIGameManager#skipTheme(Player)}.
+     * <p>
+     * <b>No {@code ignoreCancelled}:</b> Spigot/Paper fires {@code RIGHT_CLICK_AIR}
+     * with the event pre-cancelled by default (legacy "use" interaction model),
+     * so {@code ignoreCancelled=true} would silently swallow every air-click and
+     * the feather would never fire. We accept the event regardless of cancel
+     * state and re-cancel for safety.
+     * <p>
+     * <b>Hand filtering:</b> Spigot fires this event twice on 1.9+ (once per
+     * hand). We restrict to {@code HAND} so a feather right-click triggers
+     * exactly once.
+     * <p>
+     * Identity check is on the item lore tail (see {@link SkipThemeItem}),
+     * so an admin renaming the feather in lang files does not break detection.
+     */
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        Action action = event.getAction();
+        // Only react to right-clicks — left-click would trigger on every
+        // block break attempt with the feather equipped.
+        if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK)
+            return;
+        // Main hand only — avoids the off-hand mirror-fire on 1.9+.
+        if (event.getHand() != null && event.getHand() != EquipmentSlot.HAND)
+            return;
+
+        Player player = event.getPlayer();
+        BBAIGameManager gm = plugin.getContext().getGameManager();
+        if (!gm.isInGame(player.getUniqueId()))
+            return;
+        // Only PLAYING state — protect lobbies and the post-game spectator phase.
+        if (gm.getArenaState(gm.getPlayerArena(player.getUniqueId())) != ArenaState.PLAYING)
+            return;
+        org.bukkit.inventory.ItemStack hand = event.getItem();
+        if (hand == null)
+            return;
+        if (!SkipThemeItem.isSkipItem(hand,
+                plugin.getContext().getConfigService().getLangFor(player.getUniqueId())))
+            return;
+
+        // Cancel the underlying interaction so the feather does not, e.g.,
+        // open a block GUI for any block the player happens to be facing.
+        event.setCancelled(true);
+        gm.skipTheme(player);
+    }
+
+    /**
+     * Prevents players from moving the skip-theme feather to the off-hand
+     * via the F key — keeps the hotbar layout stable for the duration of
+     * the game.
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onSwapHandItems(PlayerSwapHandItemsEvent event) {
+        Player player = event.getPlayer();
+        BBAIGameManager gm = plugin.getContext().getGameManager();
+        if (!gm.isInGame(player.getUniqueId()))
+            return;
+        if (SkipThemeItem.isSkipItem(event.getMainHandItem(),
+                plugin.getContext().getConfigService().getLangFor(player.getUniqueId()))
+                || SkipThemeItem.isSkipItem(event.getOffHandItem(),
+                        plugin.getContext().getConfigService().getLangFor(player.getUniqueId())))
             event.setCancelled(true);
     }
 

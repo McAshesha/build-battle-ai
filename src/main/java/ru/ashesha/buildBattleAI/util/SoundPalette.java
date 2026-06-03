@@ -250,6 +250,33 @@ public class SoundPalette {
     public static final SoundEffect NOTIFY = new SoundEffect(
             XSound.BLOCK_NOTE_BLOCK_PLING, 0.4f, 0.8f);
 
+    // ── AI Persona ────────────────────────────────────────────────────
+    //
+    // Sounds that give the ML classifier a "thinking out loud" personality
+    // during gameplay. Used by FeedbackController in tandem with the
+    // chat / actionbar / title channels.
+
+    /**
+     * AI is thinking — the iconic villager "hmm" grunt. Pairs visually with
+     * action-bar messages like "Hmm... I think I see a Tree?".
+     * <p>
+     * Use sparingly (probability-gated by config) — would be obnoxious on
+     * every ML tick.
+     * <p>
+     * 1.8: {@code VILLAGER_IDLE} → 1.13+: {@code ENTITY_VILLAGER_AMBIENT}
+     */
+    public static final SoundEffect AI_THINKING = new SoundEffect(
+            XSound.ENTITY_VILLAGER_AMBIENT, 0.5f, 1.0f);
+
+    /**
+     * Player invoked the skip-theme feather. A short whoosh — signals "this
+     * theme is gone" without dramatising failure.
+     * <p>
+     * 1.8: {@code ITEM_BREAK} → 1.13+: {@code ENTITY_ITEM_BREAK}
+     */
+    public static final SoundEffect SKIP_THEME = new SoundEffect(
+            XSound.ENTITY_ITEM_BREAK, 0.7f, 1.2f);
+
     // ── SoundEffect ───────────────────────────────────────────────────
 
     /**

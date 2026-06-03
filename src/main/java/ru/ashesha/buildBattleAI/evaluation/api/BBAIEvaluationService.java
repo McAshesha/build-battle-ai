@@ -3,9 +3,6 @@ package ru.ashesha.buildBattleAI.evaluation.api;
 import lombok.NonNull;
 import ru.ashesha.buildBattleAI.game.GameSession;
 
-import java.util.UUID;
-import java.util.function.BiConsumer;
-
 /**
  * Public API of the evaluation pipeline. Implementations centrally schedule
  * render + ML inference across all active arenas with bounded queues,
@@ -24,13 +21,17 @@ public interface BBAIEvaluationService {
      * Registers an active game session with the evaluation pipeline. From
      * this moment on, the service will periodically scan the session's
      * dirty players and run the render → ML pipeline for them.
+     * <p>
+     * The {@code callback} fires for <i>every</i> completed evaluation, not
+     * only on theme matches — see {@link EvaluationCallback} for the full
+     * contract (top-K guesses, match flag, main-thread dispatch).
      *
-     * @param session       the active session (already in PLAYING state)
-     * @param scoreCallback invoked on the Bukkit main thread for every
-     *                      successful match — arguments are (playerId, themeIndex)
+     * @param session  the active session (already in PLAYING state)
+     * @param callback invoked on the Bukkit main thread after every ML
+     *                 evaluation of one of this session's players
      */
     void registerSession(@NonNull GameSession session,
-                         @NonNull BiConsumer<UUID, Integer> scoreCallback);
+                         @NonNull EvaluationCallback callback);
 
     /**
      * Unregisters a session. Any in-flight jobs for this arena are dropped

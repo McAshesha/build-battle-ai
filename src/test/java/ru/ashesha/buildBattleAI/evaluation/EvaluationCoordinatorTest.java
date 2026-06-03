@@ -151,6 +151,6 @@ class EvaluationCoordinatorTest {
         players.put(pid, gp);
         when(session.players()).thenReturn(players);
 
-        return new SessionHandle(session, (p, t) -> {});
+        return new SessionHandle(session, (p, t, topK, matched) -> {});
     }
 }

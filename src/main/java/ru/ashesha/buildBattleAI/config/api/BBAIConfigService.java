@@ -3,6 +3,7 @@ package ru.ashesha.buildBattleAI.config.api;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Service contract for managing plugin configuration files.
@@ -76,6 +77,21 @@ public interface BBAIConfigService {
      * @return unmodifiable set of language names (e.g. {@code ["en", "ru"]})
      */
     Set<String> getAvailableLangs();
+
+    /**
+     * Resolves the {@link Lang} for a specific player, falling back to the
+     * default language when the player has no recorded preference (or when
+     * the {@code DataService} is disabled).
+     * <p>
+     * Player preferences are stored in {@code PlayerData.language} and are
+     * set via the {@code /bbailang} command.
+     *
+     * @param playerId the player's UUID; may be {@code null} for non-player
+     *                 contexts (console, scheduled tasks) — falls through to default
+     * @return the player's preferred {@link Lang}, never {@code null} when
+     *         language files exist
+     */
+    Lang getLangFor(UUID playerId);
 
     // ── arenas ─────────────────────────────────────────────────────────────
 

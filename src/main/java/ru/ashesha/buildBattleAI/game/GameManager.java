@@ -16,9 +16,13 @@ import ru.ashesha.buildBattleAI.arena.api.Arena;
 import ru.ashesha.buildBattleAI.config.api.Lang;
 import ru.ashesha.buildBattleAI.core.PluginService;
 import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
+import ru.ashesha.buildBattleAI.game.feedback.FeedbackController;
+import ru.ashesha.buildBattleAI.game.feedback.SkipThemeItem;
 import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.ml.api.BBAIMLService;
 import ru.ashesha.buildBattleAI.render.data.MutablePlotScene;
+import ru.ashesha.buildBattleAI.util.SoundPalette;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.*;
 
@@ -69,6 +73,14 @@ public class GameManager implements BBAIGameManager, PluginService {
      */
     private boolean legacy;
 
+    /**
+     * In-game presentation layer for the chatty "AI thinking" persona:
+     * action-bar guesses, occasional chat thoughts, sidebar scoreboard,
+     * tab list, and triumph title on a correct guess. Initialised lazily
+     * in {@link #enable()} so service constructors stay context-free.
+     */
+    private FeedbackController feedback;
+
     // ── PluginService lifecycle ───────────────────────────────────────
 
     @Override
@@ -76,6 +88,7 @@ public class GameManager implements BBAIGameManager, PluginService {
         serverVersion = plugin.getContext().getServerVersion();
         // Pre-1.13 blocks use byte data values; 1.13+ uses BlockData strings.
         this.legacy = !serverVersion.isNewerThanOrEquals(ServerVersion.V_1_13);
+        this.feedback = new FeedbackController(plugin);
         plugin.getPluginLogger().info("GameManager enabled.");
     }
 
@@ -96,7 +109,10 @@ public class GameManager implements BBAIGameManager, PluginService {
 
     @Override
     public boolean joinArena(Player player, String arenaName) {
-        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+        // Use the joining player's own preferred language for all replies in
+        // this method. Broadcasts (which go to the whole lobby) use per-recipient
+        // lang via broadcastLocalized.
+        Lang lang = plugin.getContext().getConfigService().getLangFor(player.getUniqueId());
         BBAIMessageService msg = plugin.getContext().getMessageService();
 
         // Already in a game?
@@ -156,10 +172,23 @@ public class GameManager implements BBAIGameManager, PluginService {
 
         // Notify
         msg.sendChat(player, lang.get("game.join.success", "%arena%", arenaName));
-        broadcastToSession(session, lang.get("game.join.broadcast",
+        broadcastLocalized(session, "game.join.broadcast",
                 "%player%", player.getName(),
                 "%current%", String.valueOf(session.players().size()),
-                "%max%", String.valueOf(arena.maxPlayers())));
+                "%max%", String.valueOf(arena.maxPlayers()));
+
+        // Paint the lobby scoreboard + tab list for the new player. Other
+        // already-in-lobby players get their players-count line refreshed
+        // by the feedback layer too (it iterates session.players() internally
+        // via repaintPlayersLineForOthers on each new join).
+        if (feedback != null) {
+            feedback.onPlayerJoinedWaiting(session, player.getUniqueId());
+            // Refresh existing players' "Players: N/M" so the count visibly
+            // ticks up the moment someone joins.
+            for (GamePlayer other : session.players().values())
+                if (!other.playerId().equals(player.getUniqueId()))
+                    feedback.onPlayerJoinedWaiting(session, other.playerId());
+        }
 
         // Check if we should start countdown
         if (session.state() == ArenaState.WAITING
@@ -167,8 +196,8 @@ public class GameManager implements BBAIGameManager, PluginService {
             startCountdown(session);
         else if (session.state() == ArenaState.WAITING) {
             int needed = arena.minPlayers() - session.players().size();
-            broadcastToSession(session, lang.get("game.waiting.player-needed",
-                    "%needed%", String.valueOf(needed)));
+            broadcastLocalized(session, "game.waiting.player-needed",
+                    "%needed%", String.valueOf(needed));
         }
 
         plugin.getPluginLogger().info("Player '%s' joined arena '%s'.", player.getName(), arenaName);
@@ -193,16 +222,19 @@ public class GameManager implements BBAIGameManager, PluginService {
         if (gp == null)
             return false;
 
+        // Drop the per-player feedback visuals (scoreboard, tab overlay).
+        // Safe even if the session never reached PLAYING — endSession was a no-op there.
+        if (feedback != null)
+            feedback.playerLeft(arenaName, player.getUniqueId());
+
         // Restore player state
         gp.snapshot().restore(player, serverVersion);
 
-        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
-
-        // Broadcast leave message
-        broadcastToSession(session, lang.get("game.leave.broadcast",
+        // Broadcast leave message — per recipient lang.
+        broadcastLocalized(session, "game.leave.broadcast",
                 "%player%", player.getName(),
                 "%current%", String.valueOf(session.players().size()),
-                "%max%", String.valueOf(session.arena().maxPlayers())));
+                "%max%", String.valueOf(session.arena().maxPlayers()));
 
         // State-dependent cleanup
         handlePlayerLeaveState(session);
@@ -258,9 +290,21 @@ public class GameManager implements BBAIGameManager, PluginService {
                 return;
             }
 
-            Lang lang = plugin.getContext().getConfigService().getDefaultLang();
-            broadcastToSession(session, lang.get("game.countdown.starting",
-                    "%seconds%", String.valueOf(countdown[0])));
+            broadcastLocalized(session, "game.countdown.starting",
+                    "%seconds%", String.valueOf(countdown[0]));
+            // Refresh every scoreboard + tab to show the current countdown
+            // second. The feedback layer paints the COUNTDOWN layout (which
+            // differs from WAITING in the bottom-line: "Starts in: 5s" vs.
+            // "Need 2 more"). Cheap — same call rate as the existing chat.
+            if (feedback != null)
+                feedback.onCountdownTick(session, countdown[0]);
+            // Audible tick on the last few seconds.
+            if (countdown[0] <= 5)
+                for (GamePlayer gp : session.players().values()) {
+                    Player p = Bukkit.getPlayer(gp.playerId());
+                    if (p != null)
+                        SoundPalette.TICK_URGENT.play(p);
+                }
             countdown[0]--;
         }, 0L, 20L).getTaskId();
 
@@ -276,8 +320,10 @@ public class GameManager implements BBAIGameManager, PluginService {
             session.countdownTaskId(-1);
         }
         session.state(ArenaState.WAITING);
-        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
-        broadcastToSession(session, lang.get("game.countdown.cancelled"));
+        broadcastLocalized(session, "game.countdown.cancelled");
+        // Repaint scoreboards back to WAITING layout.
+        if (feedback != null)
+            feedback.onCountdownCancelled(session);
     }
 
     // ── game start ────────────────────────────────────────────────────
@@ -295,8 +341,7 @@ public class GameManager implements BBAIGameManager, PluginService {
         session.setThemes(themes);
         session.gameTimeRemaining(arena.gameTime());
 
-        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
-        broadcastToSession(session, lang.get("game.countdown.go"));
+        broadcastLocalized(session, "game.countdown.go");
 
         World arenaWorld = ensureWorldLoaded(arena);
 
@@ -319,22 +364,43 @@ public class GameManager implements BBAIGameManager, PluginService {
             session.installMirror(gp.plotIndex(),
                     MutablePlotScene.forPlot(plot, legacy));
 
+            // Per-player language lookup — each builder sees the theme and
+            // skip feather in their preferred language.
+            Lang playerLang = plugin.getContext().getConfigService().getLangFor(gp.playerId());
             String theme = session.getTheme(gp.themeIndex());
             plugin.getContext().getMessageService().sendChat(player,
-                    lang.get("game.playing.theme-assigned", "%theme%", theme));
+                    playerLang.get("game.playing.theme-assigned", "%theme%", theme));
+
+            // Hand out the skip-theme feather to slot 8 (last hotbar slot)
+            // if the feature is enabled by config. The session's feedback
+            // bundle was set up when the player joined the lobby, so the
+            // config check uses the same snapshot.
+            if (feedback != null && feedback.skipFeatherEnabledFor(arena.name())) {
+                ItemStack skipItem = SkipThemeItem.create(playerLang);
+                player.getInventory().setItem(SkipThemeItem.HOTBAR_SLOT, skipItem);
+            }
         }
 
         // Start game tick timer (every second)
         startGameTickTimer(session);
 
-        // Register session with the centralized evaluation pipeline. From now
-        // on, render + ML inference for this arena is coordinated by the
-        // EvaluationService (bounded queues, ML batching, per-player cadence).
-        // The score callback is marshalled back to the Bukkit main thread by
-        // the service, so calling handleScore directly is safe.
+        // Transition the in-game feedback layer from WAITING/COUNTDOWN to
+        // PLAYING. Must happen AFTER themes are assigned so the initial
+        // PLAYING-mode scoreboard paint has correct values.
+        feedback.startPlayingPhase(session);
+
+        // Register session with the centralized evaluation pipeline. The
+        // callback fires for EVERY ML evaluation (not only matches), so we
+        // can surface the AI's "thinking out loud" to the builder. Matches
+        // additionally run the scoring branch.
         plugin.getContext().getEvaluationService().registerSession(
                 session,
-                (playerId, themeIndex) -> handleScore(session.arena().name(), playerId, themeIndex));
+                (playerId, themeIndex, topK, matched) -> {
+                    if (matched)
+                        handleScore(session.arena().name(), playerId, themeIndex);
+                    feedback.onEvaluated(session.arena().name(),
+                            playerId, themeIndex, topK, matched);
+                });
 
         plugin.getPluginLogger().info("Game started in arena '%s' with %d player(s).",
                 arena.name(), session.players().size());
@@ -373,32 +439,35 @@ public class GameManager implements BBAIGameManager, PluginService {
             // Global timer
             session.gameTimeRemaining(session.gameTimeRemaining() - 1);
 
+            // Refresh scoreboard time fields each second — without this the
+            // builder would only see timer updates every ~5 s (ML cadence).
+            feedback.onTick(session);
+
             // Game time warnings
             int remaining = session.gameTimeRemaining();
-            if (remaining == 60 || remaining == 30 || remaining == 10) {
-                Lang lang = plugin.getContext().getConfigService().getDefaultLang();
-                broadcastToSession(session, lang.get("game.playing.game-time-warning",
+            if (remaining == 60 || remaining == 30 || remaining == 10)
+                broadcastLocalized(session, "game.playing.game-time-warning",
                         "%minutes%", String.valueOf(remaining / 60),
-                        "%seconds%", String.valueOf(remaining % 60)));
-            }
+                        "%seconds%", String.valueOf(remaining % 60));
 
             if (remaining <= 0) {
                 endGame(session);
                 return;
             }
 
-            // Per-player build timers
-            Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+            // Per-player build timers. Each player gets their own lang lookup.
             Arena arena = session.arena();
             for (GamePlayer gp : new ArrayList<>(session.players().values())) {
                 gp.decrementBuildTime();
+                Lang playerLang = plugin.getContext().getConfigService()
+                        .getLangFor(gp.playerId());
 
                 // Build time warnings (last 10s, 30s, 60s)
                 if (gp.buildTimeRemaining() == 30 || gp.buildTimeRemaining() == 10) {
                     Player player = Bukkit.getPlayer(gp.playerId());
                     if (player != null)
                         plugin.getContext().getMessageService().sendChat(player,
-                                lang.get("game.playing.build-time-warning",
+                                playerLang.get("game.playing.build-time-warning",
                                         "%seconds%", String.valueOf(gp.buildTimeRemaining())));
                 }
 
@@ -408,16 +477,23 @@ public class GameManager implements BBAIGameManager, PluginService {
                     World arenaWorld = ensureWorldLoaded(arena);
                     if (arenaWorld != null)
                         clearZone(arenaWorld, arena.plots().get(gp.plotIndex()));
+                    // Mirror is session-scoped: wipe it so the next render-tick
+                    // doesn't keep showing the expired build to the ML model.
+                    MutablePlotScene m = session.mirror(gp.plotIndex());
+                    if (m != null)
+                        m.clearAll();
                     gp.clearZoneDirty();
                     gp.advanceTheme(session.themes().size());
                     gp.resetBuildTime(arena.buildTime());
                     if (player != null) {
                         plugin.getContext().getMessageService().sendChat(player,
-                                lang.get("game.playing.build-time-expired"));
+                                playerLang.get("game.playing.build-time-expired"));
                         String newTheme = session.getTheme(gp.themeIndex());
                         plugin.getContext().getMessageService().sendChat(player,
-                                lang.get("game.playing.new-theme", "%theme%", newTheme));
+                                playerLang.get("game.playing.new-theme", "%theme%", newTheme));
                     }
+                    // Repaint scoreboard theme/score for the new round.
+                    feedback.onThemeOrScoreChanged(session, gp.playerId());
                 }
             }
         }, 20L, 20L).getTaskId();
@@ -453,7 +529,7 @@ public class GameManager implements BBAIGameManager, PluginService {
             return;
 
         Arena arena = session.arena();
-        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
+        Lang lang = plugin.getContext().getConfigService().getLangFor(playerId);
 
         // Score!
         gp.incrementScore();
@@ -474,13 +550,72 @@ public class GameManager implements BBAIGameManager, PluginService {
         gp.advanceTheme(session.themes().size());
         gp.resetBuildTime(arena.buildTime());
 
-        // Notify player
+        // Notify player. The triumph title + sound + arena broadcast are
+        // produced by the FeedbackController (invoked right after this
+        // method via the same evaluation callback) — so we keep only the
+        // baseline "new-theme" line in chat here.
         plugin.getContext().getMessageService().sendChat(player,
                 lang.get("game.playing.score",
                         "%score%", String.valueOf(gp.score())));
         String newTheme = session.getTheme(gp.themeIndex());
         plugin.getContext().getMessageService().sendChat(player,
                 lang.get("game.playing.new-theme", "%theme%", newTheme));
+
+        // Repaint the scoreboard's theme + score lines for this player so the
+        // sidebar reflects the new round immediately instead of after the next
+        // ML tick.
+        feedback.onThemeOrScoreChanged(session, playerId);
+    }
+
+    // ── skip theme ────────────────────────────────────────────────────
+
+    /**
+     * Public API entry point — players invoke this through the skip-theme
+     * feather (slot 8). Clears the player's build zone, wipes the per-plot
+     * mirror, resets the build timer, advances the theme, and refreshes the
+     * scoreboard. No-op if the player is not in a PLAYING session.
+     */
+    @Override
+    public boolean skipTheme(@NonNull Player player) {
+        String arenaName = playerArenaMap.get(player.getUniqueId());
+        if (arenaName == null)
+            return false;
+        GameSession session = sessions.get(arenaName);
+        if (session == null || session.state() != ArenaState.PLAYING)
+            return false;
+        GamePlayer gp = session.getPlayer(player.getUniqueId());
+        if (gp == null)
+            return false;
+
+        Arena arena = session.arena();
+        World arenaWorld = ensureWorldLoaded(arena);
+        if (arenaWorld != null)
+            clearZone(arenaWorld, arena.plots().get(gp.plotIndex()));
+        MutablePlotScene m = session.mirror(gp.plotIndex());
+        if (m != null)
+            m.clearAll();
+
+        gp.clearZoneDirty();
+        gp.advanceTheme(session.themes().size());
+        gp.resetBuildTime(arena.buildTime());
+
+        Lang lang = plugin.getContext().getConfigService().getLangFor(player.getUniqueId());
+        // Pick a random "theme skipped" line from lang for variety. Falls back
+        // to a literal message when the lang list is empty.
+        String feedbackLine = feedback != null
+                ? feedback.pickSkipFeedback(player.getUniqueId(), arenaName)
+                : null;
+        if (feedbackLine == null)
+            feedbackLine = lang.get("game.playing.skipped");
+        plugin.getContext().getMessageService().sendChat(player, feedbackLine);
+        String newTheme = session.getTheme(gp.themeIndex());
+        plugin.getContext().getMessageService().sendChat(player,
+                lang.get("game.playing.new-theme", "%theme%", newTheme));
+
+        SoundPalette.SKIP_THEME.play(player);
+        if (feedback != null)
+            feedback.onThemeOrScoreChanged(session, gp.playerId());
+        return true;
     }
 
     // ── game end ──────────────────────────────────────────────────────
@@ -493,13 +628,13 @@ public class GameManager implements BBAIGameManager, PluginService {
         // Detach from the evaluation pipeline before we start tearing the
         // session down so no in-flight render/ML job races with restoration.
         plugin.getContext().getEvaluationService().unregisterSession(session.arena().name());
+        // Pull down the feedback layer (scoreboards, tab list overlays).
+        feedback.endSession(session.arena().name());
         session.cancelAllTasks();
         session.state(ArenaState.ENDING);
 
         Arena arena = session.arena();
         World arenaWorld = ensureWorldLoaded(arena);
-        Lang lang = plugin.getContext().getConfigService().getDefaultLang();
-        BBAIMessageService msg = plugin.getContext().getMessageService();
 
         // Clear all zones
         if (arenaWorld != null)
@@ -521,9 +656,9 @@ public class GameManager implements BBAIGameManager, PluginService {
                 player.teleport(specLoc);
         }
 
-        // Announce results
-        broadcastToSession(session, lang.get("game.ending.time-up"));
-        broadcastToSession(session, lang.get("game.ending.results-header"));
+        // Announce results — per-recipient localization.
+        broadcastLocalized(session, "game.ending.time-up");
+        broadcastLocalized(session, "game.ending.results-header");
 
         // Sort players by score (descending)
         List<GamePlayer> sorted = new ArrayList<>(session.players().values());
@@ -537,15 +672,15 @@ public class GameManager implements BBAIGameManager, PluginService {
         // Display results
         for (int i = 0; i < sorted.size(); i++) {
             GamePlayer gp = sorted.get(i);
-            broadcastToSession(session, lang.get("game.ending.result-entry",
+            broadcastLocalized(session, "game.ending.result-entry",
                     "%position%", String.valueOf(i + 1),
                     "%player%", gp.playerName(),
-                    "%score%", String.valueOf(gp.score())));
+                    "%score%", String.valueOf(gp.score()));
         }
 
         // Announce winner
         if (sorted.isEmpty() || sorted.get(0).score() == 0) {
-            broadcastToSession(session, lang.get("game.ending.no-winner"));
+            broadcastLocalized(session, "game.ending.no-winner");
         } else {
             int topScore = sorted.get(0).score();
             List<String> winners = new ArrayList<>();
@@ -554,16 +689,16 @@ public class GameManager implements BBAIGameManager, PluginService {
                     winners.add(gp.playerName());
 
             if (winners.size() == 1)
-                broadcastToSession(session, lang.get("game.ending.winner",
+                broadcastLocalized(session, "game.ending.winner",
                         "%player%", winners.get(0),
-                        "%score%", String.valueOf(topScore)));
+                        "%score%", String.valueOf(topScore));
             else
-                broadcastToSession(session, lang.get("game.ending.draw",
-                        "%players%", joinNames(winners)));
+                broadcastLocalized(session, "game.ending.draw",
+                        "%players%", joinNames(winners));
         }
 
-        broadcastToSession(session, lang.get("game.ending.returning",
-                "%seconds%", "10"));
+        broadcastLocalized(session, "game.ending.returning",
+                "%seconds%", "10");
 
         // Schedule restoration after 10 seconds
         int endTaskId = Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
@@ -587,6 +722,9 @@ public class GameManager implements BBAIGameManager, PluginService {
         // Detach from the evaluation pipeline before tearing the session down
         // so no in-flight render/ML job tries to score a session being wiped.
         plugin.getContext().getEvaluationService().unregisterSession(session.arena().name());
+        // Tear down feedback visuals even when forced (no results display).
+        if (feedback != null)
+            feedback.endSession(session.arena().name());
         session.cancelAllTasks();
 
         Arena arena = session.arena();
@@ -645,6 +783,8 @@ public class GameManager implements BBAIGameManager, PluginService {
                     // from the evaluation pipeline first so it stops scanning
                     // this (now empty) session.
                     plugin.getContext().getEvaluationService().unregisterSession(arena.name());
+                    if (feedback != null)
+                        feedback.endSession(arena.name());
                     session.cancelAllTasks();
                     World arenaWorld = ensureWorldLoaded(arena);
                     if (arenaWorld != null)
@@ -735,7 +875,10 @@ public class GameManager implements BBAIGameManager, PluginService {
     }
 
     /**
-     * Broadcasts a chat message to all online players in a session.
+     * Broadcasts a chat message to all online players in a session. Uses a
+     * pre-rendered string (already localised), so every recipient sees the
+     * same text. For broadcasts that depend on per-player language, use
+     * {@link #broadcastLocalized(GameSession, String, Object...)} instead.
      */
     private void broadcastToSession(GameSession session, String message) {
         BBAIMessageService msg = plugin.getContext().getMessageService();
@@ -743,6 +886,27 @@ public class GameManager implements BBAIGameManager, PluginService {
             Player player = Bukkit.getPlayer(gp.playerId());
             if (player != null)
                 msg.sendChat(player, message);
+        }
+    }
+
+    /**
+     * Broadcasts a localised chat message to all online players in a session,
+     * rendering the message in EACH recipient's own preferred language. Use
+     * for broadcasts that contain translatable text. Replacements are passed
+     * straight to {@link Lang#get(String, Object...)}.
+     *
+     * @param session      the target session
+     * @param langKey      the lang key to render per-player
+     * @param replacements alternating placeholder/value pairs
+     */
+    private void broadcastLocalized(GameSession session, String langKey, Object... replacements) {
+        BBAIMessageService msg = plugin.getContext().getMessageService();
+        for (GamePlayer gp : session.players().values()) {
+            Player player = Bukkit.getPlayer(gp.playerId());
+            if (player == null)
+                continue;
+            Lang langFor = plugin.getContext().getConfigService().getLangFor(gp.playerId());
+            msg.sendChat(player, langFor.get(langKey, replacements));
         }
     }
 

@@ -127,7 +127,7 @@ class PluginContextLifecycleTest {
     // ── enable: command + listener registrations ──────────────────────────
 
     @Test
-    void enableRegistersTwoCommandsAndThreeListeners() {
+    void enableRegistersFourCommandsAndThreeListeners() {
         try (MockedConstruction<ConfigService> cfg = mockConstruction(ConfigService.class);
              MockedConstruction<DataService> dat = mockConstruction(DataService.class);
              MockedConstruction<WorldService> wld = mockConstruction(WorldService.class);
@@ -145,6 +145,8 @@ class PluginContextLifecycleTest {
              MockedConstruction<ArenaCommand> arenaCmd = mockConstruction(ArenaCommand.class);
              MockedConstruction<MLTestCommand> mlCmd = mockConstruction(MLTestCommand.class);
              MockedConstruction<WorldTpCommand> wtpCmd = mockConstruction(WorldTpCommand.class);
+             MockedConstruction<ru.ashesha.buildBattleAI.commands.LanguageCommand> langCmd =
+                     mockConstruction(ru.ashesha.buildBattleAI.commands.LanguageCommand.class);
              MockedConstruction<ArenaSetupListener> setupLst = mockConstruction(ArenaSetupListener.class);
              MockedConstruction<GameListener> gameLst = mockConstruction(GameListener.class);
              MockedConstruction<MLTestListener> mlLst = mockConstruction(MLTestListener.class)) {
@@ -158,7 +160,8 @@ class PluginContextLifecycleTest {
             verify(cmdMock).register(any(ArenaCommand.class));
             verify(cmdMock).register(any(MLTestCommand.class));
             verify(cmdMock).register(any(WorldTpCommand.class));
-            verify(cmdMock, times(3)).register(any());
+            verify(cmdMock).register(any(ru.ashesha.buildBattleAI.commands.LanguageCommand.class));
+            verify(cmdMock, times(4)).register(any());
 
             verify(lstMock).register(any(ArenaSetupListener.class));
             verify(lstMock).register(any(GameListener.class));

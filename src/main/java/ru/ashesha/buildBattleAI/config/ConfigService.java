@@ -8,6 +8,8 @@ import ru.ashesha.buildBattleAI.config.api.BBAIConfigService;
 import ru.ashesha.buildBattleAI.config.api.Lang;
 import ru.ashesha.buildBattleAI.core.PluginLogger;
 import ru.ashesha.buildBattleAI.core.PluginService;
+import ru.ashesha.buildBattleAI.data.api.BBAIDataService;
+import ru.ashesha.buildBattleAI.data.api.PlayerData;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -60,7 +62,7 @@ public class ConfigService implements BBAIConfigService, PluginService {
      * To bundle a new language, add its resource file under
      * {@code src/main/resources/lang/} and append the name here.
      */
-    private static final String[] BUNDLED_LANGS = {"en"};
+    private static final String[] BUNDLED_LANGS = {"en", "ru"};
 
     /** Buffer size for stream reading operations. */
     private static final int BUFFER_SIZE = 4096;
@@ -234,6 +236,24 @@ public class ConfigService implements BBAIConfigService, PluginService {
     @Override
     public Set<String> getAvailableLangs() {
         return Collections.unmodifiableSet(langs.keySet());
+    }
+
+    @Override
+    public Lang getLangFor(UUID playerId) {
+        // Console / null context — fall through to the default. No-op cheap path.
+        if (playerId == null)
+            return defaultLang;
+        // The data service is the source of truth for player preferences.
+        // When disabled (config: data.enabled=false) or empty, fall through
+        // to the default language — preferences just don't persist in that mode.
+        BBAIDataService data = plugin.getContext().getDataService();
+        if (data == null || !data.isEnabled())
+            return defaultLang;
+        PlayerData pd = data.getPlayer(playerId);
+        if (pd == null || pd.language() == null || pd.language().isEmpty())
+            return defaultLang;
+        Lang lang = langs.get(pd.language());
+        return lang != null ? lang : defaultLang;
     }
 
     // ── BBAIConfigService: arenas ──────────────────────────────────────────
@@ -559,6 +579,32 @@ public class ConfigService implements BBAIConfigService, PluginService {
         @Override
         public boolean has(@NonNull String key) {
             return config.contains(key);
+        }
+
+        @Override
+        public List<String> getList(@NonNull String key) {
+            // Honor scalar values too — admins may write either a single string
+            // or a YAML list at the same key. A scalar gets wrapped as a
+            // single-element list; an actual list is returned verbatim.
+            List<String> list = readList(config, key);
+            if (list == null && fallback != null)
+                list = readList(fallback, key);
+            return list != null ? list : Collections.<String>emptyList();
+        }
+
+        /**
+         * Reads the given key as either a string list or a scalar. Returns
+         * {@code null} when the key is absent — this preserves the distinction
+         * between "missing" (try the fallback) and "empty list" (admin
+         * intentionally cleared the variants).
+         */
+        private static List<String> readList(YamlConfiguration src, String key) {
+            if (!src.contains(key))
+                return null;
+            if (src.isList(key))
+                return src.getStringList(key);
+            String scalar = src.getString(key);
+            return scalar == null ? null : Collections.singletonList(scalar);
         }
     }
 }

@@ -1,11 +1,12 @@
 package ru.ashesha.buildBattleAI.evaluation;
 
 import org.junit.jupiter.api.Test;
+import ru.ashesha.buildBattleAI.evaluation.api.EvaluationCallback;
 import ru.ashesha.buildBattleAI.game.GameSession;
 
+import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiConsumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
@@ -43,18 +44,24 @@ class SessionHandleTest {
     }
 
     @Test
-    void scoreCallback_isExposed() {
+    void callback_isExposedAndForwardsAllArgs() {
         AtomicReference<UUID> capturedPid = new AtomicReference<>();
         AtomicReference<Integer> capturedTheme = new AtomicReference<>();
-        BiConsumer<UUID, Integer> cb = (p, t) -> { capturedPid.set(p); capturedTheme.set(t); };
+        AtomicReference<Boolean> capturedMatched = new AtomicReference<>();
+        EvaluationCallback cb = (p, t, topK, matched) -> {
+            capturedPid.set(p);
+            capturedTheme.set(t);
+            capturedMatched.set(matched);
+        };
         SessionHandle h = new SessionHandle(mock(GameSession.class), cb);
         UUID pid = UUID.randomUUID();
-        h.scoreCallback().accept(pid, 7);
+        h.callback().onEvaluated(pid, 7, Collections.emptyList(), true);
         assertEquals(pid, capturedPid.get());
         assertEquals(7, capturedTheme.get());
+        assertEquals(Boolean.TRUE, capturedMatched.get());
     }
 
     private static SessionHandle sample() {
-        return new SessionHandle(mock(GameSession.class), (p, t) -> {});
+        return new SessionHandle(mock(GameSession.class), (p, t, topK, matched) -> {});
     }
 }

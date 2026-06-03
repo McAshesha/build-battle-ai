@@ -56,6 +56,13 @@ public class PlayerData implements Serializable {
     private long lastPlayed;
 
     /**
+     * Player's chosen UI language code (e.g. {@code "en"}, {@code "ru"}), or
+     * {@code null} to use the server's default language. Set via the
+     * {@code /bbailang} command.
+     */
+    private String language;
+
+    /**
      * Creates player data with sensible defaults for a first-time player.
      * The {@link #firstJoin} and {@link #lastPlayed} fields are set to the
      * current system time; all counters start at zero.

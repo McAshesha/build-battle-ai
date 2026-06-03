@@ -90,3 +90,61 @@ evaluation:
 
   # Period (seconds) for the DEBUG metrics summary log line. 0 = off.
   metrics-log-period-seconds: 60
+
+# ── In-game AI Feedback ─────────────────────────────────────────────────
+# Controls the chatty "AI is thinking out loud" experience: action-bar
+# guesses, occasional chat thoughts, triumph titles on a correct guess,
+# arena-wide broadcasts, sidebar scoreboard, and tab list header/footer.
+# All texts come from lang/<lang>.yml under `game.ai.*` and can be edited
+# without recompiling.
+game:
+  feedback:
+    # Master switch — set to false to fully silence the feedback layer
+    # (no scoreboards, no AI thoughts, no titles). The base game flow
+    # (chat messages, scoring, theme rotation) keeps working.
+    enabled: true
+
+    # Show top-1 AI guess in the action bar (above hotbar) every ML tick.
+    actionbar-enabled: true
+
+    # Occasionally pipe a longer "thinking out loud" line into chat —
+    # personality without spam. Sampled per-tick at chat-thoughts-chance.
+    chat-thoughts-enabled: true
+
+    # Probability [0.0..1.0] that a single ML tick triggers a chat thought.
+    # 0.15 ≈ one chat thought per ~33 s per player at default cadence.
+    chat-thoughts-chance: 0.15
+
+    # Big title overlay shown to the builder on a correct guess.
+    title-on-correct-enabled: true
+
+    # Arena-wide chat broadcast when ANY player scores ("Player X built Y!").
+    # Disable to keep score reveals private to the builder.
+    broadcast-on-correct-enabled: true
+
+    # Sidebar scoreboard with theme / time / score / current AI guess.
+    scoreboard-enabled: true
+
+    # Tab list header + footer with arena state.
+    tab-enabled: true
+
+    # When |top-1 score - top-2 score| < this value, the AI uses the
+    # "confused" message variant ("Could be X or Y..."). 0 disables.
+    confused-threshold: 0.04
+
+    # Append "(NN%)" confidence next to AI guesses in action bar and
+    # scoreboard. Disable for a cleaner look.
+    show-confidence: true
+
+    # Play villager "hmm" sound when AI shows a thinking action-bar message.
+    # Gated by sound-on-thinking-chance to avoid sound spam every ML tick.
+    sound-on-thinking: true
+
+    # Probability [0..1] that a thinking message triggers the hmm sound.
+    # 0.4 ≈ ~2 hmm sounds per 25 s per player.
+    sound-on-thinking-chance: 0.4
+
+    # Give each builder a feather in their last hotbar slot. Right-click =
+    # skip the current theme (clears zone + advances to next theme). Useful
+    # when a theme is too hard or the build went sideways.
+    skip-feather-enabled: true

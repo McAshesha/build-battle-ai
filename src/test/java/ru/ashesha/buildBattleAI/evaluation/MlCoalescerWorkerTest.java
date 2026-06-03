@@ -2,6 +2,7 @@ package ru.ashesha.buildBattleAI.evaluation;
 
 import org.junit.jupiter.api.Test;
 import ru.ashesha.buildBattleAI.core.PluginLogger;
+import ru.ashesha.buildBattleAI.evaluation.api.EvaluationCallback;
 import ru.ashesha.buildBattleAI.evaluation.api.EvaluationStats;
 import ru.ashesha.buildBattleAI.ml.api.BBAIMLService;
 import ru.ashesha.buildBattleAI.ml.api.PredictionResult;
@@ -13,10 +14,11 @@ import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
@@ -27,41 +29,47 @@ import static org.mockito.Mockito.when;
 /**
  * Verifies that {@link MlCoalescerWorker} drains a batch from the
  * {@link MlQueue}, runs ML inference once across the whole batch, dispatches
- * one main-thread callback per matched frame, and records the corresponding
- * metrics.
+ * one main-thread callback per frame (regardless of match), and records the
+ * corresponding metrics. The match flag is forwarded to the callback so the
+ * recipient can decide what to do.
  */
 class MlCoalescerWorkerTest {
 
     @Test
-    void batchOfTwo_matchOneDispatchesCallbackOnceWithCorrectArgs() throws Exception {
+    void batchOfTwo_dispatchesCallbackPerFrameWithCorrectMatchFlag() throws Exception {
         BBAIMLService ml = mock(BBAIMLService.class);
 
-        // First frame: top-K contains its expected theme "castle" → MATCH.
+        // First frame: top-K contains its expected theme "castle" → matched=true.
         PredictionResult matchResult = new PredictionResult(
                 new float[0], "castle", 0.9f, new float[0],
                 Arrays.asList(new TopKEntry("castle", 0.9f), new TopKEntry("tree", 0.4f)));
-        // Second frame: expected "house" not in top-K → MISS.
+        // Second frame: expected "house" not in top-K → matched=false.
         PredictionResult missResult = new PredictionResult(
                 new float[0], "tree", 0.7f, new float[0],
                 Arrays.asList(new TopKEntry("tree", 0.7f), new TopKEntry("castle", 0.2f)));
         when(ml.predictBatchRgb(any(byte[][].class), anyInt(), anyInt(), anyInt()))
                 .thenReturn(new PredictionResult[]{matchResult, missResult});
 
-        AtomicInteger calls = new AtomicInteger();
+        AtomicInteger matchedCalls = new AtomicInteger();
+        AtomicInteger unmatchedCalls = new AtomicInteger();
         UUID matchPid = UUID.randomUUID();
-        BiConsumer<UUID, Integer> arenaCallback = (pid, theme) -> {
-            // Verify the dispatcher receives the exact (pid, themeIndex) pair we enqueued.
-            if (pid.equals(matchPid) && theme == 5)
-                calls.incrementAndGet();
+        UUID missPid = UUID.randomUUID();
+        EvaluationCallback arenaCallback = (pid, theme, topK, matched) -> {
+            assertNotNull(topK, "topK must be non-null in callback");
+            assertTrue(topK.size() >= 1, "topK must be non-empty");
+            if (matched && pid.equals(matchPid) && theme == 5)
+                matchedCalls.incrementAndGet();
+            else if (!matched && pid.equals(missPid))
+                unmatchedCalls.incrementAndGet();
         };
-        Function<String, BiConsumer<UUID, Integer>> registry =
+        Function<String, EvaluationCallback> registry =
                 arena -> "arena1".equals(arena) ? arenaCallback : null;
 
         SyncDispatcher dispatcher = new SyncDispatcher();
 
         MlQueue mq = new MlQueue(4);
         mq.offer(frameFor("arena1", matchPid, 5, "castle"));
-        mq.offer(frameFor("arena1", UUID.randomUUID(), 0, "house"));
+        mq.offer(frameFor("arena1", missPid, 0, "house"));
 
         EvaluationMetrics metrics = new EvaluationMetrics(8);
         MlCoalescerWorker worker = new MlCoalescerWorker(
@@ -81,7 +89,9 @@ class MlCoalescerWorkerTest {
         t.interrupt();
         t.join(1000);
 
-        assertEquals(1, calls.get(), "exactly one matched callback expected");
+        assertEquals(1, matchedCalls.get(), "exactly one matched callback expected");
+        assertEquals(1, unmatchedCalls.get(), "exactly one unmatched callback expected");
+        // matchesDispatched still counts only matched frames (the metric name reflects its semantics).
         assertEquals(1, metrics.snapshot(0, 0, 0, 0).matchesDispatched());
         assertEquals(1, metrics.snapshot(0, 0, 0, 0).mlBatchesCompleted());
     }
@@ -97,7 +107,7 @@ class MlCoalescerWorkerTest {
                 .thenReturn(new PredictionResult[]{matchResult});
 
         AtomicInteger calls = new AtomicInteger();
-        Function<String, BiConsumer<UUID, Integer>> registry = arena -> null;
+        Function<String, EvaluationCallback> registry = arena -> null;
         SyncDispatcher dispatcher = new SyncDispatcher() {
             @Override
             public void dispatch(Runnable r) {
@@ -140,7 +150,7 @@ class MlCoalescerWorkerTest {
 
         EvaluationMetrics metrics = new EvaluationMetrics(8);
         MlCoalescerWorker worker = new MlCoalescerWorker(
-                mq, ml, arena -> (pid, theme) -> { },
+                mq, ml, arena -> (pid, theme, topK, matched) -> { },
                 new SyncDispatcher(), metrics, mock(PluginLogger.class),
                 8, 50L, 2);
 

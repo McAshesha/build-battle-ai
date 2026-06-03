@@ -1,5 +1,7 @@
 package ru.ashesha.buildBattleAI.config.api;
 
+import java.util.List;
+
 /**
  * Read-only accessor for a single language's translation messages.
  * <p>
@@ -76,4 +78,25 @@ public interface Lang {
      * @return {@code true} if the key exists in this language's file
      */
     boolean has(String key);
+
+    /**
+     * Returns the message list stored at the given key.
+     * <p>
+     * Used for keys that hold multiple message variants (e.g. randomly-picked
+     * AI thoughts, alternative subtitles). Color codes inside each entry are
+     * preserved unprocessed; the caller is responsible for translation.
+     * <p>
+     * Lookup order matches {@link #get(String)}:
+     * <ol>
+     *     <li>This language's configuration (must be an actual list there)</li>
+     *     <li>The default language (fallback, when this language has no entry)</li>
+     *     <li>An empty immutable list (last resort — caller should treat as "no variants")</li>
+     * </ol>
+     * Scalar values at the key are returned as a single-element list so admins
+     * can write either a string or a list interchangeably.
+     *
+     * @param key the message key (e.g. {@code "game.ai.thinking"})
+     * @return immutable list of message variants — never {@code null}
+     */
+    List<String> getList(String key);
 }

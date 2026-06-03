@@ -13,6 +13,7 @@ import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.ArenaManager;
 import ru.ashesha.buildBattleAI.arena.api.BBAIArenaManager;
 import ru.ashesha.buildBattleAI.commands.ArenaCommand;
+import ru.ashesha.buildBattleAI.commands.LanguageCommand;
 import ru.ashesha.buildBattleAI.commands.MLTestCommand;
 import ru.ashesha.buildBattleAI.commands.WorldTpCommand;
 import ru.ashesha.buildBattleAI.config.ConfigService;
@@ -202,6 +203,7 @@ public class PluginContext {
         commandService.register(new ArenaCommand(plugin));
         commandService.register(new MLTestCommand(plugin));
         commandService.register(new WorldTpCommand(plugin));
+        commandService.register(new LanguageCommand(plugin));
         listenerService.register(new ArenaSetupListener(plugin));
         listenerService.register(new GameListener(plugin));
         listenerService.register(new MLTestListener(plugin));

@@ -5,11 +5,11 @@ import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.Accessors;
+import ru.ashesha.buildBattleAI.evaluation.api.EvaluationCallback;
 import ru.ashesha.buildBattleAI.game.GameSession;
 
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiConsumer;
 
 /**
  * Per-session bookkeeping for the evaluation pipeline. Owns the camera
@@ -27,7 +27,12 @@ import java.util.function.BiConsumer;
 final class SessionHandle {
 
     private final @NonNull GameSession session;
-    private final @NonNull BiConsumer<UUID, Integer> scoreCallback;
+    /**
+     * Per-session feedback callback. Fires for every completed evaluation
+     * of a session player, regardless of theme match — see
+     * {@link EvaluationCallback} for the full contract.
+     */
+    private final @NonNull EvaluationCallback callback;
 
     @Getter(AccessLevel.NONE)
     private final ConcurrentHashMap<UUID, Long> lastEvalAtNanos = new ConcurrentHashMap<UUID, Long>();

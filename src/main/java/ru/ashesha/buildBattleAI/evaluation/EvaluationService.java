@@ -7,15 +7,14 @@ import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.core.PluginLogger;
 import ru.ashesha.buildBattleAI.core.PluginService;
 import ru.ashesha.buildBattleAI.evaluation.api.BBAIEvaluationService;
+import ru.ashesha.buildBattleAI.evaluation.api.EvaluationCallback;
 import ru.ashesha.buildBattleAI.evaluation.api.EvaluationStats;
 import ru.ashesha.buildBattleAI.game.GameSession;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.BiConsumer;
 
 /**
  * Default implementation of {@link BBAIEvaluationService}. Owns the
@@ -77,7 +76,7 @@ public class EvaluationService implements PluginService, BBAIEvaluationService {
                 plugin.getContext().getMlService(),
                 arenaName -> {
                     SessionHandle h = registry.get(arenaName);
-                    return h == null ? null : h.scoreCallback();
+                    return h == null ? null : h.callback();
                 },
                 r -> Bukkit.getScheduler().runTask(plugin, r),
                 metrics, logger,
@@ -170,10 +169,10 @@ public class EvaluationService implements PluginService, BBAIEvaluationService {
 
     @Override
     public void registerSession(@NonNull GameSession session,
-                                @NonNull BiConsumer<UUID, Integer> scoreCallback) {
+                                @NonNull EvaluationCallback callback) {
         if (!enabled.get())
             throw new IllegalStateException("EvaluationService is not enabled");
-        registry.put(session.arena().name(), new SessionHandle(session, scoreCallback));
+        registry.put(session.arena().name(), new SessionHandle(session, callback));
     }
 
     @Override
