@@ -11,7 +11,6 @@ A Spigot plugin for Minecraft — a Build Battle variant where builds are judged
 ## Renderer
 
 The plugin's core is a CPU-only voxel ray caster written in pure Java:
-
 - **DDA traversal** through voxels with face-hit tracking
 - **Ambient Occlusion** — quadrant-sampled corner neighbours for soft shadows
 - **Translucency** — front-to-back compositing through glass, water and ice
