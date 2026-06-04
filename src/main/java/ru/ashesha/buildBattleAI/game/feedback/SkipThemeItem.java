@@ -2,6 +2,7 @@ package ru.ashesha.buildBattleAI.game.feedback;
 
 import com.cryptomorin.xseries.XMaterial;
 import lombok.NonNull;
+import org.bukkit.ChatColor;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import ru.ashesha.buildBattleAI.config.api.Lang;
@@ -87,10 +88,6 @@ public final class SkipThemeItem {
     public static boolean isSkipItem(ItemStack item, @NonNull Lang lang) {
         if (item == null)
             return false;
-        // Cheap material check first so a hotbar swing on a regular feather
-        // doesn't drag us through string comparisons we don't need.
-        // Use the XMaterial matcher (1.8–1.21 safe) rather than the
-        // deprecated XMaterial#parseMaterial.
         if (XMaterial.matchXMaterial(item.getType()) != XMaterial.FEATHER)
             return false;
         if (!item.hasItemMeta())
@@ -101,10 +98,21 @@ public final class SkipThemeItem {
         List<String> lore = meta.getLore();
         if (lore == null || lore.isEmpty())
             return false;
-        String expected = MessageUtils.translateColors(lang.get("game.ai.skip-item.marker"));
-        // Tail comparison — admins may append additional lore lines (e.g.
-        // through a third-party plugin) but the marker we wrote stays at
-        // the tail unless someone deliberately edits the item.
-        return expected.equals(lore.get(lore.size() - 1));
+        // Paper re-serialises lore through Adventure components on setLore/
+        // getLore, which can drop or reorder color codes. Strip colors and
+        // match by the textual `#bbai-skip` anchor so identity survives the
+        // round-trip on every supported server flavor.
+        String anchor = ChatColor.stripColor(MessageUtils.translateColors(
+                lang.get("game.ai.skip-item.marker")));
+        if (anchor == null || anchor.isEmpty())
+            return false;
+        for (String line : lore) {
+            if (line == null)
+                continue;
+            String stripped = ChatColor.stripColor(line);
+            if (stripped != null && stripped.contains(anchor))
+                return true;
+        }
+        return false;
     }
 }

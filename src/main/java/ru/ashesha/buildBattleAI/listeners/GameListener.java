@@ -185,46 +185,36 @@ public class GameListener extends ListenerService.PluginListener {
      * Detects right-clicks (air or block) on the skip-theme feather and invokes
      * {@link BBAIGameManager#skipTheme(Player)}.
      * <p>
-     * <b>No {@code ignoreCancelled}:</b> Spigot/Paper fires {@code RIGHT_CLICK_AIR}
+     * No {@code ignoreCancelled}: Spigot/Paper fires {@code RIGHT_CLICK_AIR}
      * with the event pre-cancelled by default (legacy "use" interaction model),
-     * so {@code ignoreCancelled=true} would silently swallow every air-click and
-     * the feather would never fire. We accept the event regardless of cancel
-     * state and re-cancel for safety.
-     * <p>
-     * <b>Hand filtering:</b> Spigot fires this event twice on 1.9+ (once per
-     * hand). We restrict to {@code HAND} so a feather right-click triggers
-     * exactly once.
-     * <p>
-     * Identity check is on the item lore tail (see {@link SkipThemeItem}),
-     * so an admin renaming the feather in lang files does not break detection.
+     * so {@code ignoreCancelled=true} would silently swallow every air-click.
+     * Hand filter restricts to {@code HAND} so the 1.9+ off-hand mirror-fire
+     * doesn't trigger the skip twice.
      */
     @EventHandler(priority = EventPriority.HIGH)
     public void onPlayerInteract(PlayerInteractEvent event) {
         Action action = event.getAction();
-        // Only react to right-clicks — left-click would trigger on every
-        // block break attempt with the feather equipped.
         if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK)
             return;
-        // Main hand only — avoids the off-hand mirror-fire on 1.9+.
         if (event.getHand() != null && event.getHand() != EquipmentSlot.HAND)
+            return;
+
+        org.bukkit.inventory.ItemStack hand = event.getItem();
+        if (hand == null)
             return;
 
         Player player = event.getPlayer();
         BBAIGameManager gm = plugin.getContext().getGameManager();
         if (!gm.isInGame(player.getUniqueId()))
             return;
-        // Only PLAYING state — protect lobbies and the post-game spectator phase.
         if (gm.getArenaState(gm.getPlayerArena(player.getUniqueId())) != ArenaState.PLAYING)
-            return;
-        org.bukkit.inventory.ItemStack hand = event.getItem();
-        if (hand == null)
             return;
         if (!SkipThemeItem.isSkipItem(hand,
                 plugin.getContext().getConfigService().getLangFor(player.getUniqueId())))
             return;
 
-        // Cancel the underlying interaction so the feather does not, e.g.,
-        // open a block GUI for any block the player happens to be facing.
+        // Cancel so the feather doesn't, e.g., open a block GUI for whatever
+        // the player happens to be facing.
         event.setCancelled(true);
         gm.skipTheme(player);
     }

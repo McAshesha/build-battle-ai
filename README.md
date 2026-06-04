@@ -45,7 +45,3 @@ mvn test             # Только тесты
 | Adventure (Kyori) | Сериализация текстовых компонентов | shaded |
 | Lombok | Генерация boilerplate-кода | compile-only |
 | JUnit 5 | Юнит-тесты | test |
-
-## Лицензия
-
-Проприетарный код. Все права защищены.
