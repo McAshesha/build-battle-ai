@@ -5,10 +5,19 @@ on:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # Bump this tag whenever the ONNX model is replaced — invalidates the cache and re-downloads.
+  MODEL_RELEASE_TAG: ml-model-v1
+  MODEL_PATH: src/main/resources/models/custom_convnext_embeddings.onnx
 
 jobs:
   build:
@@ -33,6 +42,27 @@ jobs:
           java-version: ${{ matrix.java }}
           cache: maven
 
+      - name: Cache ONNX model
+        id: cache-model
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.MODEL_PATH }}
+          key: onnx-model-${{ env.MODEL_RELEASE_TAG }}
+
+      - name: Download ONNX model from Release
+        if: steps.cache-model.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$MODEL_PATH")"
+          gh release download "$MODEL_RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern 'custom_convnext_embeddings.onnx' \
+            --output "$MODEL_PATH" \
+            --clobber
+          ls -lh "$MODEL_PATH"
+
       - name: Build and run tests
         run: mvn -B -ntp clean verify
 
@@ -46,3 +76,156 @@ jobs:
             target/*.log
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Upload plugin JAR
+        if: success() && matrix.java == 21
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-jar
+          path: |
+            target/buildbattleai-*.jar
+            !target/buildbattleai-*-lite.jar
+            !target/original-buildbattleai-*.jar
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    name: Deploy to VPS
+    needs: build
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-mc-1.8
+      cancel-in-progress: false
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      SERVICE: mc-1.8.service
+      REMOTE_ROOT: /opt/mc-1.8
+    steps:
+      - name: Download plugin JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: plugin-jar
+          path: dist/
+
+      - name: Identify full JAR
+        id: pick
+        run: |
+          set -euo pipefail
+          JAR=$(ls dist/buildbattleai-*.jar | grep -v -- '-lite' | grep -v 'original-' | head -n1)
+          test -n "$JAR" || { echo "No full JAR in dist/" >&2; ls -la dist/ >&2; exit 1; }
+          echo "jar=$JAR" >>"$GITHUB_OUTPUT"
+          echo "short_sha=$(echo "${GITHUB_SHA}" | cut -c1-7)" >>"$GITHUB_OUTPUT"
+          ls -la "$JAR"
+
+      - name: Set up SSH ControlMaster
+        id: ssh
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh ~/.ssh/cd-ctrl
+          chmod 700 ~/.ssh ~/.ssh/cd-ctrl
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/cd_ed25519
+          chmod 600 ~/.ssh/cd_ed25519
+          # Trust host key (pinned via ssh-keyscan now; future improvement: store known fingerprint as secret)
+          for i in 1 2 3 4 5; do
+            if ssh-keyscan -t ed25519 -T 8 "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null && [ -s ~/.ssh/known_hosts ]; then
+              break
+            fi
+            echo "ssh-keyscan attempt $i failed, retrying..."
+            sleep $((i * 3))
+          done
+          test -s ~/.ssh/known_hosts || { echo "Failed to keyscan $VPS_HOST" >&2; exit 1; }
+          # Open ControlMaster with retries — sshd MaxStartups drops under brute-force flood
+          SSH_BASE="-i $HOME/.ssh/cd_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ControlMaster=auto -o ControlPath=$HOME/.ssh/cd-ctrl/sock -o ControlPersist=300 -o ConnectTimeout=15"
+          echo "ssh_base=$SSH_BASE" >>"$GITHUB_OUTPUT"
+          for i in 1 2 3 4 5 6 7 8; do
+            if ssh $SSH_BASE -fN "$VPS_USER@$VPS_HOST" 2>/dev/null; then
+              echo "ControlMaster established on attempt $i"
+              break
+            fi
+            echo "ControlMaster attempt $i failed; backoff..."
+            sleep $((i * 3))
+            if [ $i -eq 8 ]; then
+              echo "Could not establish SSH ControlMaster after 8 attempts" >&2
+              exit 1
+            fi
+          done
+          ssh $SSH_BASE -O check "$VPS_USER@$VPS_HOST"
+
+      - name: Upload JAR to staging
+        run: |
+          set -euo pipefail
+          SSH_BASE="${{ steps.ssh.outputs.ssh_base }}"
+          STAGED="buildbattleai-${{ steps.pick.outputs.short_sha }}.jar"
+          # rsync over the shared control socket — no new auth handshake
+          rsync -av --no-perms --no-times --no-owner --no-group \
+            -e "ssh $SSH_BASE" \
+            "${{ steps.pick.outputs.jar }}" \
+            "$VPS_USER@$VPS_HOST:$REMOTE_ROOT/plugins-staging/$STAGED"
+
+      - name: Swap JAR & restart service
+        env:
+          SHORT_SHA: ${{ steps.pick.outputs.short_sha }}
+        run: |
+          set -euo pipefail
+          SSH_BASE="${{ steps.ssh.outputs.ssh_base }}"
+          ssh $SSH_BASE "$VPS_USER@$VPS_HOST" bash -se <<'REMOTE'
+            set -euo pipefail
+            cd "$HOME"
+            ROOT="/opt/mc-1.8"
+            cd "$ROOT"
+
+            # Latest staged JAR (the one we just rsynced)
+            STAGED=$(ls -t plugins-staging/buildbattleai-*.jar 2>/dev/null | head -n1)
+            [ -n "$STAGED" ] || { echo "No staged JAR found in $ROOT/plugins-staging/" >&2; exit 1; }
+            echo "Staged: $STAGED"
+
+            echo "::Stopping service::"
+            sudo -n /usr/bin/systemctl stop mc-1.8.service
+
+            # Archive currently-installed JAR(s), keep last 5
+            shopt -s nullglob
+            for old in plugins/buildbattleai-*.jar; do
+              ts=$(date +%Y%m%d-%H%M%S)
+              base=$(basename "$old")
+              mv -v "$old" "plugins-archive/${ts}-${base}"
+            done
+            ls -1t plugins-archive/buildbattleai-*.jar plugins-archive/*-buildbattleai-*.jar 2>/dev/null \
+              | tail -n +6 | xargs -r rm -f
+
+            # Swap in the new JAR
+            mv -v "$STAGED" plugins/
+            ls -la plugins/ | grep -i buildbattleai || true
+
+            echo "::Starting service::"
+            sudo -n /usr/bin/systemctl start mc-1.8.service
+
+            # Wait for "Done (" in the log — Spigot prints this when startup completes
+            echo "::Waiting for plugin enable & server done::"
+            DEADLINE=$(( $(date +%s) + 90 ))
+            while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+              if ! sudo -n /usr/bin/systemctl is-active mc-1.8.service >/dev/null 2>&1; then
+                echo "Service died during startup" >&2
+                journalctl -u mc-1.8.service --since '3 minutes ago' --no-pager | tail -n 80 >&2
+                exit 1
+              fi
+              if journalctl -u mc-1.8.service --since '3 minutes ago' --no-pager 2>/dev/null \
+                 | grep -qE 'Done \([0-9]+\.[0-9]+s\)'; then
+                echo "Server reports Done — deploy verified."
+                journalctl -u mc-1.8.service --since '3 minutes ago' --no-pager | tail -n 40
+                exit 0
+              fi
+              sleep 3
+            done
+            echo "Timeout: server did not reach 'Done (...)' within 90s" >&2
+            journalctl -u mc-1.8.service --since '3 minutes ago' --no-pager | tail -n 120 >&2
+            exit 1
+          REMOTE
+
+      - name: Close SSH ControlMaster
+        if: always()
+        run: |
+          SSH_BASE="${{ steps.ssh.outputs.ssh_base }}"
+          ssh $SSH_BASE -O exit "$VPS_USER@$VPS_HOST" 2>/dev/null || true
+          rm -f ~/.ssh/cd_ed25519
