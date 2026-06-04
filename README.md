@@ -1,78 +1,88 @@
 # BuildBattleAI
 
-Spigot-плагин для Minecraft — вариация Build Battle, где постройки оценивает ИИ-классификатор вместо голосования игроков.
+A Spigot plugin for Minecraft — a Build Battle variant where builds are judged by an AI classifier instead of player voting.
 
-## Как это работает
+## How it works
 
-1. Игроки строят на заданную тему в выделенных арена-зонах
-2. Встроенный CPU-рендерер захватывает постройку как 224×224 PNG — изображение, готовое для ML-модели
-3. ИИ-классификатор анализирует рендер и выставляет оценку
+1. Players build to a given theme inside dedicated arena plots.
+2. A built-in CPU renderer captures the build as a 224×224 RGB image — model-ready straight out of the camera.
+3. An ONNX classifier scores the rendered frame; if the theme lands in the top-K predictions, the player scores a point and a new theme is assigned.
 
-## Рендерер
+## Renderer
 
-Ядро плагина — voxel ray caster на чистой Java, работающий полностью на CPU:
+The plugin's core is a CPU-only voxel ray caster written in pure Java:
 
-- **DDA-обход** вокселей с отслеживанием пересечённых граней
-- **Ambient Occlusion** — квадрантная выборка угловых соседей для мягких теней
-- **Полупрозрачность** — front-to-back композитинг через стекло, воду, лёд
-- **Sub-block формы** — ray-AABB пересечение для ступеней, плит, заборов, люков и 40+ типов блоков
-- **Emissive блоки** — светящийся камень, лава, фонари рендерятся на полной яркости
-- **Параллелизация** через `ForkJoinPool` — рекурсивное разбиение по горизонтальным полосам
+- **DDA traversal** through voxels with face-hit tracking
+- **Ambient Occlusion** — quadrant-sampled corner neighbours for soft shadows
+- **Translucency** — front-to-back compositing through glass, water and ice
+- **Sub-block shapes** — ray–AABB intersection for stairs, slabs, fences, trapdoors and 40+ other block types
+- **Emissive blocks** — glowstone, lava and lanterns render at full brightness, bypassing face shading
+- **Parallelism** via `ForkJoinPool` — recursive horizontal-strip subdivision
 
-Рендер полностью потокобезопасен и не зависит от Bukkit API после захвата данных сцены.
+After a single main-thread chunk snapshot, the renderer is fully thread-safe and completely independent of the Bukkit API.
 
-## Сборка
+## ML inference
+
+- Local, in-process **ONNX Runtime 1.21** — no external service, no HTTP
+- Custom-trained **ConvNeXt-Tiny embedder** (~107 MiB), 128-dimensional L2-normalised embeddings against 15 theme centroids
+- Backend probing on enable: **CoreML → CUDA → DirectML → ROCm → CPU**
+- Optional 4-view TTA (resize, random crop, hflip, brightness jitter)
+
+## Build
 
 ```bash
-mvn clean package    # Собрать JAR + запустить тесты
-mvn test             # Только тесты
+mvn clean package    # build the JAR + run unit tests
+mvn test             # run tests only
 ```
 
-Требуется **Java 8+** и **Maven 3.6+**.
+Requires **Java 8** and **Maven 3.6+**.
 
-## Тестирование
+## Testing
 
-Базовый `mvn test` запускает 12 700+ юнит- и интеграционных тестов (рендерер, палитра, очереди evaluation, ML в disabled-режиме, MockBukkit-сценарии). Тяжёлые тесты вынесены в отдельные Maven-профили.
+The default `mvn test` runs 12 700+ unit and integration tests (renderer, palette, evaluation queues, ML in disabled mode, MockBukkit scenarios). Heavy tests live in dedicated Maven profiles.
 
-| Профиль | Что делает | Команда |
+| Profile | What it does | Command |
 |---|---|---|
-| (default) | Юнит-тесты + property-based палитра + golden-снапшоты рендерера + smoke `plugin.yml` | `mvn test` |
-| `-Pe2e` | Запускает реальные серверы **Paper 1.8.8** (`Servers/1.8/`) и **Purpur 1.21.11** (`Servers/1.21/`) как subprocess, ждёт `Done (`, проверяет, что плагин включился, отправляет `bbai list`, останавливает сервер, ассертит чистый exit | `mvn package && mvn test -Pe2e` |
-| `-Pml-it` | Грузит реальную ONNX-модель ConvNeXt-Tiny из `models/`, прогоняет один forward pass через ORT, проверяет, что embedding имеет форму `(1, 128)` и не нулевой | `mvn test -Pml-it` |
-| `-Pbench` | Компилирует JMH-бенчмарки рендерера и палитры из `src/jmh/java/` | `mvn test-compile -Pbench`<br>далее запуск через `java -cp ... org.openjdk.jmh.Main RendererBenchmark` |
+| (default) | Unit tests + property-based palette + renderer golden snapshots + `plugin.yml` smoke | `mvn test` |
+| `-Pe2e` | Spawns the real **Paper 1.8.8** (`Servers/1.8/`) and **Purpur 1.21.11** (`Servers/1.21/`) servers as subprocesses, waits for `Done (`, asserts the plugin enabled, sends `bbai list`, stops the server, asserts a clean exit | `mvn package && mvn test -Pe2e` |
+| `-Pml-it` | Loads the real ConvNeXt-Tiny ONNX model from `models/`, runs one forward pass through ORT, asserts the embedding has shape `(1, 128)` and is non-zero | `mvn test -Pml-it` |
+| `-Pbench` | Compiles JMH micro-benchmarks for the renderer and palette from `src/jmh/java/` | `mvn test-compile -Pbench`<br>then run via `java -cp ... org.openjdk.jmh.Main RendererBenchmark` |
 
-### Golden-снапшоты рендерера
+### Renderer golden snapshots
 
-`RendererGoldenSnapshotTest` рендерит набор фиксированных сцен (пустое небо, одиночный камень, каменная комната, башня с эмиссивным блоком, стена) и сравнивает SHA-256 байтов рендера с эталонами в `src/test/resources/golden/renderer/`. Если эталон отсутствует — он пишется на лету (first-run blessing). На несовпадении в `target/golden-actual/<name>.png` сохраняется реальное изображение для визуальной диффы.
+`RendererGoldenSnapshotTest` renders a fixed set of scenes (empty sky, single stone block, hollow stone room, mixed-palette tower with an emissive block, stone wall) and compares the SHA-256 of the rendered RGB bytes against golden hashes stored under `src/test/resources/golden/renderer/`. If a golden is missing it is written on the spot (first-run blessing). On a mismatch the actual rendered image is dumped to `target/golden-actual/<name>.png` for visual diffing.
 
-Перебагривание после намеренных изменений в рендерере:
+To re-bless after intentional renderer changes:
 
 ```bash
 GOLDEN_UPDATE=1 mvn test -Dtest=RendererGoldenSnapshotTest
 ```
 
-### E2E против реальных серверов
+### End-to-end against real servers
 
-E2E-драйвер живёт в `src/test/java/ru/ashesha/buildBattleAI/e2e/`:
+The E2E driver lives under `src/test/java/ru/ashesha/buildBattleAI/e2e/`:
 
-- `AbstractServerE2ETest` — общая логика: копирует свежий JAR из `target/` в `plugins/`, чистит дубликаты, форсит EULA, запускает `start.command`, парсит stdout, шлёт команды через stdin, валидирует чистый shutdown
-- `Paper18E2ETest` — пинит `Servers/1.8/` (Paper 1.8.8)
-- `Purpur121E2ETest` — пинит `Servers/1.21/` (Purpur 1.21.11)
+- `AbstractServerE2ETest` — shared logic: copies the fresh JAR from `target/` into `plugins/`, removes duplicates, forces EULA acceptance, launches `start.command`, tails stdout, sends commands via stdin, asserts a clean shutdown
+- `Paper18E2ETest` — pinned to `Servers/1.8/` (Paper 1.8.8)
+- `Purpur121E2ETest` — pinned to `Servers/1.21/` (Purpur 1.21.11)
 
-Известные cross-version предупреждения Bukkit (например, `PlayerSwapHandItemsEvent` отсутствует в 1.8) толерируются — это нормальное поведение, плагин стартует и работает.
+Known cosmetic cross-version Bukkit warnings (e.g. `PlayerSwapHandItemsEvent` does not exist on 1.8) are tolerated — the plugin still loads and runs correctly; only the missing-event listener is skipped, which is the intended behaviour on the older API.
 
-## Совместимость
+## Compatibility
 
-- **Spigot / Paper 1.21.x**
-- Java 8 (исходный код и target)
+- **Spigot / Paper 1.8 through 1.21.x** (cross-version via XSeries + PacketEvents abstractions)
+- Java 8 source and target
 
-## Зависимости
+## Dependencies
 
-| Библиотека | Назначение | Scope |
+| Library | Purpose | Scope |
 |---|---|---|
-| Spigot API | Серверное API | provided |
-| PacketEvents 2.x | Отправка пакетов | shaded |
-| XSeries | Кроссверсионная абстракция материалов | shaded |
-| Adventure (Kyori) | Сериализация текстовых компонентов | shaded |
-| Lombok | Генерация boilerplate-кода | compile-only |
-| JUnit 5 | Юнит-тесты | test |
+| Spigot API | Server API | provided |
+| PacketEvents 2.x | Packet wiring | shaded |
+| XSeries | Cross-version material / sound / particle abstractions | shaded |
+| Adventure (Kyori) | Text component serialisation | shaded |
+| ONNX Runtime 1.21 | ML inference (CPU + CoreML/CUDA/DirectML/ROCm probing) | compile |
+| Apache Ignite 2.16 | Optional distributed data backend | compile (shaded into full JAR) |
+| Lombok | Boilerplate generation | compile-only |
+| JUnit 5 / Mockito / MockBukkit | Unit & integration tests | test |
+| JMH 1.37 | Micro-benchmarks (under `-Pbench`) | test |
