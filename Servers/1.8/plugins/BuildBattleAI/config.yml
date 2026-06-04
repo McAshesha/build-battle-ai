@@ -1,0 +1,150 @@
+# ── Logging ──────────────────────────────────────────────────────────────
+# Controls the verbosity of plugin console output.
+# Levels: debug, info, warn, error, off
+#   debug - All messages including verbose diagnostics (useful for development)
+#   info  - Normal operational messages, warnings, and errors (default)
+#   warn  - Only warnings and errors
+#   error - Only critical errors
+#   off   - Suppress all plugin log output
+log-level: info
+
+default-language: en
+
+# ── Data Storage ─────────────────────────────────────────────────────────
+data:
+  # Enable persistent data storage (player stats, arena stats).
+  # If false, no data is persisted and DataService methods return defaults.
+  enabled: true
+
+  # Storage backend: "local" (JSON files) or "ignite" (Apache Ignite cluster)
+  provider: local
+
+  # Local JSON file storage settings (used when provider: local)
+  local:
+    # Directory for data files, relative to plugin data folder
+    directory: data
+    # Auto-save interval in seconds (0 = disabled, save only on shutdown)
+    auto-save-interval: 300
+
+  # Apache Ignite settings (used when provider: ignite)
+  ignite:
+    # Ignite node mode: "server", "thick-client", or "thin-client"
+    #   server       - full Ignite server node in this JVM (stores data, participates in cluster)
+    #   thick-client - thick client that connects to an existing cluster (full API, no local storage)
+    #   thin-client  - lightweight TCP client (lowest overhead, requires running cluster)
+    mode: server
+    # Cluster instance name (must match across all nodes in the cluster)
+    instance-name: BuildBattleAI
+    # Native persistence - data survives node restarts via WAL + snapshots.
+    # When false, data lives only in memory and is lost on restart.
+    persistence-enabled: true
+    # Work directory for Ignite data (WAL, snapshots, indexes),
+    # relative to plugin data folder
+    work-directory: ignite
+    # Suppress Ignite console output
+    quiet-mode: true
+    # Metrics log frequency in milliseconds (0 = disabled)
+    metrics-log-frequency: 0
+    # Memory region settings
+    initial-memory-mb: 64
+    max-memory-mb: 128
+    # Static discovery addresses for server/thick-client modes
+    discovery-addresses:
+      - "127.0.0.1:47500..47509"
+    # Connection addresses for thin-client mode
+    thin-client-addresses:
+      - "127.0.0.1:10800"
+
+# ── Evaluation Pipeline ────────────────────────────────────────────────
+# Centralised render + ML inference scheduling. Spreads load evenly
+# across time and enables ML batching. Replaces the legacy per-arena
+# render timer.
+evaluation:
+  # Minimum interval (ms) between two evaluations of the same player.
+  # Under load the effective cadence stretches automatically via queue
+  # backpressure (target <= 10 s).
+  min-cadence-ms: 5000
+
+  # Coordinator scan period in Bukkit ticks (1 tick = 50 ms).
+  coordinator-tick-period: 5
+
+  # Render worker thread count. The renderer's internal ForkJoinPool
+  # already saturates all CPU cores; 1 worker is usually optimal.
+  render-workers: 1
+
+  # Render queue capacity. When full, the coordinator drops the job
+  # (player stays dirty and is re-considered next tick).
+  render-queue-capacity: 64
+
+  # Maximum images per ML batch.
+  ml-batch-max-size: 8
+
+  # Maximum wait (ms) for the ML worker to gather a batch.
+  ml-batch-max-wait-ms: 200
+
+  # ML queue capacity.
+  ml-queue-capacity: 64
+
+  # ML topK — number of top predictions to check against the theme.
+  ml-top-k: 2
+
+  # Period (seconds) for the DEBUG metrics summary log line. 0 = off.
+  metrics-log-period-seconds: 60
+
+# ── In-game AI Feedback ─────────────────────────────────────────────────
+# Controls the chatty "AI is thinking out loud" experience: action-bar
+# guesses, occasional chat thoughts, triumph titles on a correct guess,
+# arena-wide broadcasts, sidebar scoreboard, and tab list header/footer.
+# All texts come from lang/<lang>.yml under `game.ai.*` and can be edited
+# without recompiling.
+game:
+  feedback:
+    # Master switch — set to false to fully silence the feedback layer
+    # (no scoreboards, no AI thoughts, no titles). The base game flow
+    # (chat messages, scoring, theme rotation) keeps working.
+    enabled: true
+
+    # Show top-1 AI guess in the action bar (above hotbar) every ML tick.
+    actionbar-enabled: true
+
+    # Occasionally pipe a longer "thinking out loud" line into chat —
+    # personality without spam. Sampled per-tick at chat-thoughts-chance.
+    chat-thoughts-enabled: true
+
+    # Probability [0.0..1.0] that a single ML tick triggers a chat thought.
+    # 0.15 ≈ one chat thought per ~33 s per player at default cadence.
+    chat-thoughts-chance: 0.15
+
+    # Big title overlay shown to the builder on a correct guess.
+    title-on-correct-enabled: true
+
+    # Arena-wide chat broadcast when ANY player scores ("Player X built Y!").
+    # Disable to keep score reveals private to the builder.
+    broadcast-on-correct-enabled: true
+
+    # Sidebar scoreboard with theme / time / score / current AI guess.
+    scoreboard-enabled: true
+
+    # Tab list header + footer with arena state.
+    tab-enabled: true
+
+    # When |top-1 score - top-2 score| < this value, the AI uses the
+    # "confused" message variant ("Could be X or Y..."). 0 disables.
+    confused-threshold: 0.04
+
+    # Append "(NN%)" confidence next to AI guesses in action bar and
+    # scoreboard. Disable for a cleaner look.
+    show-confidence: true
+
+    # Play villager "hmm" sound when AI shows a thinking action-bar message.
+    # Gated by sound-on-thinking-chance to avoid sound spam every ML tick.
+    sound-on-thinking: true
+
+    # Probability [0..1] that a thinking message triggers the hmm sound.
+    # 0.4 ≈ ~2 hmm sounds per 25 s per player.
+    sound-on-thinking-chance: 0.4
+
+    # Give each builder a feather in their last hotbar slot. Right-click =
+    # skip the current theme (clears zone + advances to next theme). Useful
+    # when a theme is too hard or the build went sideways.
+    skip-feather-enabled: true

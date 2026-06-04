@@ -1,0 +1,20 @@
+[
+  {
+    "uuid": "4bea4cf9-c258-3304-bb5b-1e7efea36b2b",
+    "name": "McAshesha",
+    "level": 4,
+    "bypassesPlayerLimit": false
+  },
+  {
+    "uuid": "952ed709-5c8c-4495-8360-9b8ed490a5e9",
+    "name": "McAshesha",
+    "level": 4,
+    "bypassesPlayerLimit": false
+  },
+  {
+    "uuid": "be200ced-23a5-3e08-8741-6fe380495626",
+    "name": "Ashesha",
+    "level": 4,
+    "bypassesPlayerLimit": false
+  }
+]

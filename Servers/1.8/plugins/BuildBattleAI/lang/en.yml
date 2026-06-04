@@ -1,0 +1,432 @@
+# ══════════════════════════════════════════════════════════════════════
+#  BuildBattleAI — English Language File
+# ══════════════════════════════════════════════════════════════════════
+
+test-join-message: "Welcome to the server, %player%!"
+test-leave-message: "Goodbye, %player%! See you next time!"
+
+# ── Language Command ─────────────────────────────────────────────────
+# Strings shown by /bbailang.
+lang:
+  current: "&7Current language: &e%lang%"
+  available: "&7Available: &f%list%"
+  usage: "&7Usage: &f/bbailang <code>"
+  unknown: "&c  Unknown language '&f%lang%&c'. Available: &7%list%"
+  disabled: "&c  Data storage is disabled, cannot persist language preference."
+  switched: "&a  Language switched to &f%lang%&a."
+
+# ── Arena ────────────────────────────────────────────────────────────
+arena:
+
+  # General usage hint
+  usage: "&c  Usage: /bbai <create|list|delete|join|leave> [name]"
+
+  # ── Arena Setup Panel ──────────────────────────────────────────────
+  setup:
+    divider: "&6&l▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
+    header: "&e  Arena Setup &8» &f%arena%"
+
+    # Status indicators
+    status:
+      set: "&a✔"
+      unset: "&c✘"
+      optional: "&8○"
+
+    # Coordinate display
+    value: "&f%x%&7, &f%y%&7, &f%z%"
+    corner:
+      value: "&f(%x%, %y%, %z%)"
+
+    # Buttons
+    btn:
+      set: "&a[Set]"
+      change: "&e[Change]"
+
+    # Player count selector
+    players:
+      label: "&7  Players: "
+      selected: "&a&l[%count%✓]"
+      unselected: "&7[%count%]"
+      hover: "&7Set max players to &e%count%"
+    select-players-hint: "&8  Select the number of players to configure plots"
+
+    # Lobby position
+    lobby:
+      label: "&7  Lobby: "
+      hover-set: "&7Stand where players should wait and click"
+      hover-change: "&7Click to update lobby to your position"
+
+    # Spectator position
+    spectator:
+      label: "&7  Spectator: "
+      hover-set: "&7Stand at the spectator area and click"
+      hover-change: "&7Click to update spectator to your position"
+
+    # Min players setting
+    minplayers:
+      label: "&7  Min Players: "
+      value: "&f%count%"
+      hover: "&7Click and type the minimum player count"
+      invalid: "&c  Min players must be between 2 and %max%."
+
+    # Build time setting
+    buildtime:
+      label: "&7  Build Time: "
+      value: "&f%minutes% min"
+      hover: "&7Click and type build time in minutes (0.5-10)"
+      invalid: "&c  Build time must be between 0.5 and 10 minutes."
+
+    # Game time setting
+    gametime:
+      label: "&7  Game Time: "
+      value: "&f%minutes% min"
+      hover: "&7Click and type total game time in minutes (1-30)"
+      invalid: "&c  Game time must be between 1 and 30 minutes."
+
+    # Countdown setting
+    countdown:
+      label: "&7  Countdown: "
+      value: "&f%seconds%s"
+      hover: "&7Click and type countdown duration in seconds (3-60)"
+      invalid: "&c  Countdown must be between 3 and 60 seconds."
+
+    # Plot tab bar
+    tab:
+      label: "&7  Plot Tabs: "
+      active: "&b&l[Plot %index%★]"
+      complete: "&a[Plot %index%✓]"
+      incomplete: "&7[Plot %index%✗]"
+      hover: "&7Switch to plot %index% configuration"
+
+    # Per-plot settings
+    plot:
+      header: "&6  ── Plot %index% ──"
+      spawn:
+        label: "&7    Spawn: "
+        hover-set: "&7Stand at plot %index% spawn and click"
+        hover-change: "&7Click to update spawn for plot %index%"
+      cameras:
+        label: "&7    Cameras: "
+        set: "&a[Cam %camera%]"
+        unset: "&c[Cam %camera%]"
+        hover-set: "&7Position yourself where camera %camera% should be for plot %index%, look at the build zone, and click"
+        hover-change: "&7Click to update camera %camera% for plot %index%"
+      zone:
+        label: "&7    Zone: "
+        c1: "&e[C1]"
+        c2: "&e[C2]"
+        c1-hover-set: "&7Fly to first corner of plot %index% and click"
+        c1-hover-change: "&7Click to update corner 1 for plot %index%"
+        c2-hover-set: "&7Fly to opposite corner of plot %index% and click"
+        c2-hover-change: "&7Click to update corner 2 for plot %index%"
+      picture:
+        label: "&7    Picture: "
+        c1: "&d[PC1]"
+        c2: "&d[PC2]"
+        c1-hover-set: "&7Stand on the first picture-region block for plot %index% and click"
+        c1-hover-change: "&7Click to update picture corner 1 for plot %index%"
+        c2-hover-set: "&7Stand on the opposite picture-region block for plot %index% (same block for 1×1) and click"
+        c2-hover-change: "&7Click to update picture corner 2 for plot %index%"
+        invalid-plane: "&c✘ corners not coplanar (need same X or same Z)"
+        invalid-size: "&c✘ picture must be 1×1 or 2×2"
+        face:
+          label: "&7    Face: "
+          option: "&7[%face%]"
+          option-selected: "&a&l[%face%✓]"
+          hover: "&7Set plot %index% picture face to &e%face%"
+
+    # Confirm / Cancel buttons
+    confirm:
+      ready: "&a&l[Confirm]"
+      not-ready: "&8[Confirm]"
+      hover-ready: "&aAll settings filled — click to create!"
+      hover-not-ready: "&cFill in all required settings first"
+    cancel:
+      btn: "&c&l[Cancel]"
+      hover: "&7Cancel arena setup and delete the world"
+
+    # Titles shown during setup interactions
+    title:
+      welcome: "&e&lArena Setup"
+      welcome-sub: "&7Configure your new arena"
+      players: "&6Players"
+      players-sub: "&7Set to &e%count%"
+      lobby: "&6Lobby"
+      spectator: "&6Spectator"
+      spawn: "&6Plot %index%"
+      corner: "&6Plot %index%"
+      camera: "&6Plot %index%"
+      position-saved: "&7Position saved"
+      corner1-saved: "&7Corner 1 saved"
+      corner2-saved: "&7Corner 2 saved"
+      camera-saved: "&7Camera %camera% saved"
+      created: "&a&l✔ Arena Created"
+      created-sub: "&f%arena%"
+      incomplete: "&c&l✘ Incomplete"
+      incomplete-sub: "&7Fill all required settings first"
+      cancelled: "&c&l✘ Cancelled"
+      cancelled-sub: "&7Arena setup cancelled"
+      minplayers: "&6Min Players"
+      minplayers-sub: "&7Set to &e%count%"
+      buildtime: "&6Build Time"
+      buildtime-sub: "&7Set to &e%minutes% min"
+      gametime: "&6Game Time"
+      gametime-sub: "&7Set to &e%minutes% min"
+      countdown: "&6Countdown"
+      countdown-sub: "&7Set to &e%seconds%s"
+      picture: "&6Plot %index%"
+      picture-saved: "&7Picture corner %corner% saved"
+      face: "&6Plot %index%"
+      face-saved: "&7Face set to &e%face%"
+
+    # Hologram markers at set positions during setup
+    marker:
+      lobby: "&6⬇ &eLobby"
+      spectator: "&6⬇ &eSpectator"
+      spawn: "&6⬇ &eSpawn #%index%"
+      corner1: "&c⬇ &eC1 #%index%"
+      corner2: "&c⬇ &eC2 #%index%"
+      pic-corner1: "&d⬇ &ePicture C1 #%index%"
+      pic-corner2: "&d⬇ &ePicture C2 #%index%"
+
+    # Feedback messages
+    created: "&a  Arena &f%arena% &ahas been created and activated!"
+    cancelled: "&c  Arena setup has been cancelled."
+    incomplete: "&c  Not all required settings are filled."
+    already-exists: "&c  An arena named &f%arena% &calready exists."
+    already-in-setup: "&c  You are already setting up an arena."
+    world-failed: "&c  Failed to create world for arena &f%arena%&c."
+    no-session: "&c  You don't have an active setup session."
+    name-required: "&c  Usage: /bbai create <name>"
+
+  # ── Arena List ─────────────────────────────────────────────────────
+  list:
+    header: "&e  Active Arenas:"
+    entry: " &8- &f%arena% &8| &7Players: &f%players% &8| %status%"
+    entry-game: " &8- &f%arena% &8| &7%current%/%max% &8| %state% "
+    join-btn: "&a[Join]"
+    join-hover: "&7Click to join &e%arena%"
+    full-btn: "&8[Full]"
+    in-progress-btn: "&8[In Progress]"
+    state-waiting: "&aWaiting"
+    state-countdown: "&eStarting"
+    state-playing: "&cPlaying"
+    state-ending: "&6Ending"
+    empty: "&7  No arenas configured."
+    status-enabled: "&aEnabled"
+    status-disabled: "&cDisabled"
+
+  # ── Arena Delete ───────────────────────────────────────────────────
+  delete:
+    success: "&a  Arena &f%arena% &adeleted."
+    not-found: "&c  Arena &f%arena% &cnot found."
+    usage: "&c  Usage: /bbai delete <name>"
+
+# ── Game ─────────────────────────────────────────────────────────────
+game:
+
+  # ── Join / Leave ───────────────────────────────────────────────────
+  join:
+    success: "&a  You joined arena &f%arena%&a!"
+    broadcast: "&e  %player% &7joined the game! &8(%current%/%max%)"
+    already-in-game: "&c  You are already in a game!"
+    arena-not-found: "&c  Arena &f%arena% &cnot found."
+    arena-disabled: "&c  Arena &f%arena% &cis not enabled."
+    arena-full: "&c  Arena &f%arena% &cis full!"
+    arena-in-progress: "&c  Arena &f%arena% &cis already in progress!"
+  leave:
+    success: "&a  You left the arena."
+    broadcast: "&e  %player% &7left the game. &8(%current%/%max%)"
+    not-in-game: "&c  You are not in a game."
+
+  # ── Lobby / Waiting ────────────────────────────────────────────────
+  waiting:
+    waiting-for-players: "&7  Waiting for players... &8(%current%/%min%)"
+    player-needed: "&7  Need &e%needed% &7more player(s) to start."
+
+  # ── Countdown ──────────────────────────────────────────────────────
+  countdown:
+    starting: "&e  Game starting in &f%seconds% &esecond(s)!"
+    cancelled: "&c  Countdown cancelled — not enough players."
+    go: "&a  Game started! Build!"
+
+  # ── Playing / Themes ───────────────────────────────────────────────
+  playing:
+    theme-assigned: "&e  Your theme: &b&l%theme%"
+    build-time-warning: "&7  Build time remaining: &e%seconds%s"
+    build-time-expired: "&c  Time's up! Theme changed."
+    new-theme: "&e  New theme: &b&l%theme%"
+    score: "&a  Correct! +1 point! &7(Total: &f%score%&7)"
+    skipped: "&7  Theme skipped."
+    game-time-warning: "&7  Game time remaining: &e%minutes%m %seconds%s"
+    zone-cleared: "&7  Your zone has been cleared."
+
+  # ── Ending / Results ───────────────────────────────────────────────
+  ending:
+    time-up: "&e&l  Time's up!"
+    results-header: "&6&l  ══ Game Results ══"
+    result-entry: "&7  %position%. &f%player% &8— &e%score% point(s)"
+    winner: "&a  Winner: &f&l%player% &awith &e%score% &apoint(s)!"
+    draw: "&e  It's a draw between: &f%players%"
+    no-winner: "&7  No one scored this round."
+    returning: "&7  Returning to spawn in &e%seconds%s&7..."
+
+  # ── AI Feedback ────────────────────────────────────────────────────
+  # Lines below are SAMPLED RANDOMLY at runtime (the renderer picks a
+  # different entry each tick and avoids repeating the last one). Add
+  # as many variants as you like — more variety = livelier AI persona.
+  #
+  # Placeholders:
+  #   %guess%      — top-1 class name the AI sees (also %guess1%, %guess2%)
+  #   %confidence% — top-1 similarity as percent (0–100), no '%' sign
+  #   %theme%      — the player's actual theme
+  #   %player%     — player name (for broadcasts)
+  ai:
+
+    # Theme display names — maps centroids.json class names to readable
+    # English nouns (with an article where it reads naturally). Keys NOT
+    # found here fall back to the raw class name with underscores → spaces.
+    theme-names:
+      candles: "a Candle"
+      cube: "a Cube"
+      sword: "a Sword"
+      tree: "a Tree"
+      barrel: "a Barrel"
+      castle: "a Castle"
+      castle_tower: "a Castle Tower"
+      church: "a Church"
+      default_house: "a House"
+      desert_modern_villa: "a Desert Villa"
+      house_from_hell: "a Cursed House"
+      modern_house: "a Modern House"
+      overgrown_house: "an Overgrown House"
+      ship: "a Ship"
+      skyscraper: "a Skyscraper"
+
+    # Action bar — updated every ML tick (~5 s) while AI is unsure.
+    thinking:
+      - "&8[&b🤖 AI&8] &7Hmm... I think I see &f%guess%&7?"
+      - "&8[&b🤖 AI&8] &7Squinting... is that &f%guess%&7?"
+      - "&8[&b🤖 AI&8] &7Looks suspiciously like &f%guess%&7 to me."
+      - "&8[&b🤖 AI&8] &7Could it be &f%guess%&7?"
+      - "&8[&b🤖 AI&8] &7My best guess: &f%guess% &8(&7%confidence%%&8)"
+      - "&8[&b🤖 AI&8] &7Maybe... &f%guess%&7?"
+      - "&8[&b🤖 AI&8] &7Wait, &f%guess%&7?"
+      - "&8[&b🤖 AI&8] &7I want to say &f%guess%&7..."
+      - "&8[&b🤖 AI&8] &7Hmm. &f%guess%&7? Not sure yet."
+      - "&8[&b🤖 AI&8] &7Looking at it... &f%guess%&7, maybe?"
+      - "&8[&b🤖 AI&8] &7Tilting head... &f%guess%&7?"
+      - "&8[&b🤖 AI&8] &7That has &f%guess% &7vibes."
+      - "&8[&b🤖 AI&8] &7Working on it... &f%guess%&7 perhaps?"
+
+    # When top-1 and top-2 are nearly tied — AI is genuinely torn.
+    confused:
+      - "&8[&b🤖 AI&8] &7Could be &f%guess1%&7... or maybe &f%guess2%&7?"
+      - "&8[&b🤖 AI&8] &7I'm torn — &f%guess1% &7or &f%guess2%&7?"
+      - "&8[&b🤖 AI&8] &7Either &f%guess1% &7or &f%guess2%&7. Help!"
+      - "&8[&b🤖 AI&8] &7Looks like &f%guess1%&7... but also like &f%guess2%&7."
+      - "&8[&b🤖 AI&8] &7Cross between &f%guess1% &7and &f%guess2%&7?"
+
+    # Chat — occasional thoughts (sampled by chat-thoughts-chance, ~15%).
+    thinking-chat:
+      - "&8[&bAI&8] &7Hmm, that almost looks like &f%guess%&7..."
+      - "&8[&bAI&8] &7Wait, am I seeing &f%guess%&7?"
+      - "&8[&bAI&8] &7I'd bet good money this is &f%guess%&7."
+      - "&8[&bAI&8] &7Hold on — &f%guess%&7?"
+      - "&8[&bAI&8] &7You know what, I think it's &f%guess%&7."
+      - "&8[&bAI&8] &7No way... is that &f%guess%&7?"
+      - "&8[&bAI&8] &7Squinting harder... yeah, &f%guess%&7."
+      - "&8[&bAI&8] &7Putting on my glasses... &f%guess%&7?"
+      - "&8[&bAI&8] &7That's giving me &f%guess% &7energy."
+
+    # Big title when the AI finally GOT IT — shown to the builder only.
+    correct-title:
+      - "&a&lI GOT IT!"
+      - "&a&lAHA!"
+      - "&a&lEUREKA!"
+      - "&a&lYES!"
+      - "&a&lFINALLY!"
+      - "&a&lTHAT'S IT!"
+      - "&a&lNAILED IT!"
+      - "&a&lOH! OH!"
+
+    # Subtitle paired with the title above. Builder sees this.
+    correct-subtitle:
+      - "&fIt's &b&l%theme%&f!"
+      - "&fThat's &b&l%theme%&f!"
+      - "&fDefinitely &b&l%theme%&f!"
+      - "&fOf course — &b&l%theme%&f!"
+      - "&fHow did I miss it? &b&l%theme%&f!"
+
+    # Action-bar variant for builder right after the title — celebratory.
+    correct-actionbar:
+      - "&a✓ AI thinks: &b&l%theme% &a— +1 point!"
+      - "&a✓ Got it! &b&l%theme% &7(+1 point)"
+      - "&a✓ &b&l%theme% &a— nice build!"
+
+    # Broadcast to the entire arena when SOMEONE scores. Goes to chat.
+    correct-broadcast:
+      - "&8[&bAI&8] &aOH! &f%player% &abuilt &b&l%theme%&a! Nice one!"
+      - "&8[&bAI&8] &aGOT IT! &f%player%&a's build is &b&l%theme%&a!"
+      - "&8[&bAI&8] &aI see it now — &f%player% &amade &b&l%theme%&a!"
+      - "&8[&bAI&8] &aAha! &f%player% &acrafted &b&l%theme%&a!"
+      - "&8[&bAI&8] &aBeautiful &b&l%theme% &aby &f%player%&a!"
+
+    # Sidebar scoreboard. Each line is a separate key. Three layouts are
+    # used depending on session state: WAITING / COUNTDOWN / PLAYING.
+    scoreboard:
+      title: "&6&l⚡ BuildBattleAI ⚡"
+      sep: "&8&m                    "
+      arena: "&7Arena: &f%arena%"
+
+      # ── WAITING layout ──
+      status-label: "&7Status:"
+      status-waiting: " &eWaiting..."
+      players-line: "&7Players: &e%count%&7/&e%max%"
+      min-to-start: "&7Need &e%needed% &7more"
+
+      # ── COUNTDOWN layout ──
+      status-countdown: " &6Starting!"
+      countdown-line: "&7Starts in: &e&l%seconds%s"
+
+      # ── PLAYING layout ──
+      theme-label: "&7Your theme:"
+      theme-value: " &b&l%theme%"
+      score: "&7Score: &e%score%"
+      build-time: "&7Build time: &e%time%"
+      game-time: "&7Game time: &e%time%"
+      ai-label: "&7AI sees:"
+      ai-value: " &f%guess% &8(&7%confidence%%&8)"
+      ai-thinking: " &8still thinking..."
+
+    # Tab list header/footer. Newlines (\n) are honoured. Three layouts
+    # mirror the scoreboard's WAITING / COUNTDOWN / PLAYING variants.
+    tab:
+      header: "&6&l⚡ BuildBattleAI ⚡\n&7Arena &f%arena% &8| &7Round &f%round%"
+      footer: "&8&m                    \n&7Players: &f%count%&7/&f%max%  &8|  &7Time: &f%time%"
+      header-waiting: "&6&l⚡ BuildBattleAI ⚡\n&7Arena &f%arena% &8| &eWaiting"
+      footer-waiting: "&8&m                    \n&7Players: &f%count%&7/&f%max%"
+      header-countdown: "&6&l⚡ BuildBattleAI ⚡\n&7Arena &f%arena% &8| &6Starting in &e&l%seconds%s"
+      footer-countdown: "&8&m                    \n&7Players: &f%count%&7/&f%max%"
+
+    # Skip-theme feather. Right-click in PLAYING state to clear the zone
+    # and advance to the next theme.
+    skip-item:
+      name: "&e&l⚡ Skip Theme"
+      lore:
+        - "&7Right-click to skip"
+        - "&7your current theme."
+        - ""
+        - "&8Useful when stuck or"
+        - "&8the build went wrong."
+      # Hidden marker line appended to lore — used to identify our item
+      # across pickup/drop without relying on the localised name (admin
+      # may translate). Color codes make it visually invisible; the magic
+      # text is what the listener matches against.
+      marker: "&0&k|&r&8&o#bbai-skip"
+
+    # Chat line shown to the player after they skip a theme.
+    skip-feedback:
+      - "&7Theme skipped. Better luck next time!"
+      - "&7Theme skipped — let's try a new one."
+      - "&7Skipped! The AI was just as confused as you."

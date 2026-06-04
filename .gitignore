@@ -1,6 +1,12 @@
 # Build
 target/
 
+# Plugin build artifacts inside local test servers — produced by `mvn package`,
+# 256 MB each (shaded Ignite) → exceed GitHub's 100 MB hard limit.
+Servers/**/plugins/buildbattleai-*.jar
+# Paper auto-generated remap cache — regenerated on server start.
+Servers/**/.paper-remapped/
+
 # IDE
 .idea/
 *.iml

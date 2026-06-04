@@ -1,0 +1,81 @@
+# ── Logging ──────────────────────────────────────────────────────────────
+# Controls the verbosity of plugin console output.
+# Levels: debug, info, warn, error, off
+#   debug - All messages including verbose diagnostics (useful for development)
+#   info  - Normal operational messages, warnings, and errors (default)
+#   warn  - Only warnings and errors
+#   error - Only critical errors
+#   off   - Suppress all plugin log output
+log-level: info
+
+default-language: en
+
+# ── Data Storage ─────────────────────────────────────────────────────────
+data:
+  # Enable persistent data storage (player stats, arena stats).
+  # If false, no data is persisted and DataService methods return defaults.
+  enabled: true
+  
+  # Storage backend: "local" (JSON files) or "ignite" (Apache Ignite cluster)
+  provider: local
+  
+  # Local JSON file storage settings (used when provider: local)
+  local:
+    # Directory for data files, relative to plugin data folder
+    directory: data
+    # Auto-save interval in seconds (0 = disabled, save only on shutdown)
+    auto-save-interval: 300
+  
+  # Apache Ignite settings (used when provider: ignite)
+  ignite:
+    # Ignite node mode: "server", "thick-client", or "thin-client"
+    #   server       - full Ignite server node in this JVM (stores data, participates in cluster)
+    #   thick-client - thick client that connects to an existing cluster (full API, no local storage)
+    #   thin-client  - lightweight TCP client (lowest overhead, requires running cluster)
+    mode: server
+    # Cluster instance name (must match across all nodes in the cluster)
+    instance-name: BuildBattleAI
+    # Native persistence - data survives node restarts via WAL + snapshots.
+    # When false, data lives only in memory and is lost on restart.
+    persistence-enabled: true
+    # Work directory for Ignite data (WAL, snapshots, indexes),
+    # relative to plugin data folder
+    work-directory: ignite
+    # Suppress Ignite console output
+    quiet-mode: true
+    # Metrics log frequency in milliseconds (0 = disabled)
+    metrics-log-frequency: 0
+    # Memory region settings
+    initial-memory-mb: 64
+    max-memory-mb: 128
+    # Static discovery addresses for server/thick-client modes
+    discovery-addresses:
+    - 127.0.0.1:47500..47509
+    # Connection addresses for thin-client mode
+    thin-client-addresses:
+    - 127.0.0.1:10800
+evaluation:
+  min-cadence-ms: 5000
+  coordinator-tick-period: 5
+  render-workers: 1
+  render-queue-capacity: 64
+  ml-batch-max-size: 8
+  ml-batch-max-wait-ms: 200
+  ml-queue-capacity: 64
+  ml-top-k: 2
+  metrics-log-period-seconds: 60
+game:
+  feedback:
+    enabled: true
+    actionbar-enabled: true
+    chat-thoughts-enabled: true
+    chat-thoughts-chance: 0.15
+    title-on-correct-enabled: true
+    broadcast-on-correct-enabled: true
+    scoreboard-enabled: true
+    tab-enabled: true
+    confused-threshold: 0.04
+    show-confidence: true
+    sound-on-thinking: true
+    sound-on-thinking-chance: 0.4
+    skip-feather-enabled: true

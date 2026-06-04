@@ -11,14 +11,14 @@ BuildBattleAI is a Spigot plugin for a Minecraft Build Battle variant where buil
 ## Build & Test Commands
 
 ```bash
-mvn clean package                        # Build shaded JAR, run tests, copy to ~/Servers/1.21/plugins/
+mvn clean package                        # Build shaded JAR, run tests, copy to ./Servers/1.21/plugins/
 mvn compile                              # Quick compile check
 mvn test                                 # Run all tests
 mvn test -pl . -Dtest=BlockPaletteTest   # Run a single test class
 mvn test -pl . -Dtest="BlockPaletteTest#stoneHasColor"  # Run a single test method
 ```
 
-The build produces two artifacts in `target/`: the full JAR (with Apache Ignite shaded) and a `-lite` JAR (without Ignite/javax.cache). The full JAR is auto-copied to `~/Servers/1.21/plugins/` and `~/Servers/1.8/plugins/` via maven-antrun-plugin. Local test server: `~/Servers/1.21/start.command`.
+The build produces two artifacts in `target/`: the full JAR (with Apache Ignite shaded) and a `-lite` JAR (without Ignite/javax.cache). The full JAR is auto-copied to `./Servers/1.21/plugins/` and `./Servers/1.8/plugins/` (under the project root) via maven-antrun-plugin. Local test server: `./Servers/1.21/start.command`.
 
 **JAR signing:** `mvn clean package -Psign -Djarsigner.keystore=./keystore.jks -Djarsigner.alias=bbai -Djarsigner.storepass=<pass> -Djarsigner.keypass=<pass>` (generate keystore once via `keytool -genkeypair`).
 
