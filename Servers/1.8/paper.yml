@@ -9,6 +9,10 @@
 
 config-version: 9
 data-value-allowed-items: []
+settings:
+  baby-zombie-movement-speed: 0.4
+  limit-player-interactions: true
+warnWhenSettingExcessiveVelocity: true
 effect-modifiers:
   strength: 1.3
   weakness: -0.5
@@ -16,27 +20,53 @@ stackable-buckets:
   lava: false
   water: false
   milk: false
-settings:
-  baby-zombie-movement-speed: 0.4
-  limit-player-interactions: true
-warnWhenSettingExcessiveVelocity: true
 world-settings:
   default:
     verbose: true
     disable-teleportation-suffocation-check: false
-    water-over-lava-flow-speed: 5
     disable-explosion-knockback: false
-    fix-cannons: false
+    water-over-lava-flow-speed: 5
     tnt-entity-height-nerf: 0
+    fix-cannons: false
     use-hopper-check: true
-    all-chunks-are-slime-chunks: false
-    allow-undead-horse-leashing: false
-    container-update-tick-rate: 3
+    mob-spawner-tick-rate: 2
+    squid-spawn-height:
+      minimum: 45.0
+      maximum: 63.0
+    max-growth-height:
+      cactus: 3
+      reeds: 3
+    player-exhaustion:
+      block-break: 0.02500000037252903
+      swimming: 0.014999999664723873
+    fishing-time-range:
+      MinimumTicks: 100
+      MaximumTicks: 900
+    despawn-ranges:
+      soft: 28
+      hard: 96
+    remove-unloaded:
+      enderpearls: true
+      tnt-entities: true
+      falling-blocks: true
     game-mechanics:
-      disable-end-credits: false
       boats-drop-boats: false
       disable-player-crits: false
       disable-chest-cat-detection: true
+      disable-end-credits: false
+    load-chunks:
+      enderpearls: false
+      tnt-entities: false
+      falling-blocks: false
+    fast-drain:
+      lava: true
+      water: true
+    lava-flow-speed:
+      normal: 30
+      nether: 10
+    all-chunks-are-slime-chunks: false
+    allow-undead-horse-leashing: false
+    container-update-tick-rate: 3
     keep-spawn-loaded: true
     disable-mood-sounds: false
     use-async-lighting: false
@@ -62,36 +92,6 @@ world-settings:
     cache-chunk-maps: true
     tnt-explosion-volume: 4.0
     optimize-explosions: true
-    mob-spawner-tick-rate: 2
-    squid-spawn-height:
-      minimum: 45.0
-      maximum: 63.0
-    max-growth-height:
-      cactus: 3
-      reeds: 3
-    fishing-time-range:
-      MinimumTicks: 100
-      MaximumTicks: 900
-    player-exhaustion:
-      block-break: 0.02500000037252903
-      swimming: 0.014999999664723873
-    despawn-ranges:
-      soft: 28
-      hard: 96
-    remove-unloaded:
-      enderpearls: true
-      tnt-entities: true
-      falling-blocks: true
-    load-chunks:
-      enderpearls: false
-      tnt-entities: false
-      falling-blocks: false
-    fast-drain:
-      lava: true
-      water: true
-    lava-flow-speed:
-      normal: 30
-      nether: 10
     player-blocking-damage-multiplier: 0.5
     falling-block-height-nerf: 0
     nether-ceiling-void-damage: false

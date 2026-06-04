@@ -30,6 +30,37 @@ mvn test             # Только тесты
 
 Требуется **Java 8+** и **Maven 3.6+**.
 
+## Тестирование
+
+Базовый `mvn test` запускает 12 700+ юнит- и интеграционных тестов (рендерер, палитра, очереди evaluation, ML в disabled-режиме, MockBukkit-сценарии). Тяжёлые тесты вынесены в отдельные Maven-профили.
+
+| Профиль | Что делает | Команда |
+|---|---|---|
+| (default) | Юнит-тесты + property-based палитра + golden-снапшоты рендерера + smoke `plugin.yml` | `mvn test` |
+| `-Pe2e` | Запускает реальные серверы **Paper 1.8.8** (`Servers/1.8/`) и **Purpur 1.21.11** (`Servers/1.21/`) как subprocess, ждёт `Done (`, проверяет, что плагин включился, отправляет `bbai list`, останавливает сервер, ассертит чистый exit | `mvn package && mvn test -Pe2e` |
+| `-Pml-it` | Грузит реальную ONNX-модель ConvNeXt-Tiny из `models/`, прогоняет один forward pass через ORT, проверяет, что embedding имеет форму `(1, 128)` и не нулевой | `mvn test -Pml-it` |
+| `-Pbench` | Компилирует JMH-бенчмарки рендерера и палитры из `src/jmh/java/` | `mvn test-compile -Pbench`<br>далее запуск через `java -cp ... org.openjdk.jmh.Main RendererBenchmark` |
+
+### Golden-снапшоты рендерера
+
+`RendererGoldenSnapshotTest` рендерит набор фиксированных сцен (пустое небо, одиночный камень, каменная комната, башня с эмиссивным блоком, стена) и сравнивает SHA-256 байтов рендера с эталонами в `src/test/resources/golden/renderer/`. Если эталон отсутствует — он пишется на лету (first-run blessing). На несовпадении в `target/golden-actual/<name>.png` сохраняется реальное изображение для визуальной диффы.
+
+Перебагривание после намеренных изменений в рендерере:
+
+```bash
+GOLDEN_UPDATE=1 mvn test -Dtest=RendererGoldenSnapshotTest
+```
+
+### E2E против реальных серверов
+
+E2E-драйвер живёт в `src/test/java/ru/ashesha/buildBattleAI/e2e/`:
+
+- `AbstractServerE2ETest` — общая логика: копирует свежий JAR из `target/` в `plugins/`, чистит дубликаты, форсит EULA, запускает `start.command`, парсит stdout, шлёт команды через stdin, валидирует чистый shutdown
+- `Paper18E2ETest` — пинит `Servers/1.8/` (Paper 1.8.8)
+- `Purpur121E2ETest` — пинит `Servers/1.21/` (Purpur 1.21.11)
+
+Известные cross-version предупреждения Bukkit (например, `PlayerSwapHandItemsEvent` отсутствует в 1.8) толерируются — это нормальное поведение, плагин стартует и работает.
+
 ## Совместимость
 
 - **Spigot / Paper 1.21.x**

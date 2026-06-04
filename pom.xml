@@ -50,6 +50,14 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
+                    <!-- E2E and ML integration tests are heavy (subprocess server boot,
+                         107 MiB ONNX model load) and gated by system properties.
+                         Exclude them from the default test run; the -Pe2e / -Pml-it
+                         profiles re-include them by flipping the gating properties. -->
+                    <excludes>
+                        <exclude>**/e2e/**</exclude>
+                        <exclude>**/MLIntegrationTest.java</exclude>
+                    </excludes>
                     <argLine>
                         -Dnet.bytebuddy.experimental=true
                         --add-opens=java.base/jdk.internal.access=ALL-UNNAMED
@@ -287,6 +295,149 @@
                 <jarsigner.skip>false</jarsigner.skip>
             </properties>
         </profile>
+        <!--
+             End-to-end test profile.
+
+             Activates the JUnit drivers under `src/test/java/.../e2e/` which
+             spawn a real Paper / Purpur server as a subprocess, watch its
+             stdout for plugin enable markers, and exercise a command.
+             Requires that the plugin JAR has already been built (the antrun
+             step of `mvn package` copies it into Servers/<v>/plugins/
+             automatically) and that the Servers/1.8 + Servers/1.21
+             directories are checked out locally.
+
+             Run with:
+               mvn package          # build & copy plugin into Servers/<v>/plugins
+               mvn test -Pe2e       # actually exercise both servers
+        -->
+        <profile>
+            <id>e2e</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <!-- Re-include the e2e tests excluded by the default config. -->
+                            <excludes>
+                                <exclude>**/MLIntegrationTest.java</exclude>
+                            </excludes>
+                            <includes>
+                                <include>**/e2e/**Test.java</include>
+                            </includes>
+                            <systemPropertyVariables>
+                                <bbai.e2e>true</bbai.e2e>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!--
+             Real-model ML integration profile.
+
+             Boots the bundled ONNX ConvNeXt-Tiny embedder via ORT and runs
+             a single forward pass. Slow (~10 s cold-start) so excluded from
+             the default `mvn test` run. Catches build-time regressions in
+             which Maven filtering or shading silently corrupts the model
+             file — none of the disabled-mode unit tests can detect this.
+
+             Run with:
+               mvn test -Pml-it
+        -->
+        <profile>
+            <id>ml-it</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <excludes>
+                                <exclude>**/e2e/**</exclude>
+                            </excludes>
+                            <includes>
+                                <include>**/MLIntegrationTest.java</include>
+                            </includes>
+                            <systemPropertyVariables>
+                                <bbai.ml-it>true</bbai.ml-it>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!--
+             JMH micro-benchmark profile.
+
+             Adds src/jmh/java as a test source root, pulls in the JMH
+             core + annotation processor under test scope, and exposes
+             `mvn -Pbench exec:java -Dexec.mainClass=org.openjdk.jmh.Main`
+             as the run entry point. Benchmarks live under
+             `ru.ashesha.buildBattleAI.bench.*` — `RendererBenchmark`,
+             `PaletteBenchmark`, `MlQueueBenchmark`.
+
+             Run with:
+               mvn test-compile -Pbench
+               mvn -Pbench exec:java -Dexec.mainClass=org.openjdk.jmh.Main \
+                   -Dexec.args="ru.ashesha.buildBattleAI.bench.RendererBenchmark"
+        -->
+        <profile>
+            <id>bench</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>build-helper-maven-plugin</artifactId>
+                        <version>3.6.0</version>
+                        <executions>
+                            <execution>
+                                <id>add-jmh-source</id>
+                                <phase>generate-test-sources</phase>
+                                <goals>
+                                    <goal>add-test-source</goal>
+                                </goals>
+                                <configuration>
+                                    <sources>
+                                        <source>src/jmh/java</source>
+                                    </sources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <annotationProcessorPaths combine.children="append">
+                                <path>
+                                    <groupId>org.openjdk.jmh</groupId>
+                                    <artifactId>jmh-generator-annprocess</artifactId>
+                                    <version>1.37</version>
+                                </path>
+                            </annotationProcessorPaths>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+            <dependencies>
+                <dependency>
+                    <groupId>org.openjdk.jmh</groupId>
+                    <artifactId>jmh-core</artifactId>
+                    <version>1.37</version>
+                    <scope>test</scope>
+                </dependency>
+                <dependency>
+                    <groupId>org.openjdk.jmh</groupId>
+                    <artifactId>jmh-generator-annprocess</artifactId>
+                    <version>1.37</version>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+
         <!-- Obfuscation profiles — rename only / rename+shrink+optimize / maximum -->
         <profile>
             <id>obfuscate-light</id>

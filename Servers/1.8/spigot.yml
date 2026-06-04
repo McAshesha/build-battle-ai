@@ -71,16 +71,12 @@ world-settings:
     merge-radius:
       item: 4.0
       exp: 6.0
-    enable-zombie-pigmen-portal-spawns: false
     arrow-despawn-rate: 60
+    enable-zombie-pigmen-portal-spawns: false
     wither-spawn-sound-radius: 0
     view-distance: 5
     hanging-tick-frequency: 200
     zombie-aggressive-towards-villager: false
-    chunks-per-tick: 200
-    clear-tick-list: false
-    mob-spawn-range: 3
-    dragon-death-sound-radius: 0
     anti-xray:
       enabled: false
       engine-mode: 1
@@ -140,3 +136,7 @@ world-settings:
     max-tick-time:
       tile: 50
       entity: 50
+    chunks-per-tick: 200
+    clear-tick-list: false
+    mob-spawn-range: 3
+    dragon-death-sound-radius: 0
