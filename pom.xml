@@ -24,6 +24,17 @@
         <!-- ProGuard obfuscation — skipped by default; activate with -Pobfuscate-light / -Pobfuscate / -Pobfuscate-heavy -->
         <proguard.skip>true</proguard.skip>
         <proguard.config.level>${project.basedir}/proguard/light.pro</proguard.config.level>
+        <!-- Spigot API version: single source of truth shared by the
+             provided-scope dependency and the ProGuard <libs> entry that
+             feeds the bytecode analyzer the full Bukkit class hierarchy. -->
+        <spigot.api.version>1.21.8-R0.1-SNAPSHOT</spigot.api.version>
+        <!-- Apache Ignite version: shared by the compile dependency and the
+             ProGuard <libs> entry. The lite JAR explicitly excludes Ignite
+             from shading, so ProGuard would otherwise emit warnings about
+             unresolved references from our data.ignite.* providers; adding
+             the JAR as a library jar lets the analyzer resolve those
+             without including Ignite in the obfuscated output. -->
+        <ignite.version>2.16.0</ignite.version>
     </properties>
 
     <build>
@@ -155,36 +166,82 @@
                 <artifactId>proguard-maven-plugin</artifactId>
                 <version>2.6.1</version>
                 <executions>
+                    <!-- 1) Full JAR: same artifact as shade's main output. -->
                     <execution>
                         <id>proguard</id>
                         <phase>package</phase>
                         <goals>
                             <goal>proguard</goal>
                         </goals>
+                        <configuration>
+                            <injar>${project.build.finalName}.jar</injar>
+                            <outjar>${project.build.finalName}.jar</outjar>
+                            <mappingFileName>proguard-mapping.txt</mappingFileName>
+                        </configuration>
+                    </execution>
+                    <!-- 2) Lite JAR: attached artifact built by shade-lite,
+                         obfuscated with the same rule set but a separate
+                         mapping file so stack traces from a lite deploy
+                         can be deobfuscated independently of the full build. -->
+                    <execution>
+                        <id>proguard-lite</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>proguard</goal>
+                        </goals>
+                        <configuration>
+                            <injar>${project.build.finalName}-lite.jar</injar>
+                            <outjar>${project.build.finalName}-lite.jar</outjar>
+                            <mappingFileName>proguard-mapping-lite.txt</mappingFileName>
+                        </configuration>
                     </execution>
                 </executions>
                 <configuration>
                     <skip>${proguard.skip}</skip>
                     <obfuscate>true</obfuscate>
-                    <!-- Process the shaded main JAR in-place -->
-                    <injar>${project.build.finalName}.jar</injar>
-                    <outjar>${project.build.finalName}.jar</outjar>
                     <outputDirectory>${project.build.directory}</outputDirectory>
                     <!-- Dependencies are already inside the shaded JAR -->
                     <includeDependency>false</includeDependency>
-                    <!-- Mapping file for stack trace deobfuscation -->
-                    <mappingFileName>proguard-mapping.txt</mappingFileName>
                     <!-- Base keep rules (shared by all levels) -->
                     <proguardInclude>${project.basedir}/proguard/base.pro</proguardInclude>
                     <!-- Level-specific config, selected via profile property -->
                     <options>
                         <option>@${proguard.config.level}</option>
                     </options>
-                    <!-- JDK 21 base module for core types (java.lang.Object, etc.).
-                         JDK 25 jmods use class version 69 which ProGuard
-                         cannot read, so we reference JDK 21 instead. -->
+                    <!-- JDK jmods feed ProGuard the JDK class hierarchies.
+                         Resolved via ${java.home} so the configuration works
+                         on any developer machine (macOS, Linux) and on CI
+                         without hard-coding install paths.
+
+                         Requirement: the JDK Maven runs under must be
+                         JDK 21 — JDK 25 jmods use class version 69 which
+                         ProGuard 7.x cannot read.
+
+                         Modules:
+                          - java.base: java.lang.Object and the core types
+                          - java.desktop / java.logging / java.management /
+                            java.sql: referenced indirectly by Ignite
+                            (AboutDialog → Swing, JavaLoggerFileHandler →
+                            j.u.l, MXBean machinery → JMX, JdbcDriverPropertyInfo
+                            → JDBC). Without them ProGuard emits ~20 spurious
+                            "can't find referenced member" warnings.
+
+                         Spigot API JAR from the local Maven repository feeds
+                         ProGuard the full Bukkit class hierarchy so that
+                         BuildBattleAI's calls to inherited JavaPlugin /
+                         Command members (getServer, getDataFolder, getName,
+                         unregister, …) resolve cleanly. -->
                     <libs>
-                        <lib>${user.home}/Library/Java/JavaVirtualMachines/ms-21.0.10/Contents/Home/jmods/java.base.jmod</lib>
+                        <lib>${java.home}/jmods/java.base.jmod</lib>
+                        <lib>${java.home}/jmods/java.desktop.jmod</lib>
+                        <lib>${java.home}/jmods/java.logging.jmod</lib>
+                        <lib>${java.home}/jmods/java.management.jmod</lib>
+                        <lib>${java.home}/jmods/java.sql.jmod</lib>
+                        <lib>${settings.localRepository}/org/spigotmc/spigot-api/${spigot.api.version}/spigot-api-${spigot.api.version}.jar</lib>
+                        <!-- Ignite as a library jar so the lite execution (which
+                             excludes Ignite from the shaded JAR) can still
+                             resolve references from our data.ignite.* providers. -->
+                        <lib>${settings.localRepository}/org/apache/ignite/ignite-core/${ignite.version}/ignite-core-${ignite.version}.jar</lib>
                     </libs>
                 </configuration>
                 <dependencies>
@@ -497,7 +554,7 @@
         <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>
-            <version>1.21.8-R0.1-SNAPSHOT</version>
+            <version>${spigot.api.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -538,7 +595,7 @@
         <dependency>
             <groupId>org.apache.ignite</groupId>
             <artifactId>ignite-core</artifactId>
-            <version>2.16.0</version>
+            <version>${ignite.version}</version>
             <scope>compile</scope>
         </dependency>
         <!-- Bundled & relocated Gson — Bukkit/Spigot ships a much older Gson

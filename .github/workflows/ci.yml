@@ -63,8 +63,23 @@ jobs:
             --clobber
           ls -lh "$MODEL_PATH"
 
-      - name: Build and run tests
+      - name: Build and run unit tests
         run: mvn -B -ntp clean verify
+
+      # End-to-end tests spawn real Paper / Purpur subprocesses from
+      # Servers/1.8 and Servers/1.21 (both checked into the repo) and
+      # consume the plugin JAR that antrun just dropped into
+      # Servers/<v>/plugins/ during `mvn verify`. The `e2e` profile
+      # narrows surefire to `**/e2e/**Test.java`; MLIntegrationTest is
+      # explicitly excluded from this run and handled separately below.
+      - name: Run end-to-end tests (Paper/Purpur subprocess)
+        run: mvn -B -ntp surefire:test -Pe2e
+
+      # ML integration test loads the real ONNX embedder (cached in
+      # the earlier step) and probes available backends. Runs on CPU
+      # under the GitHub runner; no GPU is expected.
+      - name: Run ML integration tests (ONNX backends)
+        run: mvn -B -ntp surefire:test -Pml-it
 
       - name: Upload Surefire reports on failure
         if: failure()

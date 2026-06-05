@@ -55,6 +55,43 @@
 # ViaVersion: optional runtime dep of PacketEvents, not shipped in JAR.
 -dontwarn com.viaversion.**
 
+# JSpecify @Nullable / @NonNull / @NullMarked: compile-time annotation API
+# used heavily by PacketEvents; classes are not on the runtime classpath
+# and not needed for execution.
+-dontwarn org.jspecify.**
+
+# Checker Framework annotations: compile-time only.
+-dontwarn org.checkerframework.**
+
+# Google AutoService: compile-time SPI generator, no runtime presence.
+-dontwarn com.google.auto.service.**
+
+# ASM bytecode library: used by XSeries XReflectASM only when reflective
+# rewriting is requested. Plugin works fine without it on the classpath.
+# The two `XReflectASM`/`MethodRewriter` field-type warnings also stem
+# from ASM not being on the classpath at obfuscation time.
+-dontwarn org.objectweb.asm.**
+-dontwarn ru.ashesha.buildBattleAI.libs.xseries.reflection.asm.**
+
+# Kyori MiniMessage: optional Adventure module (we only shade
+# adventure-text-serializer-legacy). XSeries AdventureAPIFactory probes
+# for it at runtime via reflection; absence is the expected fallback.
+-dontwarn ru.ashesha.buildBattleAI.libs.kyori.adventure.text.minimessage.**
+-dontwarn ru.ashesha.buildBattleAI.libs.xseries.paper.AdventureAPIFactory
+
+# Folia / Paper-specific schedulers and events: PacketEvents detects
+# their presence at runtime via reflection and falls back to Bukkit APIs.
+-dontwarn io.papermc.paper.threadedregions.**
+-dontwarn io.papermc.paper.event.**
+-dontwarn io.papermc.paper.connection.**
+
+# BungeeCord chat components: provided by Spigot/Paper at runtime as part
+# of the chat-component API used by XSeries Title/ActionBar.
+-dontwarn net.md_5.bungee.**
+
+# Log4j: provided by the server runtime.
+-dontwarn org.apache.logging.log4j.**
+
 # Safety net: the shaded JAR references many provided-scope classes
 # (Bukkit, Spigot, NMS) that only exist at runtime. Proceed despite
 # any remaining unresolved references.

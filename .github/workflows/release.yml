@@ -1,0 +1,364 @@
+name: Release
+
+# Manual-only release pipeline. Triggered from the GitHub Actions UI
+# (workflow_dispatch). Builds the signed + obfuscated full and lite
+# JARs, publishes a GitHub Release with both JARs and the ProGuard
+# mapping file, and bumps the pom to the next -SNAPSHOT on the
+# default branch.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          Release version, without `-SNAPSHOT` (e.g. 1.2.3). If left
+          empty, the current pom version is used and `-SNAPSHOT` is
+          stripped from it.
+        required: false
+        type: string
+        default: ''
+      release_notes:
+        description: >-
+          Release notes body (Markdown). Leave empty for an empty
+          description. The release title is generated automatically
+          and includes the version.
+        required: false
+        type: string
+        default: ''
+      obfuscation_level:
+        description: >-
+          ProGuard obfuscation profile to activate. Maps 1:1 to the
+          `-Pobfuscate-*` Maven profiles declared in pom.xml.
+        required: false
+        type: choice
+        default: obfuscate
+        options:
+          - obfuscate-light
+          - obfuscate
+          - obfuscate-heavy
+
+# `contents: write` is required to:
+#   - push the release-version commit and snapshot-bump commit back
+#     to the default branch,
+#   - push the new `vX.Y.Z` tag,
+#   - create the GitHub Release via `gh release create`.
+permissions:
+  contents: write
+
+# Releases must serialise — two simultaneous bumps would race on the
+# pom.xml commit and produce a tangled history. cancel-in-progress is
+# off on purpose: a release in flight should never be interrupted.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # Kept in sync with .github/workflows/ci.yml — the ONNX model is
+  # not committed to the repo and is restored from the dedicated
+  # `ml-model-v1` GitHub Release tag (cached between runs).
+  MODEL_RELEASE_TAG: ml-model-v1
+  MODEL_PATH: src/main/resources/models/custom_convnext_embeddings.onnx
+
+jobs:
+  release:
+    name: Build, sign, publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Full history so version-bump commits aren't shallow-pushed.
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Cache ONNX model
+        id: cache-model
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.MODEL_PATH }}
+          key: onnx-model-${{ env.MODEL_RELEASE_TAG }}
+
+      - name: Download ONNX model from Release
+        if: steps.cache-model.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$MODEL_PATH")"
+          gh release download "$MODEL_RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern 'custom_convnext_embeddings.onnx' \
+            --output "$MODEL_PATH" \
+            --clobber
+          ls -lh "$MODEL_PATH"
+
+      # ----------------------------------------------------------------
+      # Resolve the version we are going to release and the next
+      # -SNAPSHOT version to leave behind on the default branch.
+      #
+      # Rules (mirrors the spec in the workflow request):
+      #   - If `inputs.version` is non-empty: use it as the release
+      #     version verbatim. It must NOT contain -SNAPSHOT.
+      #   - Otherwise: take the current pom version, strip a trailing
+      #     `-SNAPSHOT`. The result must look like a normal version.
+      #
+      # Next snapshot is computed by incrementing the last numeric
+      # segment of the release version's numeric core (any qualifier
+      # like `-rc1` or `+build5` is stripped before incrementing).
+      # ----------------------------------------------------------------
+      - name: Resolve release and next-snapshot versions
+        id: ver
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          CURRENT=$(mvn -B -ntp -q -DforceStdout help:evaluate -Dexpression=project.version)
+          echo "Current pom version: $CURRENT"
+
+          # Trim surrounding whitespace from the input.
+          trimmed=$(printf '%s' "$INPUT_VERSION" | tr -d '[:space:]')
+
+          if [ -n "$trimmed" ]; then
+            RELEASE="$trimmed"
+          else
+            RELEASE="${CURRENT%-SNAPSHOT}"
+          fi
+
+          # Hard guard: the release version must never be a snapshot.
+          case "$RELEASE" in
+            *-SNAPSHOT*)
+              echo "Release version must not contain -SNAPSHOT (got: $RELEASE)" >&2
+              exit 1
+              ;;
+          esac
+
+          # Shape check: digits-and-dots, optional qualifier after - or +.
+          if ! printf '%s' "$RELEASE" | grep -Eq '^[0-9]+(\.[0-9]+)*([-+][A-Za-z0-9.]+)?$'; then
+            echo "Invalid release version: $RELEASE" >&2
+            exit 1
+          fi
+
+          # Strip any -qualifier / +metadata before computing the next snapshot.
+          base=$(printf '%s' "$RELEASE" | sed -E 's/[-+].*$//')
+          last=${base##*.}
+          if [ "$base" = "$last" ]; then
+            # Single-segment version, e.g. "5".
+            NEXT="$((last + 1))-SNAPSHOT"
+          else
+            prefix=${base%.*}
+            NEXT="${prefix}.$((last + 1))-SNAPSHOT"
+          fi
+
+          {
+            echo "release=$RELEASE"
+            echo "next=$NEXT"
+            echo "tag=v$RELEASE"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Will release: $RELEASE"
+          echo "Next snapshot: $NEXT"
+
+      # Refuse to overwrite an existing tag — releases are append-only.
+      - name: Refuse to overwrite existing tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists locally" >&2
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists on the remote" >&2
+            exit 1
+          fi
+
+      - name: Set release version in pom.xml
+        run: >-
+          mvn -B -ntp versions:set
+          -DnewVersion='${{ steps.ver.outputs.release }}'
+          -DgenerateBackupPoms=false
+
+      # ----------------------------------------------------------------
+      # Restore the JAR signing keystore from a base64 secret. We
+      # write it under $RUNNER_TEMP so it's outside the checked-out
+      # tree (CLAUDE.md: "Keystores (*.jks, *.p12) are gitignored —
+      # never commit them.") and is wiped automatically when the
+      # runner is destroyed.
+      # ----------------------------------------------------------------
+      - name: Decode signing keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.JAR_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "Required secret JAR_KEYSTORE_BASE64 is missing" >&2
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/keystore.jks"
+          test -s "$RUNNER_TEMP/keystore.jks"
+
+      # Single Maven invocation that:
+      #   - runs unit tests (default surefire excludes e2e/ml-it),
+      #   - shades the full + lite JARs (executions `shade` + `shade-lite`),
+      #   - obfuscates both via two ProGuard executions (`proguard`
+      #     emits `proguard-mapping.txt`, `proguard-lite` emits
+      #     `proguard-mapping-lite.txt`),
+      #   - signs both JARs with jarsigner,
+      #   - antrun-copies the signed full JAR into Servers/<v>/plugins/
+      #     (harmless side-effect; the runner is ephemeral).
+      #
+      # The obfuscation profile (`obfuscate-light` / `obfuscate` /
+      # `obfuscate-heavy`) is chosen by the workflow input and feeds
+      # `proguard.config.level` to pick light.pro / standard.pro /
+      # heavy.pro on top of the shared base.pro keep rules.
+      - name: Build signed + obfuscated JARs
+        env:
+          JAR_KEY_ALIAS: ${{ secrets.JAR_KEY_ALIAS }}
+          JAR_KEYSTORE_PASS: ${{ secrets.JAR_KEYSTORE_PASS }}
+          JAR_KEY_PASS: ${{ secrets.JAR_KEY_PASS }}
+          OBFUSCATION_PROFILE: ${{ inputs.obfuscation_level }}
+        run: |
+          set -euo pipefail
+          mvn -B -ntp clean verify \
+            -Psign,"$OBFUSCATION_PROFILE" \
+            -Djarsigner.keystore="$RUNNER_TEMP/keystore.jks" \
+            -Djarsigner.alias="$JAR_KEY_ALIAS" \
+            -Djarsigner.storepass="$JAR_KEYSTORE_PASS" \
+            -Djarsigner.keypass="$JAR_KEY_PASS"
+
+      # Gather artifacts into a clean directory so the release upload
+      # picks up exactly what we want (no -sources/-javadoc/etc.).
+      - name: Collect release artifacts
+        id: art
+        run: |
+          set -euo pipefail
+          VERSION='${{ steps.ver.outputs.release }}'
+          OUT="$RUNNER_TEMP/release-artifacts"
+          mkdir -p "$OUT"
+
+          # Full JAR = the buildbattleai-*.jar WITHOUT the -lite suffix,
+          # and without sources/javadoc classifiers.
+          FULL=$(find target -maxdepth 1 -type f \
+            -name 'buildbattleai-*.jar' \
+            ! -name '*-lite.jar' \
+            ! -name '*-sources.jar' \
+            ! -name '*-javadoc.jar' \
+            -print | head -n1)
+          LITE=$(find target -maxdepth 1 -type f -name 'buildbattleai-*-lite.jar' -print | head -n1)
+
+          # Two mapping files come out of pom.xml's two ProGuard
+          # executions (`proguard` for full, `proguard-lite` for
+          # the attached lite artifact). Both are required so a
+          # stack trace from either deploy can be deobfuscated.
+          MAP_FULL=target/proguard-mapping.txt
+          MAP_LITE=target/proguard-mapping-lite.txt
+
+          if [ -z "$FULL" ] || [ ! -f "$FULL" ]; then
+            echo "Full JAR not found in target/" >&2; ls -la target/ >&2; exit 1
+          fi
+          if [ -z "$LITE" ] || [ ! -f "$LITE" ]; then
+            echo "Lite JAR not found in target/" >&2; ls -la target/ >&2; exit 1
+          fi
+          if [ ! -f "$MAP_FULL" ]; then
+            echo "Full-JAR ProGuard mapping not found: $MAP_FULL" >&2; ls -la target/ >&2; exit 1
+          fi
+          if [ ! -f "$MAP_LITE" ]; then
+            echo "Lite-JAR ProGuard mapping not found: $MAP_LITE" >&2; ls -la target/ >&2; exit 1
+          fi
+
+          cp "$FULL" "$OUT/"
+          cp "$LITE" "$OUT/"
+          # Per-version mapping names so deobfuscating an old stack
+          # trace from either deploy is just "grab the matching file
+          # from the release page".
+          cp "$MAP_FULL" "$OUT/proguard-mapping-${VERSION}.txt"
+          cp "$MAP_LITE" "$OUT/proguard-mapping-lite-${VERSION}.txt"
+
+          echo "Artifacts staged at $OUT:"
+          ls -la "$OUT"
+          echo "dir=$OUT" >> "$GITHUB_OUTPUT"
+
+      # ----------------------------------------------------------------
+      # Version-bump commits. The release commit + tag must point at
+      # the released pom; the snapshot-bump commit comes AFTER the tag.
+      # ----------------------------------------------------------------
+      - name: Configure git identity (github-actions bot)
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit release version and create tag
+        env:
+          VERSION: ${{ steps.ver.outputs.release }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git add pom.xml
+          git commit -m "chore(release): $TAG"
+          git tag -a "$TAG" -m "Release $TAG"
+
+      - name: Bump to next snapshot
+        env:
+          NEXT: ${{ steps.ver.outputs.next }}
+        run: |
+          set -euo pipefail
+          mvn -B -ntp versions:set -DnewVersion="$NEXT" -DgenerateBackupPoms=false
+          git add pom.xml
+          git commit -m "chore: prepare $NEXT for development"
+
+      - name: Push branch and tag
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git push origin "HEAD:$BRANCH"
+          git push origin "$TAG"
+
+      # ----------------------------------------------------------------
+      # Create the GitHub Release. The body comes straight from the
+      # `release_notes` input — if it was empty we get an empty body,
+      # which is exactly what the spec calls for. The title is fixed
+      # and always carries the version.
+      # ----------------------------------------------------------------
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTES: ${{ inputs.release_notes }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          VERSION: ${{ steps.ver.outputs.release }}
+          ART_DIR: ${{ steps.art.outputs.dir }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            --title "BuildBattleAI v${VERSION}" \
+            --notes "$NOTES" \
+            --target "$(git rev-parse "$TAG"^{commit})" \
+            "$ART_DIR"/*
+
+      - name: Job summary
+        if: always()
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+          VERSION: ${{ steps.ver.outputs.release }}
+          NEXT: ${{ steps.ver.outputs.next }}
+          OBFUSCATION_PROFILE: ${{ inputs.obfuscation_level }}
+        run: |
+          {
+            echo "### Release ${TAG}"
+            echo
+            echo "- Released version:    \`${VERSION}\`"
+            echo "- Next snapshot:       \`${NEXT}\`"
+            echo "- Branch:              \`${GITHUB_REF_NAME}\`"
+            echo "- Obfuscation profile: \`${OBFUSCATION_PROFILE}\`"
+            echo "- Tag URL:             ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+          } >> "$GITHUB_STEP_SUMMARY"
