@@ -1,0 +1,87 @@
+name: VPS SSH ControlMaster
+description: >-
+  Establishes an SSH ControlMaster connection to the configured VPS and
+  exposes the base SSH flag set as the `ssh_base` output. Designed to be
+  reused by every workflow that talks to the Minecraft VPS so the
+  ssh-key handling, host-key trust, ControlMaster retry loop and key
+  cleanup live in one place.
+
+inputs:
+  vps_host:
+    description: VPS hostname or IP. Pass `${{ secrets.VPS_HOST }}`.
+    required: true
+  vps_user:
+    description: SSH user on the VPS. Pass `${{ secrets.VPS_USER }}`.
+    required: true
+  ssh_key:
+    description: >-
+      Private SSH key text (e.g. an ed25519 PEM). Pass
+      `${{ secrets.VPS_SSH_KEY }}`. The key is written to
+      `~/.ssh/cd_ed25519`, chmod 0600, and is automatically removed by
+      the matching `vps-ssh-close` step in each consumer workflow.
+    required: true
+
+outputs:
+  ssh_base:
+    description: >-
+      SSH flag set ready to be embedded into `ssh $SSH_BASE host …` and
+      `rsync -e "ssh $SSH_BASE" …` invocations. Includes the identity
+      file, IdentitiesOnly, strict host-key check, the ControlMaster
+      socket and a 15-second connect timeout.
+    value: ${{ steps.setup.outputs.ssh_base }}
+
+runs:
+  using: composite
+  steps:
+    - id: setup
+      shell: bash
+      env:
+        VPS_HOST: ${{ inputs.vps_host }}
+        VPS_USER: ${{ inputs.vps_user }}
+        VPS_SSH_KEY: ${{ inputs.ssh_key }}
+      run: |
+        set -euo pipefail
+
+        # Prepare key and ControlMaster socket directory. The socket
+        # lives under a dedicated dir so its long absolute path stays
+        # well under the Unix-domain-socket 104-byte limit.
+        mkdir -p ~/.ssh ~/.ssh/cd-ctrl
+        chmod 700 ~/.ssh ~/.ssh/cd-ctrl
+        printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/cd_ed25519
+        chmod 600 ~/.ssh/cd_ed25519
+
+        # Trust the host key. We retry because sshd's `MaxStartups`
+        # rate-limit can drop the first keyscan under cold-cache load.
+        for i in 1 2 3 4 5; do
+          if ssh-keyscan -t ed25519 -T 8 "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null \
+              && [ -s ~/.ssh/known_hosts ]; then
+            break
+          fi
+          echo "ssh-keyscan attempt $i failed, retrying..."
+          sleep $((i * 3))
+        done
+        test -s ~/.ssh/known_hosts || { echo "Failed to keyscan $VPS_HOST" >&2; exit 1; }
+
+        # Same flag set used by every workflow. Persisted as an
+        # `outputs.ssh_base` value so consumer steps embed it as
+        # `ssh $SSH_BASE …` without redeclaring the options.
+        SSH_BASE="-i $HOME/.ssh/cd_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ControlMaster=auto -o ControlPath=$HOME/.ssh/cd-ctrl/sock -o ControlPersist=300 -o ConnectTimeout=15"
+
+        # Bring the ControlMaster up with a backoff. Same retry shape as
+        # the existing deploy job — sshd brute-force protections kick in
+        # on a busy host.
+        for i in 1 2 3 4 5 6 7 8; do
+          if ssh $SSH_BASE -fN "$VPS_USER@$VPS_HOST" 2>/dev/null; then
+            echo "ControlMaster established on attempt $i"
+            break
+          fi
+          echo "ControlMaster attempt $i failed; backoff..."
+          sleep $((i * 3))
+          if [ $i -eq 8 ]; then
+            echo "Could not establish SSH ControlMaster after 8 attempts" >&2
+            exit 1
+          fi
+        done
+        ssh $SSH_BASE -O check "$VPS_USER@$VPS_HOST"
+
+        echo "ssh_base=$SSH_BASE" >> "$GITHUB_OUTPUT"

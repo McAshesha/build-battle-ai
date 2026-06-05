@@ -1,0 +1,205 @@
+name: Deploy Latest Release
+
+# Manually deploy a previously-published GitHub Release to the VPS.
+# Pulls the requested JAR flavor (lite or full) from the release page,
+# stages it on the VPS, archives whatever JAR is currently installed,
+# swaps in the new one, restarts the service and waits for the server
+# to reach "Done (…)" in the Paper log.
+#
+# Distinct from CI's deploy job — CI only ships SNAPSHOT builds from
+# main. This workflow lets you roll back to or redeploy any signed +
+# obfuscated release without re-running CI.
+on:
+  workflow_dispatch:
+    inputs:
+      flavor:
+        description: JAR flavor to deploy.
+        required: true
+        type: choice
+        default: lite
+        options:
+          - lite
+          - full
+      release_tag:
+        description: >-
+          Release tag to deploy (e.g. `v1.2.3`). Leave empty to use the
+          latest published release.
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+# Share the concurrency group with ci.yml's deploy and the other
+# server-* workflows so no two operations touch the service at once.
+concurrency:
+  group: deploy-mc-1.8
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.flavor }} JAR
+    runs-on: ubuntu-latest
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      REMOTE_ROOT: /opt/mc-1.8
+      SERVICE: mc-1.8.service
+    steps:
+      # Sparse checkout — we only need the composite action under
+      # `.github/actions/vps-ssh/`. Avoids pulling the ~1.9 GB
+      # Servers/ tree that's committed to this repo.
+      - name: Checkout (sparse, for composite action)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            .github/actions
+          sparse-checkout-cone-mode: false
+
+      - name: Resolve release tag and download requested JAR
+        id: pick
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FLAVOR: ${{ inputs.flavor }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+
+          if [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          else
+            TAG=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)
+          fi
+          echo "Release tag: $TAG"
+
+          # Fetch both flavours, then pick the requested one. Cheaper
+          # than reasoning about gh's fnmatch — full and lite differ
+          # only by the `-lite` suffix, and a single download covers
+          # both in one API hit.
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern 'buildbattleai-*.jar' \
+            --dir dist
+
+          if [ "$FLAVOR" = "lite" ]; then
+            JAR=$(ls dist/buildbattleai-*-lite.jar 2>/dev/null | head -n1)
+          else
+            # Exclude `-lite.jar`; the remaining buildbattleai-*.jar is the full one.
+            JAR=$(ls dist/buildbattleai-*.jar 2>/dev/null | grep -v -- '-lite\.jar$' | head -n1)
+          fi
+
+          if [ -z "$JAR" ] || [ ! -f "$JAR" ]; then
+            echo "No $FLAVOR JAR found on release $TAG" >&2
+            ls -la dist/ >&2
+            exit 1
+          fi
+          echo "Selected: $JAR ($(du -h "$JAR" | cut -f1))"
+
+          {
+            echo "jar=$JAR"
+            echo "tag=$TAG"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Setup SSH ControlMaster
+        id: ssh
+        uses: ./.github/actions/vps-ssh
+        with:
+          vps_host: ${{ secrets.VPS_HOST }}
+          vps_user: ${{ secrets.VPS_USER }}
+          ssh_key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Upload JAR to VPS staging
+        env:
+          SSH_BASE: ${{ steps.ssh.outputs.ssh_base }}
+          JAR: ${{ steps.pick.outputs.jar }}
+        run: |
+          set -euo pipefail
+          BASENAME=$(basename "$JAR")
+          rsync -av --no-perms --no-times --no-owner --no-group \
+            -e "ssh $SSH_BASE" \
+            "$JAR" \
+            "$VPS_USER@$VPS_HOST:$REMOTE_ROOT/plugins-staging/$BASENAME"
+
+      - name: Swap JAR & restart service
+        env:
+          SSH_BASE: ${{ steps.ssh.outputs.ssh_base }}
+          TAG: ${{ steps.pick.outputs.tag }}
+        run: |
+          set -euo pipefail
+          ssh $SSH_BASE "$VPS_USER@$VPS_HOST" bash -se <<'REMOTE'
+            set -euo pipefail
+            ROOT="/opt/mc-1.8"
+            cd "$ROOT"
+
+            STAGED=$(ls -t plugins-staging/buildbattleai-*.jar 2>/dev/null | head -n1)
+            [ -n "$STAGED" ] || { echo "No staged JAR in $ROOT/plugins-staging/" >&2; exit 1; }
+            echo "Staged: $STAGED"
+
+            echo "::Stopping service::"
+            sudo -n /usr/bin/systemctl stop mc-1.8.service
+
+            # Archive whatever is currently in plugins/. Same rotation
+            # policy as the CI deploy: keep the 5 most-recent backups.
+            shopt -s nullglob
+            for old in plugins/buildbattleai-*.jar; do
+              ts=$(date +%Y%m%d-%H%M%S)
+              base=$(basename "$old")
+              mv -v "$old" "plugins-archive/${ts}-${base}"
+            done
+            ls -1t plugins-archive/*-buildbattleai-*.jar 2>/dev/null | tail -n +6 | xargs -r rm -f
+
+            mv -v "$STAGED" plugins/
+            ls -la plugins/ | grep -i buildbattleai || true
+
+            # Paper logs via tmux + Type=forking — stdout doesn't reach
+            # journald, so we have to grep latest.log. Truncate before
+            # start so a "Done (…)" from a prior session can't false-positive.
+            LOG=logs/latest.log
+            mkdir -p logs
+            : > "$LOG"
+
+            echo "::Starting service::"
+            sudo -n /usr/bin/systemctl start mc-1.8.service
+
+            echo "::Waiting for 'Done (…)' in $LOG::"
+            DEADLINE=$(( $(date +%s) + 120 ))
+            while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+              if ! sudo -n /usr/bin/systemctl is-active mc-1.8.service >/dev/null 2>&1; then
+                echo "Service died during startup" >&2
+                tail -n 120 "$LOG" 2>/dev/null >&2 || true
+                exit 1
+              fi
+              if grep -qE 'Done \([0-9]+\.[0-9]+s\)' "$LOG" 2>/dev/null; then
+                grep -E 'Done \(|MLService online|has been enabled|ERROR|SEVERE' "$LOG" | tail -n 20
+                echo "Server reports Done — deploy verified."
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "Timeout: server did not reach 'Done (…)' within 120s" >&2
+            tail -n 150 "$LOG" 2>/dev/null >&2 || true
+            exit 1
+          REMOTE
+
+      - name: Close SSH ControlMaster
+        if: always()
+        env:
+          SSH_BASE: ${{ steps.ssh.outputs.ssh_base }}
+        run: |
+          ssh $SSH_BASE -O exit "$VPS_USER@$VPS_HOST" 2>/dev/null || true
+          rm -f ~/.ssh/cd_ed25519
+
+      - name: Job summary
+        if: always()
+        env:
+          TAG: ${{ steps.pick.outputs.tag }}
+          FLAVOR: ${{ inputs.flavor }}
+        run: |
+          {
+            echo "### Deploy ${TAG}"
+            echo
+            echo "- Flavor: \`${FLAVOR}\`"
+            echo "- Service: \`${SERVICE}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

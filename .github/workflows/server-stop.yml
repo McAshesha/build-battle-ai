@@ -1,0 +1,80 @@
+name: Server Stop
+
+# Stop mc-1.8.service on the VPS. `systemctl stop` is synchronous so
+# this returns once the service has actually exited (or its
+# `TimeoutStopSec` has elapsed and systemd has SIGKILLed it). If the
+# service is already inactive the workflow is a no-op.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-mc-1.8
+  cancel-in-progress: false
+
+jobs:
+  stop:
+    name: Stop mc-1.8 service
+    runs-on: ubuntu-latest
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      SERVICE: mc-1.8.service
+    steps:
+      - name: Checkout (sparse, for composite action)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            .github/actions
+          sparse-checkout-cone-mode: false
+
+      - name: Setup SSH ControlMaster
+        id: ssh
+        uses: ./.github/actions/vps-ssh
+        with:
+          vps_host: ${{ secrets.VPS_HOST }}
+          vps_user: ${{ secrets.VPS_USER }}
+          ssh_key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Stop service
+        env:
+          SSH_BASE: ${{ steps.ssh.outputs.ssh_base }}
+        run: |
+          set -euo pipefail
+          ssh $SSH_BASE "$VPS_USER@$VPS_HOST" bash -se <<'REMOTE'
+            set -euo pipefail
+
+            if ! sudo -n /usr/bin/systemctl is-active mc-1.8.service >/dev/null 2>&1; then
+              echo "Service is already inactive."
+              sudo -n /usr/bin/systemctl status mc-1.8.service --no-pager | head -n 10 || true
+              exit 0
+            fi
+
+            echo "::Stopping service::"
+            sudo -n /usr/bin/systemctl stop mc-1.8.service
+
+            # `systemctl stop` blocks until the unit reaches an
+            # inactive state, but we still poll briefly as a safety
+            # net in case TimeoutStopSec returned non-zero.
+            for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+              if ! sudo -n /usr/bin/systemctl is-active mc-1.8.service >/dev/null 2>&1; then
+                echo "Service stopped (after ${i}s of post-stop polling)."
+                exit 0
+              fi
+              sleep 1
+            done
+            echo "Service did not reach inactive state within 12s after stop" >&2
+            sudo -n /usr/bin/systemctl status mc-1.8.service --no-pager | head -n 30 >&2 || true
+            exit 1
+          REMOTE
+
+      - name: Close SSH ControlMaster
+        if: always()
+        env:
+          SSH_BASE: ${{ steps.ssh.outputs.ssh_base }}
+        run: |
+          ssh $SSH_BASE -O exit "$VPS_USER@$VPS_HOST" 2>/dev/null || true
+          rm -f ~/.ssh/cd_ed25519

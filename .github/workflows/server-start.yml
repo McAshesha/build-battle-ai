@@ -1,0 +1,93 @@
+name: Server Start
+
+# Start mc-1.8.service on the VPS and wait until Paper reports
+# `Done (…)`, then exit. If the service is already running this
+# workflow is a no-op (it still reports status in the summary).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Same group as the deploy and other server-* workflows so nothing
+# touches the service concurrently.
+concurrency:
+  group: deploy-mc-1.8
+  cancel-in-progress: false
+
+jobs:
+  start:
+    name: Start mc-1.8 service
+    runs-on: ubuntu-latest
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      SERVICE: mc-1.8.service
+    steps:
+      - name: Checkout (sparse, for composite action)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            .github/actions
+          sparse-checkout-cone-mode: false
+
+      - name: Setup SSH ControlMaster
+        id: ssh
+        uses: ./.github/actions/vps-ssh
+        with:
+          vps_host: ${{ secrets.VPS_HOST }}
+          vps_user: ${{ secrets.VPS_USER }}
+          ssh_key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Start service and wait for ready
+        env:
+          SSH_BASE: ${{ steps.ssh.outputs.ssh_base }}
+        run: |
+          set -euo pipefail
+          ssh $SSH_BASE "$VPS_USER@$VPS_HOST" bash -se <<'REMOTE'
+            set -euo pipefail
+            cd /opt/mc-1.8
+
+            if sudo -n /usr/bin/systemctl is-active mc-1.8.service >/dev/null 2>&1; then
+              echo "Service is already active — nothing to do."
+              sudo -n /usr/bin/systemctl status mc-1.8.service --no-pager | head -n 10 || true
+              exit 0
+            fi
+
+            # Truncate the Paper log so a "Done (…)" from a prior
+            # session can't false-positive this wait loop.
+            LOG=logs/latest.log
+            mkdir -p logs
+            : > "$LOG"
+
+            echo "::Starting service::"
+            sudo -n /usr/bin/systemctl start mc-1.8.service
+
+            echo "::Waiting for 'Done (…)' in $LOG::"
+            DEADLINE=$(( $(date +%s) + 120 ))
+            while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+              if ! sudo -n /usr/bin/systemctl is-active mc-1.8.service >/dev/null 2>&1; then
+                echo "Service died during startup" >&2
+                tail -n 120 "$LOG" 2>/dev/null >&2 || true
+                exit 1
+              fi
+              if grep -qE 'Done \([0-9]+\.[0-9]+s\)' "$LOG" 2>/dev/null; then
+                grep -E 'Done \(|MLService online|has been enabled|ERROR|SEVERE' "$LOG" | tail -n 20
+                echo "Server reports Done — start verified."
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "Timeout: server did not reach 'Done (…)' within 120s" >&2
+            tail -n 150 "$LOG" 2>/dev/null >&2 || true
+            exit 1
+          REMOTE
+
+      - name: Close SSH ControlMaster
+        if: always()
+        env:
+          SSH_BASE: ${{ steps.ssh.outputs.ssh_base }}
+        run: |
+          ssh $SSH_BASE -O exit "$VPS_USER@$VPS_HOST" 2>/dev/null || true
+          rm -f ~/.ssh/cd_ed25519

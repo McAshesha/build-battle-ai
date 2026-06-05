@@ -102,7 +102,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.5.3</version>
-                <!-- Shared relocations applied to both executions -->
+                <!-- Shared relocations and filters applied to both executions -->
                 <configuration>
                     <relocations>
                         <relocation>
@@ -126,6 +126,33 @@
                             <shadedPattern>ru.ashesha.buildBattleAI.libs.gson</shadedPattern>
                         </relocation>
                     </relocations>
+                    <!--
+                         Strip native-library debug symbols out of every shaded
+                         artifact. The ONNX Runtime Maven artifact ships the
+                         platform-specific debug symbols alongside the runtime
+                         binaries:
+                           - Windows: `onnxruntime.pdb`  (~65 MB compressed)
+                           - macOS:   `libonnxruntime.dylib.dSYM/**`
+                                       (~16 MB compressed per arch, x2 archs)
+                         None of this is needed at runtime — the JNI loader
+                         only opens `.dll`/`.dylib`/`.so`. Together these
+                         symbols add ~95 MB of dead weight to every JAR, so
+                         we drop them at shade time. Removing them is safe:
+                         the plugin and its embedded ML runtime behave
+                         identically without debug symbols, the only loss is
+                         the ability to symbolicate a hypothetical ONNX
+                         Runtime native crash — which we don't ship support
+                         for anyway.
+                    -->
+                    <filters>
+                        <filter>
+                            <artifact>*:*</artifact>
+                            <excludes>
+                                <exclude>**/*.pdb</exclude>
+                                <exclude>**/*.dSYM/**</exclude>
+                            </excludes>
+                        </filter>
+                    </filters>
                 </configuration>
                 <executions>
                     <!-- 1) Lite JAR: without Ignite (attached artifact, does not replace main) -->
