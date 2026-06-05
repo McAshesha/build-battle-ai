@@ -17,7 +17,6 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.api.Arena;
@@ -217,24 +216,6 @@ public class GameListener extends ListenerService.PluginListener {
         // the player happens to be facing.
         event.setCancelled(true);
         gm.skipTheme(player);
-    }
-
-    /**
-     * Prevents players from moving the skip-theme feather to the off-hand
-     * via the F key — keeps the hotbar layout stable for the duration of
-     * the game.
-     */
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
-    public void onSwapHandItems(PlayerSwapHandItemsEvent event) {
-        Player player = event.getPlayer();
-        BBAIGameManager gm = plugin.getContext().getGameManager();
-        if (!gm.isInGame(player.getUniqueId()))
-            return;
-        if (SkipThemeItem.isSkipItem(event.getMainHandItem(),
-                plugin.getContext().getConfigService().getLangFor(player.getUniqueId()))
-                || SkipThemeItem.isSkipItem(event.getOffHandItem(),
-                        plugin.getContext().getConfigService().getLangFor(player.getUniqueId())))
-            event.setCancelled(true);
     }
 
     /**

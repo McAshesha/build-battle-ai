@@ -35,6 +35,7 @@ import ru.ashesha.buildBattleAI.listeners.ArenaSetupListener;
 import ru.ashesha.buildBattleAI.listeners.GameListener;
 import ru.ashesha.buildBattleAI.listeners.ListenerService;
 import ru.ashesha.buildBattleAI.listeners.MLTestListener;
+import ru.ashesha.buildBattleAI.listeners.OffHandSwapListener;
 import ru.ashesha.buildBattleAI.message.MessageService;
 import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
 import ru.ashesha.buildBattleAI.ml.MLService;
@@ -207,6 +208,19 @@ public class PluginContext {
         listenerService.register(new ArenaSetupListener(plugin));
         listenerService.register(new GameListener(plugin));
         listenerService.register(new MLTestListener(plugin));
+        // PlayerSwapHandItemsEvent exists only on 1.9+. Registering the listener
+        // unconditionally would make Bukkit's PluginManager abort the *entire*
+        // listener with NoClassDefFoundError on 1.8, knocking out other handlers.
+        // Detect via reflection on the event class rather than ServerVersion —
+        // this avoids touching PacketEvents (which is uninitialised in unit
+        // tests) and directly probes the exact capability we depend on.
+        try {
+            Class.forName("org.bukkit.event.player.PlayerSwapHandItemsEvent");
+            listenerService.register(new OffHandSwapListener(plugin));
+        } catch (ClassNotFoundException legacy) {
+            plugin.getPluginLogger().debug(
+                    "PlayerSwapHandItemsEvent not present — skipping OffHandSwapListener (legacy 1.8 server).");
+        }
 
         long elapsed = System.currentTimeMillis() - start;
         plugin.getPluginLogger().debug("PluginContext enabled %d service(s) in %d ms.",

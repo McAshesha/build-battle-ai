@@ -21,6 +21,7 @@ import ru.ashesha.buildBattleAI.listeners.ArenaSetupListener;
 import ru.ashesha.buildBattleAI.listeners.GameListener;
 import ru.ashesha.buildBattleAI.listeners.ListenerService;
 import ru.ashesha.buildBattleAI.listeners.MLTestListener;
+import ru.ashesha.buildBattleAI.listeners.OffHandSwapListener;
 import ru.ashesha.buildBattleAI.message.MessageService;
 import ru.ashesha.buildBattleAI.ml.MLService;
 import ru.ashesha.buildBattleAI.render.RenderService;
@@ -83,7 +84,10 @@ class PluginContextLifecycleTest {
              MockedConstruction<MLTestCommand> mlCmd = mockConstruction(MLTestCommand.class);
              MockedConstruction<ArenaSetupListener> setupLst = mockConstruction(ArenaSetupListener.class);
              MockedConstruction<GameListener> gameLst = mockConstruction(GameListener.class);
-             MockedConstruction<MLTestListener> mlLst = mockConstruction(MLTestListener.class)) {
+             MockedConstruction<MLTestListener> mlLst = mockConstruction(MLTestListener.class);
+             // OffHandSwapListener is registered conditionally on PlayerSwapHandItemsEvent
+             // being present on the classpath (paper-api 1.21.5 in test scope has it).
+             MockedConstruction<OffHandSwapListener> swapLst = mockConstruction(OffHandSwapListener.class)) {
 
             PluginContext ctx = new PluginContext(plugin);
             ctx.enable();
@@ -127,7 +131,7 @@ class PluginContextLifecycleTest {
     // ── enable: command + listener registrations ──────────────────────────
 
     @Test
-    void enableRegistersFourCommandsAndThreeListeners() {
+    void enableRegistersFourCommandsAndFourListeners() {
         try (MockedConstruction<ConfigService> cfg = mockConstruction(ConfigService.class);
              MockedConstruction<DataService> dat = mockConstruction(DataService.class);
              MockedConstruction<WorldService> wld = mockConstruction(WorldService.class);
@@ -149,7 +153,10 @@ class PluginContextLifecycleTest {
                      mockConstruction(ru.ashesha.buildBattleAI.commands.LanguageCommand.class);
              MockedConstruction<ArenaSetupListener> setupLst = mockConstruction(ArenaSetupListener.class);
              MockedConstruction<GameListener> gameLst = mockConstruction(GameListener.class);
-             MockedConstruction<MLTestListener> mlLst = mockConstruction(MLTestListener.class)) {
+             MockedConstruction<MLTestListener> mlLst = mockConstruction(MLTestListener.class);
+             // OffHandSwapListener is registered conditionally on PlayerSwapHandItemsEvent
+             // being present on the classpath (paper-api 1.21.5 in test scope has it).
+             MockedConstruction<OffHandSwapListener> swapLst = mockConstruction(OffHandSwapListener.class)) {
 
             PluginContext ctx = new PluginContext(plugin);
             ctx.enable();
@@ -166,7 +173,8 @@ class PluginContextLifecycleTest {
             verify(lstMock).register(any(ArenaSetupListener.class));
             verify(lstMock).register(any(GameListener.class));
             verify(lstMock).register(any(MLTestListener.class));
-            verify(lstMock, times(3)).register(any());
+            verify(lstMock).register(any(OffHandSwapListener.class));
+            verify(lstMock, times(4)).register(any());
         }
     }
 
@@ -250,7 +258,10 @@ class PluginContextLifecycleTest {
              MockedConstruction<MLTestCommand> mlCmd = mockConstruction(MLTestCommand.class);
              MockedConstruction<ArenaSetupListener> setupLst = mockConstruction(ArenaSetupListener.class);
              MockedConstruction<GameListener> gameLst = mockConstruction(GameListener.class);
-             MockedConstruction<MLTestListener> mlLst = mockConstruction(MLTestListener.class)) {
+             MockedConstruction<MLTestListener> mlLst = mockConstruction(MLTestListener.class);
+             // OffHandSwapListener is registered conditionally on PlayerSwapHandItemsEvent
+             // being present on the classpath (paper-api 1.21.5 in test scope has it).
+             MockedConstruction<OffHandSwapListener> swapLst = mockConstruction(OffHandSwapListener.class)) {
 
             PluginContext ctx = new PluginContext(plugin);
             ctx.reload();
@@ -332,7 +343,10 @@ class PluginContextLifecycleTest {
              MockedConstruction<MLTestCommand> mlCmd = mockConstruction(MLTestCommand.class);
              MockedConstruction<ArenaSetupListener> setupLst = mockConstruction(ArenaSetupListener.class);
              MockedConstruction<GameListener> gameLst = mockConstruction(GameListener.class);
-             MockedConstruction<MLTestListener> mlLst = mockConstruction(MLTestListener.class)) {
+             MockedConstruction<MLTestListener> mlLst = mockConstruction(MLTestListener.class);
+             // OffHandSwapListener is registered conditionally on PlayerSwapHandItemsEvent
+             // being present on the classpath (paper-api 1.21.5 in test scope has it).
+             MockedConstruction<OffHandSwapListener> swapLst = mockConstruction(OffHandSwapListener.class)) {
 
             PluginContext ctx = new PluginContext(plugin);
             ctx.enable();

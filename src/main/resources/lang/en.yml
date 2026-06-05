@@ -305,27 +305,27 @@ game:
 
     # Action bar — updated every ML tick (~5 s) while AI is unsure.
     thinking:
-      - "&8[&b🤖 AI&8] &7Hmm... I think I see &f%guess%&7?"
-      - "&8[&b🤖 AI&8] &7Squinting... is that &f%guess%&7?"
-      - "&8[&b🤖 AI&8] &7Looks suspiciously like &f%guess%&7 to me."
-      - "&8[&b🤖 AI&8] &7Could it be &f%guess%&7?"
-      - "&8[&b🤖 AI&8] &7My best guess: &f%guess% &8(&7%confidence%%&8)"
-      - "&8[&b🤖 AI&8] &7Maybe... &f%guess%&7?"
-      - "&8[&b🤖 AI&8] &7Wait, &f%guess%&7?"
-      - "&8[&b🤖 AI&8] &7I want to say &f%guess%&7..."
-      - "&8[&b🤖 AI&8] &7Hmm. &f%guess%&7? Not sure yet."
-      - "&8[&b🤖 AI&8] &7Looking at it... &f%guess%&7, maybe?"
-      - "&8[&b🤖 AI&8] &7Tilting head... &f%guess%&7?"
-      - "&8[&b🤖 AI&8] &7That has &f%guess% &7vibes."
-      - "&8[&b🤖 AI&8] &7Working on it... &f%guess%&7 perhaps?"
+      - "&8[&b\U0001F916 AI&8] &7Hmm... I think I see &f%guess%&7?"
+      - "&8[&b\U0001F916 AI&8] &7Squinting... is that &f%guess%&7?"
+      - "&8[&b\U0001F916 AI&8] &7Looks suspiciously like &f%guess%&7 to me."
+      - "&8[&b\U0001F916 AI&8] &7Could it be &f%guess%&7?"
+      - "&8[&b\U0001F916 AI&8] &7My best guess: &f%guess% &8(&7%confidence%%&8)"
+      - "&8[&b\U0001F916 AI&8] &7Maybe... &f%guess%&7?"
+      - "&8[&b\U0001F916 AI&8] &7Wait, &f%guess%&7?"
+      - "&8[&b\U0001F916 AI&8] &7I want to say &f%guess%&7..."
+      - "&8[&b\U0001F916 AI&8] &7Hmm. &f%guess%&7? Not sure yet."
+      - "&8[&b\U0001F916 AI&8] &7Looking at it... &f%guess%&7, maybe?"
+      - "&8[&b\U0001F916 AI&8] &7Tilting head... &f%guess%&7?"
+      - "&8[&b\U0001F916 AI&8] &7That has &f%guess% &7vibes."
+      - "&8[&b\U0001F916 AI&8] &7Working on it... &f%guess%&7 perhaps?"
 
     # When top-1 and top-2 are nearly tied — AI is genuinely torn.
     confused:
-      - "&8[&b🤖 AI&8] &7Could be &f%guess1%&7... or maybe &f%guess2%&7?"
-      - "&8[&b🤖 AI&8] &7I'm torn — &f%guess1% &7or &f%guess2%&7?"
-      - "&8[&b🤖 AI&8] &7Either &f%guess1% &7or &f%guess2%&7. Help!"
-      - "&8[&b🤖 AI&8] &7Looks like &f%guess1%&7... but also like &f%guess2%&7."
-      - "&8[&b🤖 AI&8] &7Cross between &f%guess1% &7and &f%guess2%&7?"
+      - "&8[&b\U0001F916 AI&8] &7Could be &f%guess1%&7... or maybe &f%guess2%&7?"
+      - "&8[&b\U0001F916 AI&8] &7I'm torn — &f%guess1% &7or &f%guess2%&7?"
+      - "&8[&b\U0001F916 AI&8] &7Either &f%guess1% &7or &f%guess2%&7. Help!"
+      - "&8[&b\U0001F916 AI&8] &7Looks like &f%guess1%&7... but also like &f%guess2%&7."
+      - "&8[&b\U0001F916 AI&8] &7Cross between &f%guess1% &7and &f%guess2%&7?"
 
     # Chat — occasional thoughts (sampled by chat-thoughts-chance, ~15%).
     thinking-chat:
