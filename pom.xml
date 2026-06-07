@@ -61,14 +61,17 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
-                    <!-- E2E and ML integration tests are heavy (subprocess server boot,
-                         107 MiB ONNX model load) and gated by system properties.
-                         Exclude them from the default test run; the -Pe2e / -Pml-it
-                         profiles re-include them by flipping the gating properties. -->
+                    <!-- Pattern-based excludes (preserved for backwards compat) -->
                     <excludes>
                         <exclude>**/e2e/**</exclude>
                         <exclude>**/MLIntegrationTest.java</exclude>
                     </excludes>
+                    <!-- Tag-based excludes: non-unit tests opt-in via @Tag and are only run
+                         under their respective profiles. Untagged tests (the vast majority,
+                         unit) keep running by default. nightly-only is a secondary tag for
+                         tests that belong to e2e/integration/stress but should be skipped
+                         in PR CI. -->
+                    <excludedGroups>e2e,bench,stress,ml-it,nightly-only</excludedGroups>
                     <argLine>
                         -Dnet.bytebuddy.experimental=true
                         --add-opens=java.base/jdk.internal.access=ALL-UNNAMED
@@ -526,6 +529,125 @@
             </dependencies>
         </profile>
 
+        <!--
+             Aggregate PR-gate profile.
+
+             Reverses the default-profile excludes so that integration,
+             smoke, and the basic (non-nightly) ml-it tests all run in one
+             pass. Excludes the slow tiers (e2e, bench, stress) and any
+             test secondary-tagged nightly-only.
+
+             Run with:
+               mvn -B -ntp verify -P pr-gate
+        -->
+        <profile>
+            <id>pr-gate</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <!-- Re-include e2e + MLIntegrationTest excluded by default pattern. -->
+                            <excludes combine.self="override"/>
+                            <!-- ml-it tests need their gating system property. -->
+                            <systemPropertyVariables>
+                                <bbai.ml-it>true</bbai.ml-it>
+                                <bbai.e2e>true</bbai.e2e>
+                            </systemPropertyVariables>
+                            <excludedGroups>e2e,bench,stress,nightly-only</excludedGroups>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!--
+             Aggregate nightly profile.
+
+             Runs the full PR-gate set + the slow tiers (e2e, stress, ml-it
+             nightly-only). Benchmarks remain under the separate `bench`
+             profile because they are invoked via `exec:java`, not Surefire.
+
+             Run with:
+               mvn -B -ntp verify -P nightly
+        -->
+        <profile>
+            <id>nightly</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <excludes combine.self="override"/>
+                            <systemPropertyVariables>
+                                <bbai.ml-it>true</bbai.ml-it>
+                                <bbai.e2e>true</bbai.e2e>
+                            </systemPropertyVariables>
+                            <excludedGroups>bench</excludedGroups>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Standalone smoke run: -P smoke -->
+        <profile>
+            <id>smoke</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <groups>smoke</groups>
+                            <!-- Override parent excludedGroups so smoke (and any
+                                 other tag the parent excludes) is reachable. -->
+                            <excludedGroups combine.self="override"></excludedGroups>
+                            <excludes combine.self="override"/>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Standalone integration run: -P integration -->
+        <profile>
+            <id>integration</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <groups>integration</groups>
+                            <excludedGroups combine.self="override"></excludedGroups>
+                            <excludes combine.self="override"/>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Standalone stress run: -P stress -->
+        <profile>
+            <id>stress</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <groups>stress</groups>
+                            <excludedGroups combine.self="override"></excludedGroups>
+                            <excludes combine.self="override"/>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
         <!-- Obfuscation profiles — rename only / rename+shrink+optimize / maximum -->
         <profile>
             <id>obfuscate-light</id>
@@ -663,6 +785,31 @@
             <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
             <version>5.12.0</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- Awaitility — explicit polling for integration tests that wait
+             on background pipeline state (EvaluationService queue drains,
+             GameSession state transitions, etc.). Test scope only. -->
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <version>4.2.2</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- Testcontainers — used by future Ignite thin-client integration
+             tests (DATA-06). Declared now so all phases share one upgrade
+             cadence. Requires Docker on the test host; tests that use it
+             must be tagged @Tag("nightly-only") to keep PR CI Docker-free. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>1.20.4</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>1.20.4</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
