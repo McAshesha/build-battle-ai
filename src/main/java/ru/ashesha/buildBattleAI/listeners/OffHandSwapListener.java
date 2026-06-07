@@ -6,7 +6,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
-import ru.ashesha.buildBattleAI.config.api.Lang;
 import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
 import ru.ashesha.buildBattleAI.game.feedback.SkipThemeItem;
 
@@ -46,9 +45,8 @@ public class OffHandSwapListener extends ListenerService.PluginListener {
         BBAIGameManager gm = plugin.getContext().getGameManager();
         if (!gm.isInGame(player.getUniqueId()))
             return;
-        Lang lang = plugin.getContext().getConfigService().getLangFor(player.getUniqueId());
-        if (SkipThemeItem.isSkipItem(event.getMainHandItem(), lang)
-                || SkipThemeItem.isSkipItem(event.getOffHandItem(), lang))
+        if (SkipThemeItem.isSkipItem(event.getMainHandItem())
+                || SkipThemeItem.isSkipItem(event.getOffHandItem()))
             event.setCancelled(true);
     }
 }

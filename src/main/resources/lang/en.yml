@@ -6,11 +6,11 @@ test-join-message: "Welcome to the server, %player%!"
 test-leave-message: "Goodbye, %player%! See you next time!"
 
 # ── Language Command ─────────────────────────────────────────────────
-# Strings shown by /bbailang.
+# Strings shown by /bbai lang.
 lang:
   current: "&7Current language: &e%lang%"
   available: "&7Available: &f%list%"
-  usage: "&7Usage: &f/bbailang <code>"
+  usage: "&7Usage: &f/bbai lang <code>"
   unknown: "&c  Unknown language '&f%lang%&c'. Available: &7%list%"
   disabled: "&c  Data storage is disabled, cannot persist language preference."
   switched: "&a  Language switched to &f%lang%&a."
@@ -419,11 +419,6 @@ game:
         - ""
         - "&8Useful when stuck or"
         - "&8the build went wrong."
-      # Hidden marker line appended to lore — used to identify our item
-      # across pickup/drop without relying on the localised name (admin
-      # may translate). Color codes make it visually invisible; the magic
-      # text is what the listener matches against.
-      marker: "&0&k|&r&8&o#bbai-skip"
 
     # Chat line shown to the player after they skip a theme.
     skip-feedback:

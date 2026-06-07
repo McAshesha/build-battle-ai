@@ -26,6 +26,8 @@ The build produces two artifacts in `target/`: the full JAR (with Apache Ignite 
 
 **Resource filtering caveat (DO NOT BREAK):** `src/main/resources/models/**` is *explicitly excluded* from Maven resource filtering in `pom.xml` — filtering would silently corrupt the bundled `custom_convnext_embeddings.onnx` (~107 MiB) and `centroids.json`. If you add another binary resource, exclude it from the filtered `<resource>` block and re-include it under the unfiltered one.
 
+**Shade filter — ONNX debug symbols (DO NOT REMOVE):** the shared `maven-shade-plugin` `<configuration>` carries a `<filters>` block that drops `**/*.pdb` and `**/*.dSYM/**` from every shaded artifact. The ONNX Runtime jar ships Windows PDB (~65 MB) and macOS dSYM (~16 MB × 2 archs) symbol bundles that the JNI loader never reads — together they account for ~95 MB of dead weight per JAR. Removing the filter regresses the full JAR back to ~263 MB / lite to ~251 MB. If you add a native-bearing dependency, audit its archive for similar symbol files and extend the excludes accordingly.
+
 ## Language & Compatibility
 
 **Java 8 only.** Do not use `var`, records, text blocks, `List.of()`, `Map.of()`, switch expressions, pattern matching, or any Java 9+ features.
@@ -188,6 +190,37 @@ ProGuard config in `proguard/`: `base.pro` (shared keep rules) + `light.pro`/`st
 Auto-kept patterns: `**.api.**` interfaces, `implements Listener` / `extends Command`, `@EventHandler` methods, `Serializable` machinery. **Manually-kept (don't touch):** `ai.onnxruntime.**` (native code), `libs.**`, `org.apache.ignite.**`, `javax.cache.**` (ServiceLoader + reflection on own class names).
 
 When adding code accessed by name via reflection strings, add explicit `-keep` entries in `base.pro`.
+
+## CI / CD Pipelines
+
+All automation lives under `.github/`. Workflows share the `deploy-mc-1.8` concurrency group whenever they touch the VPS so two operations never collide on the service.
+
+| Workflow | Trigger | Purpose |
+|---|---|---|
+| `ci.yml` | PR + push to `main`, `workflow_dispatch` | `mvn verify` → `surefire:test -Pe2e` → `surefire:test -Pml-it`. On `push main` also deploys the **lite** JAR to the VPS via the inline ControlMaster SSH path. ONNX model is restored from the `ml-model-v1` GitHub Release tag and cached between runs. |
+| `release.yml` | Manual (`workflow_dispatch`) | Builds the **signed + obfuscated** full and lite JARs, publishes a GitHub Release with both JARs and both ProGuard mapping files (`proguard-mapping-<ver>.txt` + `proguard-mapping-lite-<ver>.txt`), then commits the snapshot bump. Inputs: `version` (optional — defaults to current pom minus `-SNAPSHOT`), `release_notes` (optional Markdown body), `obfuscation_level` (`obfuscate-light` / `obfuscate` / `obfuscate-heavy`). The release commit + tag point at the released pom; the snapshot-bump commit comes **after** the tag so the tag is reproducible. |
+| `deploy-release.yml` | Manual | Pulls a previously-published Release's JAR (flavour: `lite` or `full`, tag: empty = latest) and swaps it onto the VPS. Used for roll-backs and out-of-band redeploys without re-running CI. |
+| `server-{start,stop,restart}.yml` | Manual | Idempotent `systemctl` operations on `mc-1.8.service`. Start / restart truncate `logs/latest.log` before action and poll for `Done (…)` within 120 s. |
+| `claude.yml`, `claude-code-review.yml` | PR comments / events | Anthropic Claude reviewer integrations — not part of the build pipeline. |
+
+**Composite action `.github/actions/vps-ssh/`** — single source of truth for the VPS SSH ControlMaster setup (keyscan retry under `MaxStartups`, ControlMaster backoff loop, `ssh_base` output containing `-i / -o IdentitiesOnly / -o ControlPath / …`). The legacy inline block in `ci.yml`'s `deploy` job duplicates the same logic for historical reasons; new workflows must consume the composite. Always pair it with a final `ssh -O exit` + `rm -f ~/.ssh/cd_ed25519` cleanup step (`if: always()`).
+
+**Required repository secrets:**
+
+| Secret | Used by | Notes |
+|---|---|---|
+| `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` | every workflow that touches the VPS | private key text (e.g. ed25519 PEM). |
+| `JAR_KEYSTORE_BASE64` | `release.yml` | base64 of `keystore.jks` (used: `base64 -w0 keystore.jks`). Decoded into `$RUNNER_TEMP`, never written into the workspace. |
+| `JAR_KEYSTORE_PASS`, `JAR_KEY_PASS`, `JAR_KEY_ALIAS` | `release.yml` | match the values used for local `-Psign` builds (alias is `bbai` by default). |
+| `RELEASE_PAT` | `release.yml` checkout step only | PAT belonging to a user listed in the `main` branch-protection bypass set, scoped `contents:write` + `metadata:read`. The default `GITHUB_TOKEN` cannot push tag + bump commits past classic branch protection (`GH006`). `actions/checkout` persists this PAT into `.git/config`, so the later `git push` in the same job uses it automatically. |
+
+**Branch protection model:** `main` uses **classic** branch protection. `enforce_all_for_admins` is intentionally **unchecked**, which is how the `RELEASE_PAT`-owning admin bypasses it. Do not switch to Rulesets without re-doing the bypass configuration.
+
+**Operational invariants:**
+- The Release workflow refuses to overwrite an existing tag — releases are append-only. If you need to redo a release, bump the version first.
+- `release.yml` collects artifacts via `mvn help:evaluate -Dexpression=project.build.finalName`, not via a `find` glob — ProGuard leaves a `*_proguard_base.jar` pre-obfuscation backup next to the final JAR, and a naive glob would publish the unobfuscated backup.
+- ONNX model file (`custom_convnext_embeddings.onnx`, ~107 MiB) lives on the `ml-model-v1` GitHub Release tag and is **not committed**. CI and the release workflow both restore it via `gh release download` with `actions/cache` keyed on `MODEL_RELEASE_TAG`. Bump that env var (in both workflows in lockstep) whenever the model is replaced.
+- CD ships only the **lite** JAR to the VPS — the VPS uses the local JSON data backend, so the shaded Apache Ignite in the full JAR is dead weight.
 
 ## Dependencies (provided scope = server supplies them)
 

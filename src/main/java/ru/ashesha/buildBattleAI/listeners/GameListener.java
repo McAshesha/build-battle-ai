@@ -17,7 +17,6 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.inventory.EquipmentSlot;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.api.Arena;
 import ru.ashesha.buildBattleAI.game.ArenaState;
@@ -34,6 +33,43 @@ import ru.ashesha.buildBattleAI.game.feedback.SkipThemeItem;
  * cancelled for all players in game sessions.
  */
 public class GameListener extends ListenerService.PluginListener {
+
+    /**
+     * Reflective handle for {@code PlayerInteractEvent#getHand()} — added in 1.9
+     * together with the off-hand system. {@code null} on 1.8 servers where the
+     * method does not exist. Resolved once at class load to avoid a per-event
+     * lookup cost on the hot interact path.
+     */
+    private static final java.lang.reflect.Method GET_HAND_METHOD;
+
+    /**
+     * Reflectively resolved {@code EquipmentSlot.HAND} enum constant — also
+     * 1.9+. {@code null} on 1.8. Held as {@code Object} so this class compiles
+     * and verifies without {@code org.bukkit.inventory.EquipmentSlot} being
+     * present on the runtime classpath.
+     */
+    private static final Object EQUIPMENT_SLOT_HAND;
+
+    static {
+        java.lang.reflect.Method handMethod = null;
+        Object handConstant = null;
+        try {
+            handMethod = PlayerInteractEvent.class.getMethod("getHand");
+            Class<?> slotClass = Class.forName("org.bukkit.inventory.EquipmentSlot");
+            // EquipmentSlot is an enum on every server version that ships it;
+            // valueOf is the cheapest cross-version way to obtain the HAND
+            // constant without importing the class.
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            Object resolved = Enum.valueOf((Class<Enum>) slotClass.asSubclass(Enum.class), "HAND");
+            handConstant = resolved;
+        } catch (Throwable ignored) {
+            // 1.8 server — off-hand and EquipmentSlot do not exist. The
+            // interact handler will skip its hand filter entirely; on 1.8
+            // there is only one hand so the filter is a no-op anyway.
+        }
+        GET_HAND_METHOD = handMethod;
+        EQUIPMENT_SLOT_HAND = handConstant;
+    }
 
     /**
      * Creates the game listener.
@@ -187,16 +223,37 @@ public class GameListener extends ListenerService.PluginListener {
      * No {@code ignoreCancelled}: Spigot/Paper fires {@code RIGHT_CLICK_AIR}
      * with the event pre-cancelled by default (legacy "use" interaction model),
      * so {@code ignoreCancelled=true} would silently swallow every air-click.
-     * Hand filter restricts to {@code HAND} so the 1.9+ off-hand mirror-fire
-     * doesn't trigger the skip twice.
+     * <p>
+     * Hand filter restricts to the main hand so the 1.9+ off-hand mirror-fire
+     * does not trigger the skip twice. The filter is implemented via cached
+     * reflection ({@link #GET_HAND_METHOD} / {@link #EQUIPMENT_SLOT_HAND}) so
+     * 1.8 servers — where {@code PlayerInteractEvent#getHand()} and
+     * {@code EquipmentSlot} do not exist — load and run this handler without
+     * triggering {@code NoSuchMethodError} or {@code NoClassDefFoundError}
+     * during JVM verification of the method body.
      */
     @EventHandler(priority = EventPriority.HIGH)
     public void onPlayerInteract(PlayerInteractEvent event) {
         Action action = event.getAction();
         if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK)
             return;
-        if (event.getHand() != null && event.getHand() != EquipmentSlot.HAND)
-            return;
+
+        // Hand filter — 1.9+ only. On 1.8 both static handles are null and
+        // we skip the filter entirely (no off-hand exists on 1.8, so the
+        // event can only have come from the main hand anyway).
+        if (GET_HAND_METHOD != null && EQUIPMENT_SLOT_HAND != null) {
+            Object hand;
+            try {
+                hand = GET_HAND_METHOD.invoke(event);
+            } catch (Throwable e) {
+                // Reflection should never fail once the lookup succeeded at
+                // class load time; bail out defensively rather than scoring
+                // a skip the player did not request.
+                return;
+            }
+            if (hand != null && hand != EQUIPMENT_SLOT_HAND)
+                return;
+        }
 
         org.bukkit.inventory.ItemStack hand = event.getItem();
         if (hand == null)
@@ -208,8 +265,7 @@ public class GameListener extends ListenerService.PluginListener {
             return;
         if (gm.getArenaState(gm.getPlayerArena(player.getUniqueId())) != ArenaState.PLAYING)
             return;
-        if (!SkipThemeItem.isSkipItem(hand,
-                plugin.getContext().getConfigService().getLangFor(player.getUniqueId())))
+        if (!SkipThemeItem.isSkipItem(hand))
             return;
 
         // Cancel so the feather doesn't, e.g., open a block GUI for whatever

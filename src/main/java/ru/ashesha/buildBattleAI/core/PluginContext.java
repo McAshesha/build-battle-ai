@@ -13,9 +13,7 @@ import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.ArenaManager;
 import ru.ashesha.buildBattleAI.arena.api.BBAIArenaManager;
 import ru.ashesha.buildBattleAI.commands.ArenaCommand;
-import ru.ashesha.buildBattleAI.commands.LanguageCommand;
-import ru.ashesha.buildBattleAI.commands.MLTestCommand;
-import ru.ashesha.buildBattleAI.commands.WorldTpCommand;
+import ru.ashesha.buildBattleAI.commands.FlatSubcommand;
 import ru.ashesha.buildBattleAI.config.ConfigService;
 import ru.ashesha.buildBattleAI.config.api.BBAIConfigService;
 import ru.ashesha.buildBattleAI.data.DataService;
@@ -34,7 +32,6 @@ import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
 import ru.ashesha.buildBattleAI.listeners.ArenaSetupListener;
 import ru.ashesha.buildBattleAI.listeners.GameListener;
 import ru.ashesha.buildBattleAI.listeners.ListenerService;
-import ru.ashesha.buildBattleAI.listeners.MLTestListener;
 import ru.ashesha.buildBattleAI.listeners.OffHandSwapListener;
 import ru.ashesha.buildBattleAI.message.MessageService;
 import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
@@ -201,13 +198,16 @@ public class PluginContext {
         // belong here because they are owned by the plugin as a whole, not by
         // the command / listener services (those services only provide the
         // registration mechanism and the bulk-unregistration guarantees).
-        commandService.register(new ArenaCommand(plugin));
-        commandService.register(new MLTestCommand(plugin));
-        commandService.register(new WorldTpCommand(plugin));
-        commandService.register(new LanguageCommand(plugin));
+        ArenaCommand arenaCommand = new ArenaCommand(plugin);
+        commandService.register(arenaCommand);
+        // Optionally also expose each public subcommand as a top-level
+        // command. Reads the choice from config.yml; defaults to "subcommand"
+        // (the historical behaviour) when the key is absent or the config
+        // object is unavailable (e.g. unit tests mock the service out).
+        if ("flat".equals(resolveCommandStyle()))
+            registerFlatAliases(arenaCommand);
         listenerService.register(new ArenaSetupListener(plugin));
         listenerService.register(new GameListener(plugin));
-        listenerService.register(new MLTestListener(plugin));
         // PlayerSwapHandItemsEvent exists only on 1.9+. Registering the listener
         // unconditionally would make Bukkit's PluginManager abort the *entire*
         // listener with NoClassDefFoundError on 1.8, knocking out other handlers.
@@ -225,6 +225,75 @@ public class PluginContext {
         long elapsed = System.currentTimeMillis() - start;
         plugin.getPluginLogger().debug("PluginContext enabled %d service(s) in %d ms.",
                 services.size(), elapsed);
+    }
+
+    /**
+     * Reads the {@code commands.style} key from {@code config.yml} and
+     * normalises it to lower case. Returns {@code "subcommand"} (the safe
+     * default) when the key is missing, the config object is unavailable
+     * (e.g. mocked-out service in unit tests), or the value is malformed.
+     */
+    private String resolveCommandStyle() {
+        if (configService == null)
+            return "subcommand";
+        org.bukkit.configuration.file.YamlConfiguration cfg = configService.config();
+        if (cfg == null)
+            return "subcommand";
+        String raw = cfg.getString("commands.style", "subcommand");
+        return raw == null
+                ? "subcommand"
+                : raw.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /**
+     * Registers a {@link FlatSubcommand} for every public subcommand of
+     * {@link ArenaCommand} so they become available as top-level commands
+     * ({@code /create}, {@code /join}, {@code /lang}, …). Each alias is a
+     * thin delegator — all business logic remains in the parent.
+     * <p>
+     * The umbrella {@code /bbai} stays registered alongside; the arena
+     * setup wizard's click buttons emit {@code /bbai setup ...} payloads
+     * and would break otherwise.
+     */
+    private void registerFlatAliases(ArenaCommand parent) {
+        for (String sub : ArenaCommand.publicSubcommands())
+            commandService.register(new FlatSubcommand(
+                    plugin, parent, sub,
+                    flatDescriptionFor(sub),
+                    flatUsageFor(sub)));
+    }
+
+    /**
+     * Short human-readable description shown in {@code /help} entries for
+     * the flat alias of each subcommand. Kept colocated with the
+     * registration logic since it is the only consumer.
+     */
+    private static String flatDescriptionFor(String sub) {
+        switch (sub) {
+            case "create": return "Start the BuildBattleAI arena setup wizard";
+            case "list":   return "List configured BuildBattleAI arenas";
+            case "delete": return "Delete a BuildBattleAI arena";
+            case "join":   return "Join a BuildBattleAI arena game";
+            case "leave":  return "Leave your current BuildBattleAI game";
+            case "lang":   return "Show or switch your BuildBattleAI UI language";
+            case "stats":  return "Show BuildBattleAI evaluation pipeline stats";
+            default:       return "BuildBattleAI " + sub;
+        }
+    }
+
+    /**
+     * Usage hint appended after the command name in {@code /help} output.
+     * Mirrors the {@code <arg>}/{@code [arg]} convention used by the
+     * umbrella command.
+     */
+    private static String flatUsageFor(String sub) {
+        switch (sub) {
+            case "create": return "<name>";
+            case "delete": return "<name>";
+            case "join":   return "<arena>";
+            case "lang":   return "[code]";
+            default:       return "";
+        }
     }
 
     /**
@@ -294,8 +363,15 @@ public class PluginContext {
      * @param packet the packet to send
      */
     public void sendPacket(@NonNull Player player, @NonNull PacketWrapper<?> packet) {
+        // PacketEvents removes the User from its registry the moment the
+        // player's network channel closes, which is before our PlayerQuit
+        // cleanup runs (scoreboard removal, team removal, tablist clear).
+        // A null user here is a normal disconnect race, not an error —
+        // silently skip instead of spamming the console with warnings.
+        User user = PacketEvents.getAPI().getPlayerManager().getUser(player);
+        if (user == null)
+            return;
         try {
-            User user = PacketEvents.getAPI().getPlayerManager().getUser(player);
             user.sendPacket(packet);
         } catch (Throwable e) {
             plugin.getPluginLogger().warn("Failed to send %s to %s: %s",

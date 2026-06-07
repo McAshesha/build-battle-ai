@@ -58,7 +58,7 @@ public class PlayerData implements Serializable {
     /**
      * Player's chosen UI language code (e.g. {@code "en"}, {@code "ru"}), or
      * {@code null} to use the server's default language. Set via the
-     * {@code /bbailang} command.
+     * {@code /bbai lang} command.
      */
     private String language;
 

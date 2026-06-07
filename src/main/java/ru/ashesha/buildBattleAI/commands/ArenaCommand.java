@@ -7,7 +7,10 @@ import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.api.Arena;
 import ru.ashesha.buildBattleAI.arena.api.BBAIArenaManager;
+import ru.ashesha.buildBattleAI.config.api.BBAIConfigService;
 import ru.ashesha.buildBattleAI.config.api.Lang;
+import ru.ashesha.buildBattleAI.data.api.BBAIDataService;
+import ru.ashesha.buildBattleAI.data.api.PlayerData;
 import ru.ashesha.buildBattleAI.evaluation.api.EvaluationStats;
 import ru.ashesha.buildBattleAI.game.ArenaState;
 import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
@@ -24,11 +27,16 @@ import java.util.Locale;
  * <p>
  * Public subcommands (visible in tab completion):
  * <ul>
- *     <li>{@code create <name>} — starts the interactive arena setup wizard</li>
+ *     <li>{@code create <name>} — starts the interactive arena setup wizard
+ *         (hidden in tab completion while the player is already in a game)</li>
  *     <li>{@code list} — displays all configured arenas with game status</li>
  *     <li>{@code delete <name>} — permanently removes an arena and its world</li>
- *     <li>{@code join <arena>} — joins a game in the specified arena</li>
- *     <li>{@code leave} — leaves the current game</li>
+ *     <li>{@code join <arena>} — joins a game in the specified arena
+ *         (hidden in tab completion while the player is already in a game)</li>
+ *     <li>{@code leave} — leaves the current game (hidden in tab completion
+ *         while the player is not in any game)</li>
+ *     <li>{@code lang [code]} — shows or switches the player's UI language</li>
+ *     <li>{@code stats} — prints evaluation-pipeline metrics</li>
  * </ul>
  * Internal subcommands (triggered by clickable chat messages during the
  * setup wizard, intentionally hidden from tab completion):
@@ -44,9 +52,37 @@ import java.util.Locale;
  */
 public class ArenaCommand extends CommandService.PluginCommand {
 
-    /** Subcommands exposed in tab completion. */
+    /** Full set of public subcommands the command will execute. */
     private static final List<String> PUBLIC_SUBCOMMANDS =
-            Arrays.asList("create", "list", "delete", "join", "leave", "stats");
+            Arrays.asList("create", "list", "delete", "join", "leave", "stats", "lang");
+
+    /**
+     * Returns the immutable list of public subcommand names. Exposed so the
+     * flat-mode command bootstrapper (see {@link FlatSubcommand}) can iterate
+     * over the same canonical list rather than duplicate the literals.
+     */
+    public static List<String> publicSubcommands() {
+        return PUBLIC_SUBCOMMANDS;
+    }
+
+    /**
+     * Forwards an already-shaped {@code args} array (subcommand name at index 0,
+     * remaining tokens after) into the standard execution path. Used by
+     * {@link FlatSubcommand} so flat aliases share the exact dispatch logic of
+     * {@code /bbai}.
+     */
+    void dispatch(CommandSender sender, String[] args) {
+        execute(sender, args);
+    }
+
+    /**
+     * Tab-completion counterpart of {@link #dispatch(CommandSender, String[])}.
+     * Flat wrappers prepend their own subcommand name before delegating so the
+     * second-arg branch of {@link #suggest} resolves correctly.
+     */
+    List<String> dispatchSuggest(CommandSender sender, String[] args) {
+        return suggest(sender, args);
+    }
 
     /**
      * Creates the arena command.
@@ -55,7 +91,7 @@ public class ArenaCommand extends CommandService.PluginCommand {
      */
     public ArenaCommand(@NonNull BuildBattleAI plugin) {
         super(plugin, "bbai", "BuildBattleAI arena management",
-                "<create|list|delete|join|leave|stats> [name]");
+                "<create|list|delete|join|leave|lang|stats> [arg]");
     }
 
     @Override
@@ -85,6 +121,9 @@ public class ArenaCommand extends CommandService.PluginCommand {
             case "stats":
                 handleStatsCommand(sender);
                 break;
+            case "lang":
+                handleLang(sender, args);
+                break;
             case "setup":
                 handleSetup(sender, args);
                 break;
@@ -94,18 +133,64 @@ public class ArenaCommand extends CommandService.PluginCommand {
         }
     }
 
+    /**
+     * Provides tab-completion suggestions for {@code /bbai}.
+     * <p>
+     * The first-arg list is filtered by the player's current state so the
+     * client only sees actions that make sense:
+     * <ul>
+     *     <li>If the player is in an active game session, {@code create} and
+     *         {@code join} are hidden (they would just print an error) while
+     *         {@code leave} stays available.</li>
+     *     <li>If the player is not in any session, {@code leave} is hidden
+     *         and the rest is offered.</li>
+     *     <li>For non-players (console), the full list is shown — console
+     *         can administer arenas and {@code lang} is a no-op anyway.</li>
+     * </ul>
+     * Second-arg completion proposes arena names for {@code delete} /
+     * {@code join} and language codes for {@code lang}.
+     */
     @Override
     protected List<String> suggest(CommandSender sender, String[] args) {
         if (args.length == 1)
-            return filterStartsWith(PUBLIC_SUBCOMMANDS, args[0]);
+            return filterStartsWith(visibleSubcommandsFor(sender), args[0]);
         if (args.length == 2) {
             String sub = args[0].toLowerCase();
             if ("delete".equals(sub) || "join".equals(sub))
                 return filterStartsWith(
                         new ArrayList<>(plugin.getContext().getArenaManager().getArenaNames()),
                         args[1]);
+            if ("lang".equals(sub))
+                return filterStartsWith(
+                        new ArrayList<>(plugin.getContext().getConfigService().getAvailableLangs()),
+                        args[1]);
         }
         return Collections.emptyList();
+    }
+
+    /**
+     * Returns the subcommands worth offering to {@code sender} right now,
+     * taking the player's session state into account. See {@link #suggest}
+     * for the filtering rules.
+     */
+    private List<String> visibleSubcommandsFor(CommandSender sender) {
+        if (!(sender instanceof Player))
+            return PUBLIC_SUBCOMMANDS;
+        Player player = (Player) sender;
+        boolean inGame = plugin.getContext().getGameManager().isInGame(player.getUniqueId());
+        List<String> out = new ArrayList<>(PUBLIC_SUBCOMMANDS.size());
+        for (String sub : PUBLIC_SUBCOMMANDS) {
+            // While in a session, hide commands that the player cannot use
+            // from here (create / join) and surface only the actions that
+            // make sense (leave / list / stats / lang). Mirror logic for
+            // the not-in-game case — leave is suppressed.
+            if (inGame && ("create".equals(sub) || "join".equals(sub)))
+                continue;
+            if (!inGame && "leave".equals(sub))
+                continue;
+            out.add(sub);
+        }
+        return out;
     }
 
     // ── subcommand handlers ────────────────────────────────────────────
@@ -446,6 +531,81 @@ public class ArenaCommand extends CommandService.PluginCommand {
             return;
         }
         am.handleSetCountdown(player, seconds);
+    }
+
+    /**
+     * Handles {@code /bbai lang [code]} — without an argument prints the
+     * player's current language plus the list of available languages; with
+     * a code argument persists the new language preference and confirms in
+     * the freshly-switched language.
+     */
+    private void handleLang(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player)) {
+            sendPlayerOnly(sender);
+            return;
+        }
+        Player player = (Player) sender;
+        BBAIConfigService cfg = plugin.getContext().getConfigService();
+        // Resolve the current per-player lang so the response is shown in
+        // whatever language the player currently uses — feels natural even
+        // when they are about to switch away.
+        Lang lang = cfg.getLangFor(player.getUniqueId());
+        java.util.Set<String> available = cfg.getAvailableLangs();
+
+        if (args.length < 2) {
+            // List mode: show current + available codes.
+            String current = currentLangNameFor(player);
+            plugin.getContext().getMessageService().sendChat(player,
+                    lang.get("lang.current", "%lang%", current));
+            plugin.getContext().getMessageService().sendChat(player,
+                    lang.get("lang.available",
+                            "%list%", String.join(", ", available)));
+            plugin.getContext().getMessageService().sendChat(player,
+                    lang.get("lang.usage"));
+            return;
+        }
+
+        String requested = args[1].toLowerCase();
+        if (!available.contains(requested)) {
+            plugin.getContext().getMessageService().sendChat(player,
+                    lang.get("lang.unknown",
+                            "%lang%", requested,
+                            "%list%", String.join(", ", available)));
+            return;
+        }
+
+        // Persistence requires DataService — when disabled (data.enabled=false)
+        // there is nowhere durable to remember the preference, so we refuse
+        // rather than silently dropping the choice on the next relog.
+        BBAIDataService data = plugin.getContext().getDataService();
+        if (!data.isEnabled()) {
+            plugin.getContext().getMessageService().sendChat(player,
+                    lang.get("lang.disabled"));
+            return;
+        }
+        PlayerData pd = data.getOrCreatePlayer(player.getUniqueId(), player.getName());
+        pd.language(requested);
+        data.savePlayer(pd);
+
+        // After saving, fetch the new lang to confirm in THE NEW language.
+        Lang newLang = cfg.getLangFor(player.getUniqueId());
+        plugin.getContext().getMessageService().sendChat(player,
+                newLang.get("lang.switched", "%lang%", requested));
+    }
+
+    /**
+     * Returns the player's currently-stored language code, or the default
+     * language name when the player has not set a preference.
+     */
+    private String currentLangNameFor(Player player) {
+        BBAIDataService data = plugin.getContext().getDataService();
+        if (data.isEnabled()) {
+            PlayerData pd = data.getPlayer(player.getUniqueId());
+            if (pd != null && pd.language() != null && !pd.language().isEmpty())
+                return pd.language();
+        }
+        Lang def = plugin.getContext().getConfigService().getDefaultLang();
+        return def != null ? def.name() : "?";
     }
 
     /**

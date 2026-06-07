@@ -10,6 +10,25 @@ log-level: info
 
 default-language: en
 
+# ── Commands ─────────────────────────────────────────────────────────────
+commands:
+  # How plugin commands are exposed to players.
+  #   subcommand - everything lives under the /bbai umbrella
+  #                (e.g. /bbai create, /bbai join, /bbai lang).
+  #                Default — guaranteed not to clash with vanilla or other
+  #                plugins.
+  #   flat       - each public action is ALSO registered as a top-level
+  #                command (/create, /list, /delete, /join, /leave, /lang,
+  #                /stats), delegating to the same handlers. The /bbai
+  #                umbrella stays registered in both modes since the arena
+  #                setup wizard's clickable chat buttons rely on it.
+  #                Be aware that flat names can collide with vanilla
+  #                (/list shows the player list) or other plugins
+  #                (/leave, /join in BungeeCord-style lobbies); on collision
+  #                the operator can address ours explicitly via
+  #                /buildbattleai:<name>.
+  style: subcommand
+
 # ── Data Storage ─────────────────────────────────────────────────────────
 data:
   # Enable persistent data storage (player stats, arena stats).

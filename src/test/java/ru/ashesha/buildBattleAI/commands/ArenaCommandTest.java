@@ -595,12 +595,26 @@ class ArenaCommandTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void tabCompletionSuggestsPublicSubcommands() throws Exception {
+    void tabCompletionSuggestsPublicSubcommandsWhenNotInGame() throws Exception {
         Player player = playerMock();
+        // Not in game (default mock return) — `leave` is filtered out.
         List<String> suggestions = invokeSuggest(player, new String[]{""});
-        assertTrue(suggestions.containsAll(Arrays.asList("create", "list", "delete", "join", "leave")));
+        assertTrue(suggestions.containsAll(Arrays.asList("create", "list", "delete", "join", "lang", "stats")));
+        assertFalse(suggestions.contains("leave"));
         // Internal "setup" must not appear.
         assertFalse(suggestions.contains("setup"));
+    }
+
+    @Test
+    void tabCompletionHidesCreateAndJoinWhenInGame() throws Exception {
+        Player player = playerMock();
+        when(gameManager.isInGame(player.getUniqueId())).thenReturn(true);
+        List<String> suggestions = invokeSuggest(player, new String[]{""});
+        assertTrue(suggestions.contains("leave"));
+        assertFalse(suggestions.contains("create"));
+        assertFalse(suggestions.contains("join"));
+        // Always-available actions remain.
+        assertTrue(suggestions.containsAll(Arrays.asList("list", "stats", "lang", "delete")));
     }
 
     @Test
@@ -613,7 +627,14 @@ class ArenaCommandTest {
     @Test
     void tabCompletionFilterIsCaseInsensitive() throws Exception {
         Player player = playerMock();
+        // Not in game — for prefix "L" only `list` matches, `leave` is hidden.
         List<String> suggestions = invokeSuggest(player, new String[]{"L"});
+        assertTrue(suggestions.contains("list"));
+        assertFalse(suggestions.contains("leave"));
+
+        // In game — both surface (case-insensitive match on "L").
+        when(gameManager.isInGame(player.getUniqueId())).thenReturn(true);
+        suggestions = invokeSuggest(player, new String[]{"L"});
         assertTrue(suggestions.contains("list"));
         assertTrue(suggestions.contains("leave"));
     }

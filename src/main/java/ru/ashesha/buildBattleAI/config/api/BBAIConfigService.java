@@ -84,7 +84,7 @@ public interface BBAIConfigService {
      * the {@code DataService} is disabled).
      * <p>
      * Player preferences are stored in {@code PlayerData.language} and are
-     * set via the {@code /bbailang} command.
+     * set via the {@code /bbai lang} command.
      *
      * @param playerId the player's UUID; may be {@code null} for non-player
      *                 contexts (console, scheduled tasks) — falls through to default

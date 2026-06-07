@@ -36,6 +36,35 @@ mvn test             # run tests only
 
 Requires **Java 8** and **Maven 3.6+**.
 
+Each `package` produces two artifacts in `target/`:
+
+- `buildbattleai-<version>.jar` — full build (Apache Ignite shaded in for the optional distributed data backend, ~167 MB)
+- `buildbattleai-<version>-lite.jar` — Ignite stripped, suitable for single-server deploys, ~153 MB
+
+The shade configuration filters out ONNX Runtime debug symbols (`.pdb` / `.dSYM`) which the JNI loader never reads — that alone saves ~95 MB per JAR.
+
+### Signed + obfuscated builds
+
+```bash
+mvn clean package -Psign,obfuscate \
+    -Djarsigner.keystore=./keystore.jks \
+    -Djarsigner.alias=bbai \
+    -Djarsigner.storepass=<pass> \
+    -Djarsigner.keypass=<pass>
+```
+
+Obfuscation profiles: `-Pobfuscate-light` (rename only), `-Pobfuscate` (rename + repackage), `-Pobfuscate-heavy` (maximum). The mapping for deobfuscating stack traces is written to `target/proguard-mapping.txt` (full) and `target/proguard-mapping-lite.txt` (lite).
+
+### Releases
+
+Releases are cut manually from the **Release** workflow in GitHub Actions. Inputs:
+
+- `version` — optional; if empty the current pom version is used with `-SNAPSHOT` stripped.
+- `release_notes` — optional Markdown body for the GitHub Release page.
+- `obfuscation_level` — one of `obfuscate-light` / `obfuscate` / `obfuscate-heavy`.
+
+The workflow builds the signed + obfuscated full and lite JARs, publishes a GitHub Release with both JARs and both ProGuard mapping files, tags the release commit, and bumps the pom to the next `-SNAPSHOT` on the default branch. CD on `main` deploys only the **lite** JAR to the VPS; the **Deploy Latest Release** workflow can roll back to or redeploy any tagged release on demand.
+
 ## Testing
 
 The default `mvn test` runs 12 700+ unit and integration tests (renderer, palette, evaluation queues, ML in disabled mode, MockBukkit scenarios). Heavy tests live in dedicated Maven profiles.

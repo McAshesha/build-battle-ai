@@ -6,10 +6,10 @@ import org.mockito.InOrder;
 import org.mockito.MockedConstruction;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.arena.ArenaManager;
+import org.bukkit.configuration.file.YamlConfiguration;
 import ru.ashesha.buildBattleAI.commands.ArenaCommand;
 import ru.ashesha.buildBattleAI.commands.CommandService;
-import ru.ashesha.buildBattleAI.commands.MLTestCommand;
-import ru.ashesha.buildBattleAI.commands.WorldTpCommand;
+import ru.ashesha.buildBattleAI.commands.FlatSubcommand;
 import ru.ashesha.buildBattleAI.config.ConfigService;
 import ru.ashesha.buildBattleAI.data.DataService;
 import ru.ashesha.buildBattleAI.entity.hologram.HologramService;
@@ -20,7 +20,6 @@ import ru.ashesha.buildBattleAI.game.GameManager;
 import ru.ashesha.buildBattleAI.listeners.ArenaSetupListener;
 import ru.ashesha.buildBattleAI.listeners.GameListener;
 import ru.ashesha.buildBattleAI.listeners.ListenerService;
-import ru.ashesha.buildBattleAI.listeners.MLTestListener;
 import ru.ashesha.buildBattleAI.listeners.OffHandSwapListener;
 import ru.ashesha.buildBattleAI.message.MessageService;
 import ru.ashesha.buildBattleAI.ml.MLService;
@@ -81,10 +80,8 @@ class PluginContextLifecycleTest {
              MockedConstruction<CommandService> cmd = mockConstruction(CommandService.class);
              MockedConstruction<ListenerService> lst = mockConstruction(ListenerService.class);
              MockedConstruction<ArenaCommand> arenaCmd = mockConstruction(ArenaCommand.class);
-             MockedConstruction<MLTestCommand> mlCmd = mockConstruction(MLTestCommand.class);
              MockedConstruction<ArenaSetupListener> setupLst = mockConstruction(ArenaSetupListener.class);
              MockedConstruction<GameListener> gameLst = mockConstruction(GameListener.class);
-             MockedConstruction<MLTestListener> mlLst = mockConstruction(MLTestListener.class);
              // OffHandSwapListener is registered conditionally on PlayerSwapHandItemsEvent
              // being present on the classpath (paper-api 1.21.5 in test scope has it).
              MockedConstruction<OffHandSwapListener> swapLst = mockConstruction(OffHandSwapListener.class)) {
@@ -131,7 +128,7 @@ class PluginContextLifecycleTest {
     // ── enable: command + listener registrations ──────────────────────────
 
     @Test
-    void enableRegistersFourCommandsAndFourListeners() {
+    void enableRegistersArenaCommandAndAllListeners() {
         try (MockedConstruction<ConfigService> cfg = mockConstruction(ConfigService.class);
              MockedConstruction<DataService> dat = mockConstruction(DataService.class);
              MockedConstruction<WorldService> wld = mockConstruction(WorldService.class);
@@ -147,13 +144,8 @@ class PluginContextLifecycleTest {
              MockedConstruction<CommandService> cmd = mockConstruction(CommandService.class);
              MockedConstruction<ListenerService> lst = mockConstruction(ListenerService.class);
              MockedConstruction<ArenaCommand> arenaCmd = mockConstruction(ArenaCommand.class);
-             MockedConstruction<MLTestCommand> mlCmd = mockConstruction(MLTestCommand.class);
-             MockedConstruction<WorldTpCommand> wtpCmd = mockConstruction(WorldTpCommand.class);
-             MockedConstruction<ru.ashesha.buildBattleAI.commands.LanguageCommand> langCmd =
-                     mockConstruction(ru.ashesha.buildBattleAI.commands.LanguageCommand.class);
              MockedConstruction<ArenaSetupListener> setupLst = mockConstruction(ArenaSetupListener.class);
              MockedConstruction<GameListener> gameLst = mockConstruction(GameListener.class);
-             MockedConstruction<MLTestListener> mlLst = mockConstruction(MLTestListener.class);
              // OffHandSwapListener is registered conditionally on PlayerSwapHandItemsEvent
              // being present on the classpath (paper-api 1.21.5 in test scope has it).
              MockedConstruction<OffHandSwapListener> swapLst = mockConstruction(OffHandSwapListener.class)) {
@@ -165,16 +157,58 @@ class PluginContextLifecycleTest {
             ListenerService lstMock = lst.constructed().get(0);
 
             verify(cmdMock).register(any(ArenaCommand.class));
-            verify(cmdMock).register(any(MLTestCommand.class));
-            verify(cmdMock).register(any(WorldTpCommand.class));
-            verify(cmdMock).register(any(ru.ashesha.buildBattleAI.commands.LanguageCommand.class));
-            verify(cmdMock, times(4)).register(any());
+            verify(cmdMock, times(1)).register(any());
 
             verify(lstMock).register(any(ArenaSetupListener.class));
             verify(lstMock).register(any(GameListener.class));
-            verify(lstMock).register(any(MLTestListener.class));
             verify(lstMock).register(any(OffHandSwapListener.class));
-            verify(lstMock, times(4)).register(any());
+            verify(lstMock, times(3)).register(any());
+        }
+    }
+
+    /**
+     * When {@code commands.style: flat} is set in {@code config.yml}, every
+     * public subcommand of {@link ArenaCommand} must be additionally
+     * registered as a top-level {@link FlatSubcommand}. The umbrella
+     * {@code /bbai} (ArenaCommand) must still be registered — the arena
+     * setup wizard's click buttons rely on it.
+     */
+    @Test
+    void enableInFlatModeRegistersFlatAliasesForEverySubcommand() {
+        try (MockedConstruction<ConfigService> cfg = mockConstruction(ConfigService.class, (svc, ctxArgs) -> {
+                YamlConfiguration y = new YamlConfiguration();
+                y.set("commands.style", "flat");
+                when(svc.config()).thenReturn(y);
+             });
+             MockedConstruction<DataService> dat = mockConstruction(DataService.class);
+             MockedConstruction<WorldService> wld = mockConstruction(WorldService.class);
+             MockedConstruction<ArenaManager> arn = mockConstruction(ArenaManager.class);
+             MockedConstruction<GameManager> gam = mockConstruction(GameManager.class);
+             MockedConstruction<MessageService> msg = mockConstruction(MessageService.class);
+             MockedConstruction<NPCService> npc = mockConstruction(NPCService.class);
+             MockedConstruction<HologramService> hol = mockConstruction(HologramService.class);
+             MockedConstruction<PictureService> pic = mockConstruction(PictureService.class);
+             MockedConstruction<MLService> mls = mockConstruction(MLService.class);
+             MockedConstruction<RenderService> rnd = mockConstruction(RenderService.class);
+             MockedConstruction<EvaluationService> evl = mockConstruction(EvaluationService.class);
+             MockedConstruction<CommandService> cmd = mockConstruction(CommandService.class);
+             MockedConstruction<ListenerService> lst = mockConstruction(ListenerService.class);
+             MockedConstruction<ArenaCommand> arenaCmd = mockConstruction(ArenaCommand.class);
+             MockedConstruction<FlatSubcommand> flatCmd = mockConstruction(FlatSubcommand.class);
+             MockedConstruction<ArenaSetupListener> setupLst = mockConstruction(ArenaSetupListener.class);
+             MockedConstruction<GameListener> gameLst = mockConstruction(GameListener.class);
+             MockedConstruction<OffHandSwapListener> swapLst = mockConstruction(OffHandSwapListener.class)) {
+
+            PluginContext ctx = new PluginContext(plugin);
+            ctx.enable();
+
+            CommandService cmdMock = cmd.constructed().get(0);
+
+            // One umbrella + one alias per public subcommand.
+            int expectedAliases = ArenaCommand.publicSubcommands().size();
+            verify(cmdMock).register(any(ArenaCommand.class));
+            verify(cmdMock, times(expectedAliases)).register(any(FlatSubcommand.class));
+            verify(cmdMock, times(1 + expectedAliases)).register(any());
         }
     }
 
@@ -255,10 +289,8 @@ class PluginContextLifecycleTest {
              MockedConstruction<CommandService> cmd = mockConstruction(CommandService.class);
              MockedConstruction<ListenerService> lst = mockConstruction(ListenerService.class);
              MockedConstruction<ArenaCommand> arenaCmd = mockConstruction(ArenaCommand.class);
-             MockedConstruction<MLTestCommand> mlCmd = mockConstruction(MLTestCommand.class);
              MockedConstruction<ArenaSetupListener> setupLst = mockConstruction(ArenaSetupListener.class);
              MockedConstruction<GameListener> gameLst = mockConstruction(GameListener.class);
-             MockedConstruction<MLTestListener> mlLst = mockConstruction(MLTestListener.class);
              // OffHandSwapListener is registered conditionally on PlayerSwapHandItemsEvent
              // being present on the classpath (paper-api 1.21.5 in test scope has it).
              MockedConstruction<OffHandSwapListener> swapLst = mockConstruction(OffHandSwapListener.class)) {
@@ -340,10 +372,8 @@ class PluginContextLifecycleTest {
              MockedConstruction<CommandService> cmd = mockConstruction(CommandService.class);
              MockedConstruction<ListenerService> lst = mockConstruction(ListenerService.class);
              MockedConstruction<ArenaCommand> arenaCmd = mockConstruction(ArenaCommand.class);
-             MockedConstruction<MLTestCommand> mlCmd = mockConstruction(MLTestCommand.class);
              MockedConstruction<ArenaSetupListener> setupLst = mockConstruction(ArenaSetupListener.class);
              MockedConstruction<GameListener> gameLst = mockConstruction(GameListener.class);
-             MockedConstruction<MLTestListener> mlLst = mockConstruction(MLTestListener.class);
              // OffHandSwapListener is registered conditionally on PlayerSwapHandItemsEvent
              // being present on the classpath (paper-api 1.21.5 in test scope has it).
              MockedConstruction<OffHandSwapListener> swapLst = mockConstruction(OffHandSwapListener.class)) {

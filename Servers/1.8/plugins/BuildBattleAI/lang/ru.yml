@@ -1,428 +1,348 @@
-# ══════════════════════════════════════════════════════════════════════
-#  BuildBattleAI — Russian Language File
-# ══════════════════════════════════════════════════════════════════════
-
-test-join-message: "С возвращением, %player%!"
-test-leave-message: "Пока, %player%! До встречи!"
-
-# ── Language Command ─────────────────────────────────────────────────
-# Сообщения команды /bbailang.
+test-join-message: С возвращением, %player%!
+test-leave-message: Пока, %player%! До встречи!
 lang:
-  current: "&7Текущий язык: &e%lang%"
-  available: "&7Доступные: &f%list%"
-  usage: "&7Использование: &f/bbailang <код>"
-  unknown: "&c  Неизвестный язык '&f%lang%&c'. Доступные: &7%list%"
-  disabled: "&c  Хранилище данных выключено, выбор языка не сохраняется."
-  switched: "&a  Язык переключён на &f%lang%&a."
-
-# ── Arena ────────────────────────────────────────────────────────────
+  current: '&7Текущий язык: &e%lang%'
+  available: '&7Доступные: &f%list%'
+  usage: '&7Использование: &f/bbailang <код>'
+  unknown: '&c  Неизвестный язык ''&f%lang%&c''. Доступные: &7%list%'
+  disabled: '&c  Хранилище данных выключено, выбор языка не сохраняется.'
+  switched: '&a  Язык переключён на &f%lang%&a.'
 arena:
-
-  # Общая подсказка
-  usage: "&c  Использование: /bbai <create|list|delete|join|leave> [имя]"
-
-  # ── Панель настройки арены ─────────────────────────────────────────
+  usage: '&c  Использование: /bbai <create|list|delete|join|leave> [имя]'
   setup:
-    divider: "&6&l▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
-    header: "&e  Настройка арены &8» &f%arena%"
-
-    # Индикаторы статуса
+    divider: '&6&l▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬'
+    header: '&e  Настройка арены &8» &f%arena%'
     status:
-      set: "&a✔"
-      unset: "&c✘"
-      optional: "&8○"
-
-    # Отображение координат
-    value: "&f%x%&7, &f%y%&7, &f%z%"
+      set: '&a✔'
+      unset: '&c✘'
+      optional: '&8○'
+    value: '&f%x%&7, &f%y%&7, &f%z%'
     corner:
-      value: "&f(%x%, %y%, %z%)"
-
-    # Кнопки
+      value: '&f(%x%, %y%, %z%)'
     btn:
-      set: "&a[Задать]"
-      change: "&e[Изменить]"
-
-    # Выбор количества игроков
+      set: '&a[Задать]'
+      change: '&e[Изменить]'
     players:
-      label: "&7  Игроков: "
-      selected: "&a&l[%count%✓]"
-      unselected: "&7[%count%]"
-      hover: "&7Задать макс. игроков: &e%count%"
-    select-players-hint: "&8  Выбери число игроков для настройки плотов"
-
-    # Позиция лобби
+      label: '&7  Игроков: '
+      selected: '&a&l[%count%✓]'
+      unselected: '&7[%count%]'
+      hover: '&7Задать макс. игроков: &e%count%'
+    select-players-hint: '&8  Выбери число игроков для настройки плотов'
     lobby:
-      label: "&7  Лобби: "
-      hover-set: "&7Встань на место ожидания и нажми"
-      hover-change: "&7Нажми, чтобы обновить позицию лобби"
-
-    # Позиция наблюдения
+      label: '&7  Лобби: '
+      hover-set: '&7Встань на место ожидания и нажми'
+      hover-change: '&7Нажми, чтобы обновить позицию лобби'
     spectator:
-      label: "&7  Зритель: "
-      hover-set: "&7Встань в зрительскую зону и нажми"
-      hover-change: "&7Нажми, чтобы обновить позицию зрителя"
-
-    # Минимум игроков
+      label: '&7  Зритель: '
+      hover-set: '&7Встань в зрительскую зону и нажми'
+      hover-change: '&7Нажми, чтобы обновить позицию зрителя'
     minplayers:
-      label: "&7  Мин. игроков: "
-      value: "&f%count%"
-      hover: "&7Нажми и введи минимальное число игроков"
-      invalid: "&c  Мин. игроков должно быть от 2 до %max%."
-
-    # Время постройки
+      label: '&7  Мин. игроков: '
+      value: '&f%count%'
+      hover: '&7Нажми и введи минимальное число игроков'
+      invalid: '&c  Мин. игроков должно быть от 2 до %max%.'
     buildtime:
-      label: "&7  Время постройки: "
-      value: "&f%minutes% мин"
-      hover: "&7Нажми и введи время постройки в минутах (0.5–10)"
-      invalid: "&c  Время постройки должно быть от 0.5 до 10 минут."
-
-    # Время игры
+      label: '&7  Время постройки: '
+      value: '&f%minutes% мин'
+      hover: '&7Нажми и введи время постройки в минутах (0.5–10)'
+      invalid: '&c  Время постройки должно быть от 0.5 до 10 минут.'
     gametime:
-      label: "&7  Время игры: "
-      value: "&f%minutes% мин"
-      hover: "&7Нажми и введи общее время игры в минутах (1–30)"
-      invalid: "&c  Время игры должно быть от 1 до 30 минут."
-
-    # Обратный отсчёт
+      label: '&7  Время игры: '
+      value: '&f%minutes% мин'
+      hover: '&7Нажми и введи общее время игры в минутах (1–30)'
+      invalid: '&c  Время игры должно быть от 1 до 30 минут.'
     countdown:
-      label: "&7  Отсчёт: "
-      value: "&f%seconds%с"
-      hover: "&7Нажми и введи длину обратного отсчёта в секундах (3–60)"
-      invalid: "&c  Отсчёт должен быть от 3 до 60 секунд."
-
-    # Вкладки плотов
+      label: '&7  Отсчёт: '
+      value: '&f%seconds%с'
+      hover: '&7Нажми и введи длину обратного отсчёта в секундах (3–60)'
+      invalid: '&c  Отсчёт должен быть от 3 до 60 секунд.'
     tab:
-      label: "&7  Плоты: "
-      active: "&b&l[Плот %index%★]"
-      complete: "&a[Плот %index%✓]"
-      incomplete: "&7[Плот %index%✗]"
-      hover: "&7Перейти к настройке плота %index%"
-
-    # Настройки конкретного плота
+      label: '&7  Плоты: '
+      active: '&b&l[Плот %index%★]'
+      complete: '&a[Плот %index%✓]'
+      incomplete: '&7[Плот %index%✗]'
+      hover: '&7Перейти к настройке плота %index%'
     plot:
-      header: "&6  ── Плот %index% ──"
+      header: '&6  ── Плот %index% ──'
       spawn:
-        label: "&7    Спавн: "
-        hover-set: "&7Встань на спавн плота %index% и нажми"
-        hover-change: "&7Нажми, чтобы обновить спавн плота %index%"
+        label: '&7    Спавн: '
+        hover-set: '&7Встань на спавн плота %index% и нажми'
+        hover-change: '&7Нажми, чтобы обновить спавн плота %index%'
       cameras:
-        label: "&7    Камеры: "
-        set: "&a[Кам %camera%]"
-        unset: "&c[Кам %camera%]"
-        hover-set: "&7Встань в точку камеры %camera% для плота %index%, посмотри на постройку и нажми"
-        hover-change: "&7Нажми, чтобы обновить камеру %camera% плота %index%"
+        label: '&7    Камеры: '
+        set: '&a[Кам %camera%]'
+        unset: '&c[Кам %camera%]'
+        hover-set: '&7Встань в точку камеры %camera% для плота %index%, посмотри на
+          постройку и нажми'
+        hover-change: '&7Нажми, чтобы обновить камеру %camera% плота %index%'
       zone:
-        label: "&7    Зона: "
-        c1: "&e[C1]"
-        c2: "&e[C2]"
-        c1-hover-set: "&7Долети до первого угла плота %index% и нажми"
-        c1-hover-change: "&7Нажми, чтобы обновить угол 1 плота %index%"
-        c2-hover-set: "&7Долети до противоположного угла плота %index% и нажми"
-        c2-hover-change: "&7Нажми, чтобы обновить угол 2 плота %index%"
+        label: '&7    Зона: '
+        c1: '&e[C1]'
+        c2: '&e[C2]'
+        c1-hover-set: '&7Долети до первого угла плота %index% и нажми'
+        c1-hover-change: '&7Нажми, чтобы обновить угол 1 плота %index%'
+        c2-hover-set: '&7Долети до противоположного угла плота %index% и нажми'
+        c2-hover-change: '&7Нажми, чтобы обновить угол 2 плота %index%'
       picture:
-        label: "&7    Картина: "
-        c1: "&d[PC1]"
-        c2: "&d[PC2]"
-        c1-hover-set: "&7Встань на первый блок региона картины плота %index% и нажми"
-        c1-hover-change: "&7Нажми, чтобы обновить угол 1 картины плота %index%"
-        c2-hover-set: "&7Встань на противоположный блок региона картины плота %index% (тот же для 1×1) и нажми"
-        c2-hover-change: "&7Нажми, чтобы обновить угол 2 картины плота %index%"
-        invalid-plane: "&c✘ углы не на одной плоскости (нужны одинаковые X или Z)"
-        invalid-size: "&c✘ картина должна быть 1×1 или 2×2"
+        label: '&7    Картина: '
+        c1: '&d[PC1]'
+        c2: '&d[PC2]'
+        c1-hover-set: '&7Встань на первый блок региона картины плота %index% и нажми'
+        c1-hover-change: '&7Нажми, чтобы обновить угол 1 картины плота %index%'
+        c2-hover-set: '&7Встань на противоположный блок региона картины плота %index%
+          (тот же для 1×1) и нажми'
+        c2-hover-change: '&7Нажми, чтобы обновить угол 2 картины плота %index%'
+        invalid-plane: '&c✘ углы не на одной плоскости (нужны одинаковые X или Z)'
+        invalid-size: '&c✘ картина должна быть 1×1 или 2×2'
         face:
-          label: "&7    Сторона: "
-          option: "&7[%face%]"
-          option-selected: "&a&l[%face%✓]"
-          hover: "&7Задать сторону картины плота %index%: &e%face%"
-
-    # Подтверждение / отмена
+          label: '&7    Сторона: '
+          option: '&7[%face%]'
+          option-selected: '&a&l[%face%✓]'
+          hover: '&7Задать сторону картины плота %index%: &e%face%'
     confirm:
-      ready: "&a&l[Подтвердить]"
-      not-ready: "&8[Подтвердить]"
-      hover-ready: "&aВсе настройки заполнены — нажми для создания!"
-      hover-not-ready: "&cСначала заполни все обязательные поля"
+      ready: '&a&l[Подтвердить]'
+      not-ready: '&8[Подтвердить]'
+      hover-ready: '&aВсе настройки заполнены — нажми для создания!'
+      hover-not-ready: '&cСначала заполни все обязательные поля'
     cancel:
-      btn: "&c&l[Отмена]"
-      hover: "&7Отменить настройку арены и удалить мир"
-
-    # Тайтлы при настройке
+      btn: '&c&l[Отмена]'
+      hover: '&7Отменить настройку арены и удалить мир'
     title:
-      welcome: "&e&lНастройка арены"
-      welcome-sub: "&7Настрой свою новую арену"
-      players: "&6Игроки"
-      players-sub: "&7Задано: &e%count%"
-      lobby: "&6Лобби"
-      spectator: "&6Зритель"
-      spawn: "&6Плот %index%"
-      corner: "&6Плот %index%"
-      camera: "&6Плот %index%"
-      position-saved: "&7Позиция сохранена"
-      corner1-saved: "&7Угол 1 сохранён"
-      corner2-saved: "&7Угол 2 сохранён"
-      camera-saved: "&7Камера %camera% сохранена"
-      created: "&a&l✔ Арена создана"
-      created-sub: "&f%arena%"
-      incomplete: "&c&l✘ Не готово"
-      incomplete-sub: "&7Сначала заполни все поля"
-      cancelled: "&c&l✘ Отменено"
-      cancelled-sub: "&7Настройка арены отменена"
-      minplayers: "&6Мин. игроков"
-      minplayers-sub: "&7Задано: &e%count%"
-      buildtime: "&6Время постройки"
-      buildtime-sub: "&7Задано: &e%minutes% мин"
-      gametime: "&6Время игры"
-      gametime-sub: "&7Задано: &e%minutes% мин"
-      countdown: "&6Отсчёт"
-      countdown-sub: "&7Задано: &e%seconds%с"
-      picture: "&6Плот %index%"
-      picture-saved: "&7Угол %corner% картины сохранён"
-      face: "&6Плот %index%"
-      face-saved: "&7Сторона: &e%face%"
-
-    # Голограммы-маркеры на заданных позициях
+      welcome: '&e&lНастройка арены'
+      welcome-sub: '&7Настрой свою новую арену'
+      players: '&6Игроки'
+      players-sub: '&7Задано: &e%count%'
+      lobby: '&6Лобби'
+      spectator: '&6Зритель'
+      spawn: '&6Плот %index%'
+      corner: '&6Плот %index%'
+      camera: '&6Плот %index%'
+      position-saved: '&7Позиция сохранена'
+      corner1-saved: '&7Угол 1 сохранён'
+      corner2-saved: '&7Угол 2 сохранён'
+      camera-saved: '&7Камера %camera% сохранена'
+      created: '&a&l✔ Арена создана'
+      created-sub: '&f%arena%'
+      incomplete: '&c&l✘ Не готово'
+      incomplete-sub: '&7Сначала заполни все поля'
+      cancelled: '&c&l✘ Отменено'
+      cancelled-sub: '&7Настройка арены отменена'
+      minplayers: '&6Мин. игроков'
+      minplayers-sub: '&7Задано: &e%count%'
+      buildtime: '&6Время постройки'
+      buildtime-sub: '&7Задано: &e%minutes% мин'
+      gametime: '&6Время игры'
+      gametime-sub: '&7Задано: &e%minutes% мин'
+      countdown: '&6Отсчёт'
+      countdown-sub: '&7Задано: &e%seconds%с'
+      picture: '&6Плот %index%'
+      picture-saved: '&7Угол %corner% картины сохранён'
+      face: '&6Плот %index%'
+      face-saved: '&7Сторона: &e%face%'
     marker:
-      lobby: "&6⬇ &eЛобби"
-      spectator: "&6⬇ &eЗритель"
-      spawn: "&6⬇ &eСпавн #%index%"
-      corner1: "&c⬇ &eC1 #%index%"
-      corner2: "&c⬇ &eC2 #%index%"
-      pic-corner1: "&d⬇ &eКартина C1 #%index%"
-      pic-corner2: "&d⬇ &eКартина C2 #%index%"
-
-    # Системные сообщения
-    created: "&a  Арена &f%arena% &aсоздана и активирована!"
-    cancelled: "&c  Настройка арены отменена."
-    incomplete: "&c  Не все обязательные поля заполнены."
-    already-exists: "&c  Арена с именем &f%arena% &cуже существует."
-    already-in-setup: "&c  Ты уже настраиваешь арену."
-    world-failed: "&c  Не удалось создать мир для арены &f%arena%&c."
-    no-session: "&c  У тебя нет активной сессии настройки."
-    name-required: "&c  Использование: /bbai create <имя>"
-
-  # ── Список арен ────────────────────────────────────────────────────
+      lobby: '&6⬇ &eЛобби'
+      spectator: '&6⬇ &eЗритель'
+      spawn: '&6⬇ &eСпавн #%index%'
+      corner1: '&c⬇ &eC1 #%index%'
+      corner2: '&c⬇ &eC2 #%index%'
+      pic-corner1: '&d⬇ &eКартина C1 #%index%'
+      pic-corner2: '&d⬇ &eКартина C2 #%index%'
+    created: '&a  Арена &f%arena% &aсоздана и активирована!'
+    cancelled: '&c  Настройка арены отменена.'
+    incomplete: '&c  Не все обязательные поля заполнены.'
+    already-exists: '&c  Арена с именем &f%arena% &cуже существует.'
+    already-in-setup: '&c  Ты уже настраиваешь арену.'
+    world-failed: '&c  Не удалось создать мир для арены &f%arena%&c.'
+    no-session: '&c  У тебя нет активной сессии настройки.'
+    name-required: '&c  Использование: /bbai create <имя>'
   list:
-    header: "&e  Активные арены:"
-    entry: " &8- &f%arena% &8| &7Игроков: &f%players% &8| %status%"
-    entry-game: " &8- &f%arena% &8| &7%current%/%max% &8| %state% "
-    join-btn: "&a[Войти]"
-    join-hover: "&7Нажми, чтобы войти на &e%arena%"
-    full-btn: "&8[Полно]"
-    in-progress-btn: "&8[Идёт игра]"
-    state-waiting: "&aОжидание"
-    state-countdown: "&eСтартует"
-    state-playing: "&cИгра"
-    state-ending: "&6Завершение"
-    empty: "&7  Арены не настроены."
-    status-enabled: "&aВкл"
-    status-disabled: "&cВыкл"
-
-  # ── Удаление арены ─────────────────────────────────────────────────
+    header: '&e  Активные арены:'
+    entry: ' &8- &f%arena% &8| &7Игроков: &f%players% &8| %status%'
+    entry-game: ' &8- &f%arena% &8| &7%current%/%max% &8| %state% '
+    join-btn: '&a[Войти]'
+    join-hover: '&7Нажми, чтобы войти на &e%arena%'
+    full-btn: '&8[Полно]'
+    in-progress-btn: '&8[Идёт игра]'
+    state-waiting: '&aОжидание'
+    state-countdown: '&eСтартует'
+    state-playing: '&cИгра'
+    state-ending: '&6Завершение'
+    empty: '&7  Арены не настроены.'
+    status-enabled: '&aВкл'
+    status-disabled: '&cВыкл'
   delete:
-    success: "&a  Арена &f%arena% &aудалена."
-    not-found: "&c  Арена &f%arena% &cне найдена."
-    usage: "&c  Использование: /bbai delete <имя>"
-
-# ── Игра ─────────────────────────────────────────────────────────────
+    success: '&a  Арена &f%arena% &aудалена.'
+    not-found: '&c  Арена &f%arena% &cне найдена.'
+    usage: '&c  Использование: /bbai delete <имя>'
 game:
-
-  # ── Вход / Выход ───────────────────────────────────────────────────
   join:
-    success: "&a  Ты зашёл на арену &f%arena%&a!"
-    broadcast: "&e  %player% &7зашёл в игру! &8(%current%/%max%)"
-    already-in-game: "&c  Ты уже в игре!"
-    arena-not-found: "&c  Арена &f%arena% &cне найдена."
-    arena-disabled: "&c  Арена &f%arena% &cотключена."
-    arena-full: "&c  Арена &f%arena% &cзаполнена!"
-    arena-in-progress: "&c  На арене &f%arena% &cуже идёт игра!"
+    success: '&a  Ты зашёл на арену &f%arena%&a!'
+    broadcast: '&e  %player% &7зашёл в игру! &8(%current%/%max%)'
+    already-in-game: '&c  Ты уже в игре!'
+    arena-not-found: '&c  Арена &f%arena% &cне найдена.'
+    arena-disabled: '&c  Арена &f%arena% &cотключена.'
+    arena-full: '&c  Арена &f%arena% &cзаполнена!'
+    arena-in-progress: '&c  На арене &f%arena% &cуже идёт игра!'
   leave:
-    success: "&a  Ты вышел с арены."
-    broadcast: "&e  %player% &7вышел из игры. &8(%current%/%max%)"
-    not-in-game: "&c  Ты не в игре."
-
-  # ── Лобби / Ожидание ───────────────────────────────────────────────
+    success: '&a  Ты вышел с арены.'
+    broadcast: '&e  %player% &7вышел из игры. &8(%current%/%max%)'
+    not-in-game: '&c  Ты не в игре.'
   waiting:
-    waiting-for-players: "&7  Ждём игроков... &8(%current%/%min%)"
-    player-needed: "&7  Нужно ещё &e%needed% &7игрок(а/ов) для старта."
-
-  # ── Обратный отсчёт ────────────────────────────────────────────────
+    waiting-for-players: '&7  Ждём игроков... &8(%current%/%min%)'
+    player-needed: '&7  Нужно ещё &e%needed% &7игрок(а/ов) для старта.'
   countdown:
-    starting: "&e  Игра начнётся через &f%seconds% &eсек!"
-    cancelled: "&c  Отсчёт отменён — не хватает игроков."
-    go: "&a  Игра началась! Стройте!"
-
-  # ── Игра / Темы ────────────────────────────────────────────────────
+    starting: '&e  Игра начнётся через &f%seconds% &eсек!'
+    cancelled: '&c  Отсчёт отменён — не хватает игроков.'
+    go: '&a  Игра началась! Стройте!'
   playing:
-    theme-assigned: "&e  Твоя тема: &b&l%theme%"
-    build-time-warning: "&7  Осталось времени постройки: &e%seconds%с"
-    build-time-expired: "&c  Время вышло! Тема сменилась."
-    new-theme: "&e  Новая тема: &b&l%theme%"
-    score: "&a  Угадано! +1 очко! &7(Всего: &f%score%&7)"
-    skipped: "&7  Тема пропущена."
-    game-time-warning: "&7  Осталось времени игры: &e%minutes%м %seconds%с"
-    zone-cleared: "&7  Твоя зона очищена."
-
-  # ── Завершение / Результаты ────────────────────────────────────────
+    theme-assigned: '&e  Твоя тема: &b&l%theme%'
+    build-time-warning: '&7  Осталось времени постройки: &e%seconds%с'
+    build-time-expired: '&c  Время вышло! Тема сменилась.'
+    new-theme: '&e  Новая тема: &b&l%theme%'
+    score: '&a  Угадано! +1 очко! &7(Всего: &f%score%&7)'
+    skipped: '&7  Тема пропущена.'
+    game-time-warning: '&7  Осталось времени игры: &e%minutes%м %seconds%с'
+    zone-cleared: '&7  Твоя зона очищена.'
   ending:
-    time-up: "&e&l  Время вышло!"
-    results-header: "&6&l  ══ Итоги игры ══"
-    result-entry: "&7  %position%. &f%player% &8— &e%score% очк."
-    winner: "&a  Победитель: &f&l%player% &aс &e%score% &aочк.!"
-    draw: "&e  Ничья между: &f%players%"
-    no-winner: "&7  Никто не набрал очков."
-    returning: "&7  Возвращение на спавн через &e%seconds%с&7..."
-
-  # ── AI Feedback ────────────────────────────────────────────────────
-  # Строки ниже выбираются РАНДОМНО в рантайме (рендерер берёт каждый
-  # раз новую и не повторяет последнюю). Добавляй сколько хочешь — чем
-  # больше вариантов, тем живее AI.
-  #
-  # Плейсхолдеры:
-  #   %guess%      — top-1 догадка AI (также %guess1%, %guess2%)
-  #   %confidence% — уверенность top-1 в процентах (0–100), без знака '%'
-  #   %theme%      — настоящая тема игрока
-  #   %player%     — имя игрока (для широковещательных)
+    time-up: '&e&l  Время вышло!'
+    results-header: '&6&l  ══ Итоги игры ══'
+    result-entry: '&7  %position%. &f%player% &8— &e%score% очк.'
+    winner: '&a  Победитель: &f&l%player% &aс &e%score% &aочк.!'
+    draw: '&e  Ничья между: &f%players%'
+    no-winner: '&7  Никто не набрал очков.'
+    returning: '&7  Возвращение на спавн через &e%seconds%с&7...'
   ai:
-
-    # Отображаемые имена тем — маппит классы из centroids.json на
-    # читаемые русские названия. Ключи, не найденные здесь, превращаются
-    # в auto-humanized строку (подчёркивания → пробелы).
     theme-names:
-      candles: "свеча"
-      cube: "куб"
-      sword: "меч"
-      tree: "дерево"
-      barrel: "бочка"
-      castle: "замок"
-      castle_tower: "башня замка"
-      church: "церковь"
-      default_house: "дом"
-      desert_modern_villa: "вилла в пустыне"
-      house_from_hell: "проклятый дом"
-      modern_house: "современный дом"
-      overgrown_house: "заросший дом"
-      ship: "корабль"
-      skyscraper: "небоскрёб"
-
-    # ActionBar — обновляется на каждом ML-тике (~5 с), пока AI не уверен.
+      candles: свеча
+      cube: куб
+      sword: меч
+      tree: дерево
+      barrel: бочка
+      castle: замок
+      castle_tower: башня замка
+      church: церковь
+      default_house: дом
+      desert_modern_villa: вилла в пустыне
+      house_from_hell: проклятый дом
+      modern_house: современный дом
+      overgrown_house: заросший дом
+      ship: корабль
+      skyscraper: небоскрёб
     thinking:
-      - "&8[&b🤖 ИИ&8] &7Хм... кажется, я вижу &f%guess%&7?"
-      - "&8[&b🤖 ИИ&8] &7Прищуриваюсь... это &f%guess%&7?"
-      - "&8[&b🤖 ИИ&8] &7Подозрительно похоже на &f%guess%&7."
-      - "&8[&b🤖 ИИ&8] &7Может это &f%guess%&7?"
-      - "&8[&b🤖 ИИ&8] &7Лучшая догадка: &f%guess% &8(&7%confidence%%&8)"
-      - "&8[&b🤖 ИИ&8] &7Возможно... &f%guess%&7?"
-      - "&8[&b🤖 ИИ&8] &7Постой, &f%guess%&7?"
-      - "&8[&b🤖 ИИ&8] &7Хочется сказать &f%guess%&7..."
-      - "&8[&b🤖 ИИ&8] &7Хм. &f%guess%&7? Пока не уверен."
-      - "&8[&b🤖 ИИ&8] &7Смотрю... &f%guess%&7, может?"
-      - "&8[&b🤖 ИИ&8] &7Наклоняю голову... &f%guess%&7?"
-      - "&8[&b🤖 ИИ&8] &7От этого пахнет &f%guess%&7."
-      - "&8[&b🤖 ИИ&8] &7Думаю... &f%guess%&7, наверное?"
-
-    # Когда top-1 и top-2 почти равны — AI реально мечется.
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQpdC8Li4uINC60LDQttC10YLRgdGPLCDRjyDQstC40LbRgyAmZiVndWVzcyUmNz8=
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQn9GA0LjRidGD0YDQuNCy0LDRjtGB0YwuLi4g0Y3RgtC+ICZmJWd1ZXNzJSY3Pw==
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQn9C+0LTQvtC30YDQuNGC0LXQu9GM0L3QviDQv9C+0YXQvtC20LUg0L3QsCAmZiVndWVzcyUmNy4=
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQnNC+0LbQtdGCINGN0YLQviAmZiVndWVzcyUmNz8=
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQm9GD0YfRiNCw0Y8g0LTQvtCz0LDQtNC60LA6ICZmJWd1ZXNzJSAmOCgmNyVjb25maWRlbmNlJSUmOCk=
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQktC+0LfQvNC+0LbQvdC+Li4uICZmJWd1ZXNzJSY3Pw==
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQn9C+0YHRgtC+0LksICZmJWd1ZXNzJSY3Pw==
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQpdC+0YfQtdGC0YHRjyDRgdC60LDQt9Cw0YLRjCAmZiVndWVzcyUmNy4uLg==
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQpdC8LiAmZiVndWVzcyUmNz8g0J/QvtC60LAg0L3QtSDRg9Cy0LXRgNC10L0u
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQodC80L7RgtGA0Y4uLi4gJmYlZ3Vlc3MlJjcsINC80L7QttC10YI/
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQndCw0LrQu9C+0L3Rj9GOINCz0L7Qu9C+0LLRgy4uLiAmZiVndWVzcyUmNz8=
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQntGCINGN0YLQvtCz0L4g0L/QsNGF0L3QtdGCICZmJWd1ZXNzJSY3Lg==
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQlNGD0LzQsNGOLi4uICZmJWd1ZXNzJSY3LCDQvdCw0LLQtdGA0L3QvtC1Pw==
     confused:
-      - "&8[&b🤖 ИИ&8] &7Может это &f%guess1%&7... или всё-таки &f%guess2%&7?"
-      - "&8[&b🤖 ИИ&8] &7Я в раздумьях — &f%guess1% &7или &f%guess2%&7?"
-      - "&8[&b🤖 ИИ&8] &7Либо &f%guess1%&7, либо &f%guess2%&7. Помогите!"
-      - "&8[&b🤖 ИИ&8] &7Похоже на &f%guess1%&7... но и на &f%guess2%&7 тоже."
-      - "&8[&b🤖 ИИ&8] &7Что-то среднее между &f%guess1% &7и &f%guess2%&7?"
-
-    # Чат — изредка (chat-thoughts-chance, ~15%).
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQnNC+0LbQtdGCINGN0YLQviAmZiVndWVzczElJjcuLi4g0LjQu9C4INCy0YHRkS3RgtCw0LrQuCAmZiVndWVzczIlJjc/
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQryDQsiDRgNCw0LfQtNGD0LzRjNGP0YUg4oCUICZmJWd1ZXNzMSUgJjfQuNC70LggJmYlZ3Vlc3MyJSY3Pw==
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQm9C40LHQviAmZiVndWVzczElJjcsINC70LjQsdC+ICZmJWd1ZXNzMiUmNy4g0J/QvtC80L7Qs9C40YLQtSE=
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQn9C+0YXQvtC20LUg0L3QsCAmZiVndWVzczElJjcuLi4g0L3QviDQuCDQvdCwICZmJWd1ZXNzMiUmNyDRgtC+0LbQtS4=
+    - !!binary |-
+      JjhbJmLwn6SWINCY0JgmOF0gJjfQp9GC0L4t0YLQviDRgdGA0LXQtNC90LXQtSDQvNC10LbQtNGDICZmJWd1ZXNzMSUgJjfQuCAmZiVndWVzczIlJjc/
     thinking-chat:
-      - "&8[&bИИ&8] &7Хм, это почти похоже на &f%guess%&7..."
-      - "&8[&bИИ&8] &7Стоп, я вижу &f%guess%&7?"
-      - "&8[&bИИ&8] &7Готов спорить, что это &f%guess%&7."
-      - "&8[&bИИ&8] &7Подожди — &f%guess%&7?"
-      - "&8[&bИИ&8] &7Знаешь что, по-моему это &f%guess%&7."
-      - "&8[&bИИ&8] &7Не может быть... это &f%guess%&7?"
-      - "&8[&bИИ&8] &7Прищуриваюсь сильнее... ага, &f%guess%&7."
-      - "&8[&bИИ&8] &7Надеваю очки... &f%guess%&7?"
-      - "&8[&bИИ&8] &7От этого веет &f%guess%&7."
-
-    # Большой тайтл, когда AI наконец УГАДАЛ.
+    - '&8[&bИИ&8] &7Хм, это почти похоже на &f%guess%&7...'
+    - '&8[&bИИ&8] &7Стоп, я вижу &f%guess%&7?'
+    - '&8[&bИИ&8] &7Готов спорить, что это &f%guess%&7.'
+    - '&8[&bИИ&8] &7Подожди — &f%guess%&7?'
+    - '&8[&bИИ&8] &7Знаешь что, по-моему это &f%guess%&7.'
+    - '&8[&bИИ&8] &7Не может быть... это &f%guess%&7?'
+    - '&8[&bИИ&8] &7Прищуриваюсь сильнее... ага, &f%guess%&7.'
+    - '&8[&bИИ&8] &7Надеваю очки... &f%guess%&7?'
+    - '&8[&bИИ&8] &7От этого веет &f%guess%&7.'
     correct-title:
-      - "&a&lЯ ПОНЯЛ!"
-      - "&a&lАГА!"
-      - "&a&lЭВРИКА!"
-      - "&a&lДА!"
-      - "&a&lНАКОНЕЦ-ТО!"
-      - "&a&lВОТ ОНО!"
-      - "&a&lТОЧНО!"
-      - "&a&lОО! ОО!"
-
-    # Подзаголовок к тайтлу выше. Видит только строитель.
+    - '&a&lЯ ПОНЯЛ!'
+    - '&a&lАГА!'
+    - '&a&lЭВРИКА!'
+    - '&a&lДА!'
+    - '&a&lНАКОНЕЦ-ТО!'
+    - '&a&lВОТ ОНО!'
+    - '&a&lТОЧНО!'
+    - '&a&lОО! ОО!'
     correct-subtitle:
-      - "&fЭто же &b&l%theme%&f!"
-      - "&fДа это &b&l%theme%&f!"
-      - "&fТочно &b&l%theme%&f!"
-      - "&fКонечно — &b&l%theme%&f!"
-      - "&fКак я мог не заметить? &b&l%theme%&f!"
-
-    # ActionBar после тайтла — праздничный вариант.
+    - '&fЭто же &b&l%theme%&f!'
+    - '&fДа это &b&l%theme%&f!'
+    - '&fТочно &b&l%theme%&f!'
+    - '&fКонечно — &b&l%theme%&f!'
+    - '&fКак я мог не заметить? &b&l%theme%&f!'
     correct-actionbar:
-      - "&a✓ ИИ видит: &b&l%theme% &a— +1 очко!"
-      - "&a✓ Угадал! &b&l%theme% &7(+1 очко)"
-      - "&a✓ &b&l%theme% &a— классная постройка!"
-
-    # Бродкаст на всю арену, когда кто-то набрал очко. В чат.
+    - '&a✓ ИИ видит: &b&l%theme% &a— +1 очко!'
+    - '&a✓ Угадал! &b&l%theme% &7(+1 очко)'
+    - '&a✓ &b&l%theme% &a— классная постройка!'
     correct-broadcast:
-      - "&8[&bИИ&8] &aО! &f%player% &aпостроил &b&l%theme%&a! Красавчик!"
-      - "&8[&bИИ&8] &aДОШЛО! Постройка &f%player%&a — это &b&l%theme%&a!"
-      - "&8[&bИИ&8] &aТеперь я вижу — &f%player% &aсделал &b&l%theme%&a!"
-      - "&8[&bИИ&8] &aАга! &f%player% &aсотворил &b&l%theme%&a!"
-      - "&8[&bИИ&8] &aПрекрасный &b&l%theme% &aот &f%player%&a!"
-
-    # Боковой скорборд. Три раскладки: WAITING / COUNTDOWN / PLAYING.
+    - '&8[&bИИ&8] &aО! &f%player% &aпостроил &b&l%theme%&a! Красавчик!'
+    - '&8[&bИИ&8] &aДОШЛО! Постройка &f%player%&a — это &b&l%theme%&a!'
+    - '&8[&bИИ&8] &aТеперь я вижу — &f%player% &aсделал &b&l%theme%&a!'
+    - '&8[&bИИ&8] &aАга! &f%player% &aсотворил &b&l%theme%&a!'
+    - '&8[&bИИ&8] &aПрекрасный &b&l%theme% &aот &f%player%&a!'
     scoreboard:
-      title: "&6&l⚡ BuildBattleAI ⚡"
-      sep: "&8&m                    "
-      arena: "&7Арена: &f%arena%"
-
-      # ── WAITING ──
-      status-label: "&7Статус:"
-      status-waiting: " &eОжидание..."
-      players-line: "&7Игроков: &e%count%&7/&e%max%"
-      min-to-start: "&7Нужно ещё &e%needed%"
-
-      # ── COUNTDOWN ──
-      status-countdown: " &6Старт!"
-      countdown-line: "&7Старт через: &e&l%seconds%с"
-
-      # ── PLAYING ──
-      theme-label: "&7Твоя тема:"
-      theme-value: " &b&l%theme%"
-      score: "&7Очки: &e%score%"
-      build-time: "&7Время постройки: &e%time%"
-      game-time: "&7Время игры: &e%time%"
-      ai-label: "&7ИИ видит:"
-      ai-value: " &f%guess% &8(&7%confidence%%&8)"
-      ai-thinking: " &8думаю..."
-
-    # Заголовок/подвал таблицы игроков. \n работает. Три варианта.
+      title: '&6&l⚡ BuildBattleAI ⚡'
+      sep: '&8&m                    '
+      arena: '&7Арена: &f%arena%'
+      status-label: '&7Статус:'
+      status-waiting: ' &eОжидание...'
+      players-line: '&7Игроков: &e%count%&7/&e%max%'
+      min-to-start: '&7Нужно ещё &e%needed%'
+      status-countdown: ' &6Старт!'
+      countdown-line: '&7Старт через: &e&l%seconds%с'
+      theme-label: '&7Твоя тема:'
+      theme-value: ' &b&l%theme%'
+      score: '&7Очки: &e%score%'
+      build-time: '&7Время постройки: &e%time%'
+      game-time: '&7Время игры: &e%time%'
+      ai-label: '&7ИИ видит:'
+      ai-value: ' &f%guess% &8(&7%confidence%%&8)'
+      ai-thinking: ' &8думаю...'
     tab:
-      header: "&6&l⚡ BuildBattleAI ⚡\n&7Арена &f%arena% &8| &7Раунд &f%round%"
-      footer: "&8&m                    \n&7Игроков: &f%count%&7/&f%max%  &8|  &7Время: &f%time%"
-      header-waiting: "&6&l⚡ BuildBattleAI ⚡\n&7Арена &f%arena% &8| &eОжидание"
+      header: |-
+        &6&l⚡ BuildBattleAI ⚡
+        &7Арена &f%arena% &8| &7Раунд &f%round%
+      footer: "&8&m                    \n&7Игроков: &f%count%&7/&f%max%  &8|  &7Вр\
+        емя: &f%time%"
+      header-waiting: |-
+        &6&l⚡ BuildBattleAI ⚡
+        &7Арена &f%arena% &8| &eОжидание
       footer-waiting: "&8&m                    \n&7Игроков: &f%count%&7/&f%max%"
-      header-countdown: "&6&l⚡ BuildBattleAI ⚡\n&7Арена &f%arena% &8| &6Старт через &e&l%seconds%с"
+      header-countdown: |-
+        &6&l⚡ BuildBattleAI ⚡
+        &7Арена &f%arena% &8| &6Старт через &e&l%seconds%с
       footer-countdown: "&8&m                    \n&7Игроков: &f%count%&7/&f%max%"
-
-    # Перо «пропустить тему». ПКМ во время игры — очистка зоны + новая тема.
     skip-item:
-      name: "&e&l⚡ Пропустить тему"
+      name: '&e&l⚡ Пропустить тему'
       lore:
-        - "&7ПКМ — пропустить"
-        - "&7текущую тему."
-        - ""
-        - "&8Когда застрял или"
-        - "&8постройка пошла не так."
-      # Скрытый маркер в конце лора — определяем наш предмет, не полагаясь
-      # на отображаемое имя (админ может перевести). Цвет-коды делают
-      # маркер невидимым; листенер сверяется с магической строкой.
-      marker: "&0&k|&r&8&o#bbai-skip"
-
-    # Сообщение в чате после использования пера.
+      - '&7ПКМ — пропустить'
+      - '&7текущую тему.'
+      - ''
+      - '&8Когда застрял или'
+      - '&8постройка пошла не так.'
+      marker: '&0&k|&r&8&o#bbai-skip'
     skip-feedback:
-      - "&7Тема пропущена. Повезёт в следующий раз!"
-      - "&7Тема пропущена — попробуем другую."
-      - "&7Пропустил! ИИ был в таком же недоумении, как и ты."
+    - '&7Тема пропущена. Повезёт в следующий раз!'
+    - '&7Тема пропущена — попробуем другую.'
+    - '&7Пропустил! ИИ был в таком же недоумении, как и ты.'
