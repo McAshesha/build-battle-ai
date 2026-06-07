@@ -172,6 +172,40 @@ if (color == TRANSPARENT) return color;
 - **`MockedStatic`** for code paths that resolve packet factories or static Bukkit/PacketEvents accessors during `enable()`.
 - **`MockedConstruction` (chained)** for structural lifecycle tests of `PluginContext.enable/shutdown/reload`.
 
+### Test taxonomy & tagging
+
+Non-unit tests are gated via JUnit 5 `@Tag` rather than file-name pattern. The taxonomy:
+
+| Tag | Purpose | Typical cost |
+|---|---|---|
+| (untagged) | Unit tests | < 100 ms |
+| `smoke` | Build / wiring integrity (plugin loads, services class-loadable, no shading break) | < 500 ms |
+| `integration` | In-JVM, MockBukkit + real `PluginContext`, ≥ 2 services together | 0.5–5 s |
+| `e2e` | Subprocess Paper/Purpur server with scripted game scenarios | 60–240 s |
+| `ml-it` | Real ONNX forward pass | 5–30 s |
+| `stress` | Concurrency stress, lifecycle leak detection | 5–60 s |
+| `bench` | JMH measurements (under `src/jmh/`) | 30 s – 10 min/class |
+| `nightly-only` | Secondary tag — excludes a test from PR CI even if it carries one of the above | — |
+
+Profile-to-tag mapping:
+
+| Profile | Runs |
+|---|---|
+| default (`mvn test`) | Untagged + smoke + integration (cheap tiers run by default) |
+| `-P pr-gate` | Unit + smoke + integration + fast ml-it; excludes e2e + bench + stress + nightly-only |
+| `-P nightly` | Everything except `bench` (benches run via `exec:java`) |
+| `-P smoke` / `-P integration` / `-P stress` | Just that one tag (overrides parent's excludedGroups) |
+| `-P e2e` / `-P ml-it` | Existing pattern-based profiles (unchanged) |
+| `-P bench` | JMH source-root attachment (unchanged) |
+
+How to add a new non-unit test:
+
+1. Decide the cheapest tier that catches the failure. Smoke for "did it load?"; integration for "do two services agree?"; stress for "does it hold under concurrent load?"; e2e for "does a real server play a full game?"; bench for "is the latency budget intact?".
+2. Put the file under `src/test/java/ru/ashesha/buildBattleAI/<tag>/<domain>/`.
+3. Add `@Tag("<tag>")` at the class level. Use `@Tag("nightly-only")` as a SECONDARY tag for tests that should skip PR CI.
+4. If the test needs MockBukkit + a default world + silent players, extend `ru.ashesha.buildBattleAI.support.IntegrationTestSupport`.
+5. Javadoc the class: name the risk ID from the spec, name the invariant, name why this tier (not unit).
+
 ## Testing Gotchas
 
 - `XMaterial.AIR.ordinal()` is **not** 0 (ordinal 0 is `ACACIA_BOAT`). When creating `FlatScene` test data, always fill arrays with `(short) XMaterial.AIR.ordinal()` — do not rely on default zero-initialization.
