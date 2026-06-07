@@ -61,6 +61,15 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
+                    <!-- Test discovery: also pick up *IT.java (integration test
+                         convention) on top of Surefire's default *Test.java /
+                         Test*.java / *Tests.java / TestCase*.java patterns. -->
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
+                        <include>**/Test*.java</include>
+                        <include>**/*IT.java</include>
+                    </includes>
                     <!-- Pattern-based excludes (preserved for backwards compat) -->
                     <excludes>
                         <exclude>**/e2e/**</exclude>
