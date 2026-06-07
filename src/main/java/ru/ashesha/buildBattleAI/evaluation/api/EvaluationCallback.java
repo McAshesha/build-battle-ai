@@ -12,7 +12,7 @@ import java.util.UUID;
  * <p>
  * Always dispatched on the Bukkit main thread, so implementations may
  * freely touch Bukkit state (player teleports, block placements, packet
- * sending) without further marshalling.
+ * sending) without further marshaling.
  * <p>
  * <b>Replaces the legacy {@code BiConsumer<UUID, Integer>} score callback.</b>
  * The richer signature lets the game-side feedback layer surface AI

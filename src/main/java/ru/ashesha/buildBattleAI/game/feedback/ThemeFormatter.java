@@ -10,7 +10,7 @@ import ru.ashesha.buildBattleAI.config.api.Lang;
  * through {@code lang/<lang>.yml} under {@code game.ai.theme-names.<class>}.
  * <p>
  * When the lang file has no entry for a class name, falls back to a generic
- * humanisation: underscores → spaces, each word title-cased, no article.
+ * humanization: underscores → spaces, each word title-cased, no article.
  * <p>
  * Pure helper, no state — safe to call from any thread.
  */
@@ -25,7 +25,7 @@ public final class ThemeFormatter {
      * <p>
      * Lookup: {@code game.ai.theme-names.<className>} (lowercased). If the
      * key is missing — or the file falls back to the raw key name (no
-     * translation) — the class name is humanised in-place.
+     * translation) — the class name is humanized in-place.
      *
      * @param lang      the active language
      * @param className the raw class name from the model (case-insensitive)
@@ -35,7 +35,7 @@ public final class ThemeFormatter {
         String key = "game.ai.theme-names." + className.toLowerCase();
         String mapped = lang.get(key);
         // Lang#get returns the key itself when nothing is found — detect that
-        // and fall back to the generic humanisation rather than show the raw
+        // and fall back to the generic humanization rather than show the raw
         // dotted path in chat.
         if (mapped == null || mapped.isEmpty() || mapped.equals(key))
             return humanise(className);

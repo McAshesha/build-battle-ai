@@ -169,8 +169,7 @@ public class MLService implements BBAIMLService, PluginService {
         CUDA("CUDAExecutionProvider") {
             @Override
             void apply(SessionOptions opts) throws OrtException {
-                OrtCUDAProviderOptions cudaOpts = new OrtCUDAProviderOptions(0);
-                try {
+                try (OrtCUDAProviderOptions cudaOpts = new OrtCUDAProviderOptions(0)) {
                     // EXHAUSTIVE picks the optimal cuDNN conv algorithm per
                     // shape on the first inference (~1-2s one-time cost)
                     // and gives 20-40% steady-state speedup on conv-heavy
@@ -185,8 +184,6 @@ public class MLService implements BBAIMLService, PluginService {
                     // other CUDA workloads on the host.
                     cudaOpts.add("arena_extend_strategy", "kSameAsRequested");
                     opts.addCUDA(cudaOpts);
-                } finally {
-                    cudaOpts.close();
                 }
             }
         },
@@ -530,9 +527,9 @@ public class MLService implements BBAIMLService, PluginService {
     public float @NonNull [][] embedBatchWithTTA(byte @NonNull [][] rgbBatch, int width, int height) {
         if (rgbBatch.length == 0)
             return new float[0][];
-        for (int i = 0; i < rgbBatch.length; i++)
-            validateRgbBuffer(rgbBatch[i], width, height);
-        // 1) Resize every input to 246×246 (shared optimisation across views).
+        for (byte[] batch : rgbBatch)
+            validateRgbBuffer(batch, width, height);
+        // 1) Resize every input to 246×246 (shared optimization across views).
         byte[][] resized = new byte[rgbBatch.length][];
         for (int i = 0; i < rgbBatch.length; i++)
             resized[i] = bilinearResizeRgb(rgbBatch[i], width, height, TTA_RESIZE_EDGE, TTA_RESIZE_EDGE);
@@ -583,13 +580,13 @@ public class MLService implements BBAIMLService, PluginService {
     @Override
     @NonNull
     public List<String> classNames() {
-        return classNamesView != null ? classNamesView : Collections.<String>emptyList();
+        return classNamesView != null ? classNamesView : Collections.emptyList();
     }
 
     @Override
     @NonNull
     public Map<String, float[]> centroids() {
-        return centroidsView != null ? centroidsView : Collections.<String, float[]>emptyMap();
+        return centroidsView != null ? centroidsView : Collections.emptyMap();
     }
 
     @Override
@@ -645,10 +642,8 @@ public class MLService implements BBAIMLService, PluginService {
      * any step fails — the next backend will be tried.
      */
     private OrtSession tryOpenSession(byte[] modelBytes, Backend backend) {
-        SessionOptions opts = null;
         OrtSession candidate = null;
-        try {
-            opts = buildSessionOptions(backend);
+        try (SessionOptions opts = buildSessionOptions(backend)) {
             candidate = env.createSession(modelBytes, opts);
 
             // Warm up BOTH inference shapes the service will ever see:
@@ -666,21 +661,13 @@ public class MLService implements BBAIMLService, PluginService {
             return candidate;
         } catch (Throwable t) {
             // Close partially-opened resources before trying the next backend.
-            if (candidate != null) {
+            if (candidate != null)
                 try {
                     candidate.close();
                 } catch (Throwable ignored) {
                 }
-            }
             plugin.getPluginLogger().debug("Backend %s unavailable: %s", backend.label, t.getMessage());
             return null;
-        } finally {
-            if (opts != null) {
-                try {
-                    opts.close();
-                } catch (Throwable ignored) {
-                }
-            }
         }
     }
 
@@ -761,24 +748,19 @@ public class MLService implements BBAIMLService, PluginService {
      *       fail at runtime if a required op isn't supported.</li>
      * </ul>
      */
+    @SuppressWarnings("ResultOfMethodCallIgnored")
     private void warmupSession(OrtSession sess, int batchSize) throws OrtException {
         float[] warmup = new float[batchSize * CHANNELS * INPUT_SIZE * INPUT_SIZE];
         long[] shape = {batchSize, CHANNELS, INPUT_SIZE, INPUT_SIZE};
-        OnnxTensor input = OnnxTensor.createTensor(env, FloatBuffer.wrap(warmup), shape);
-        try {
+        try (OnnxTensor input = OnnxTensor.createTensor(env, FloatBuffer.wrap(warmup), shape)) {
             String firstInputName = sess.getInputNames().iterator().next();
             Map<String, OnnxTensor> feed = Collections.singletonMap(firstInputName, input);
-            OrtSession.Result result = sess.run(feed);
-            try {
+            try (OrtSession.Result result = sess.run(feed)) {
                 // Touch the iterator so we know the run actually produced
                 // output (some EP failures only surface during result
                 // materialisation, not the run() call itself).
                 result.iterator().hasNext();
-            } finally {
-                result.close();
             }
-        } finally {
-            input.close();
         }
     }
 
@@ -809,6 +791,7 @@ public class MLService implements BBAIMLService, PluginService {
      * the centroid matrix together with the class list and pre-processing
      * metadata (which we ignore here — the model itself encodes that contract).
      */
+    @SuppressWarnings("MismatchedQueryAndUpdateOfCollection")
     private static final class CentroidsBundle {
         List<String> classes;
         List<List<Double>> centroids;
@@ -861,13 +844,13 @@ public class MLService implements BBAIMLService, PluginService {
                 float[] v = new float[EMBEDDING_DIM];
                 for (int j = 0; j < EMBEDDING_DIM; j++)
                     v[j] = row.get(j).floatValue();
-                // Defensive re-normalisation: the on-disk vectors are unit-
+                // Defensive re-normalization: the on-disk vectors are unit-
                 // norm already, but a small numerical drift after float-cast
                 // is cheap to fix and prevents a subtle skew in cosine scores.
                 l2Normalize(v);
                 vectors[i] = v;
             }
-            applyCentroids(new ArrayList<String>(bundle.classes), vectors);
+            applyCentroids(new ArrayList<>(bundle.classes), vectors);
             return true;
         } catch (Throwable t) {
             plugin.getPluginLogger().warn("Failed to parse centroids JSON: %s — using fallback.",
@@ -898,7 +881,7 @@ public class MLService implements BBAIMLService, PluginService {
                 v[i] = (float) rng.nextGaussian();
             l2Normalize(v);
         }
-        applyCentroids(new ArrayList<String>(FALLBACK_CLASSES), vectors);
+        applyCentroids(new ArrayList<>(FALLBACK_CLASSES), vectors);
     }
 
     /**
@@ -910,7 +893,7 @@ public class MLService implements BBAIMLService, PluginService {
         classNames = names;
         centroidVectors = vectors;
         classNamesView = Collections.unmodifiableList(classNames);
-        LinkedHashMap<String, float[]> centroidMap = new LinkedHashMap<String, float[]>();
+        LinkedHashMap<String, float[]> centroidMap = new LinkedHashMap<>();
         for (int i = 0; i < classNames.size(); i++)
             centroidMap.put(classNames.get(i), centroidVectors[i]);
         centroidsView = Collections.unmodifiableMap(centroidMap);
@@ -1144,7 +1127,7 @@ public class MLService implements BBAIMLService, PluginService {
     /**
      * Generates a single augmented view via the lightweight TTA pipeline:
      * random crop (within the 22-pixel 246×246→224×224 margin), optional
-     * horizontal flip, brightness jitter, ImageNet normalisation, CHW
+     * horizontal flip, brightness jitter, ImageNet normalization, CHW
      * layout. Returns a flat float array of length
      * {@code 3 * INPUT_SIZE * INPUT_SIZE}.
      * <p>
@@ -1253,10 +1236,9 @@ public class MLService implements BBAIMLService, PluginService {
         int totalViews = batch * TTA_VIEWS;
         float[][] views = new float[totalViews][];
         Random rng = ThreadLocalRandom.current();
-        for (int i = 0; i < batch; i++) {
+        for (int i = 0; i < batch; i++)
             for (int j = 0; j < TTA_VIEWS; j++)
                 views[i * TTA_VIEWS + j] = buildOneTtaView(resized[i], rng);
-        }
         float[][] flat = runBatch(views);
         // Reduce each contiguous TTA_VIEWS-block back to a single embedding.
         float[][] fused = new float[batch][];
@@ -1294,28 +1276,19 @@ public class MLService implements BBAIMLService, PluginService {
      * Runs a single-sample inference and returns the L2-normalized embedding.
      * Falls back to a zero vector if the service is disabled.
      */
+    @SuppressWarnings("OptionalGetWithoutIsPresent")
     private float[] runSingle(float[] input) {
-        if (session == null) {
-            // Disabled: return a zero vector so callers don't crash.
+        // Disabled: return a zero vector so callers don't crash.
+        if (session == null)
             return new float[EMBEDDING_DIM];
-        }
         long[] shape = {1, CHANNELS, INPUT_SIZE, INPUT_SIZE};
-        OnnxTensor tensor = null;
-        OrtSession.Result result = null;
-        try {
-            tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(input), shape);
-            result = session.run(Collections.singletonMap(inputName, tensor));
+        try (OnnxTensor tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(input), shape); OrtSession.Result result = session.run(Collections.singletonMap(inputName, tensor))) {
             float[][] raw = (float[][]) result.get(outputName).get().getValue();
             float[] embedding = raw[0].clone();
             l2Normalize(embedding);
             return embedding;
         } catch (OrtException e) {
             throw new RuntimeException("ONNX inference failed: " + e.getMessage(), e);
-        } finally {
-            if (result != null)
-                result.close();
-            if (tensor != null)
-                tensor.close();
         }
     }
 
@@ -1323,10 +1296,10 @@ public class MLService implements BBAIMLService, PluginService {
      * Runs a batched inference and returns one L2-normalized embedding per
      * input row. Falls back to zero vectors if the service is disabled.
      */
+    @SuppressWarnings("OptionalGetWithoutIsPresent")
     private float[][] runBatch(float[][] inputs) {
-        if (session == null) {
+        if (session == null)
             return new float[inputs.length][EMBEDDING_DIM];
-        }
         int batch = inputs.length;
         int rowLen = CHANNELS * INPUT_SIZE * INPUT_SIZE;
         // Flatten all rows into one contiguous buffer because ORT expects a
@@ -1339,11 +1312,7 @@ public class MLService implements BBAIMLService, PluginService {
             System.arraycopy(src, 0, flat, b * rowLen, rowLen);
         }
         long[] shape = {batch, CHANNELS, INPUT_SIZE, INPUT_SIZE};
-        OnnxTensor tensor = null;
-        OrtSession.Result result = null;
-        try {
-            tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(flat), shape);
-            result = session.run(Collections.singletonMap(inputName, tensor));
+        try (OnnxTensor tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(flat), shape); OrtSession.Result result = session.run(Collections.singletonMap(inputName, tensor))) {
             float[][] raw = (float[][]) result.get(outputName).get().getValue();
             float[][] out = new float[batch][];
             for (int b = 0; b < batch; b++) {
@@ -1353,11 +1322,6 @@ public class MLService implements BBAIMLService, PluginService {
             return out;
         } catch (OrtException e) {
             throw new RuntimeException("ONNX batch inference failed: " + e.getMessage(), e);
-        } finally {
-            if (result != null)
-                result.close();
-            if (tensor != null)
-                tensor.close();
         }
     }
 
@@ -1392,7 +1356,7 @@ public class MLService implements BBAIMLService, PluginService {
             order[best] = tmp;
         }
 
-        List<TopKEntry> top = new ArrayList<TopKEntry>(k);
+        List<TopKEntry> top = new ArrayList<>(k);
         for (int i = 0; i < k; i++) {
             int idx = order[i];
             top.add(new TopKEntry(classNames.get(idx), scores[idx]));

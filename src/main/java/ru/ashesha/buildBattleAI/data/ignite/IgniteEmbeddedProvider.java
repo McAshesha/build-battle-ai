@@ -109,6 +109,7 @@ public class IgniteEmbeddedProvider implements DataProvider {
      *
      * @throws Exception if the node fails to start or join the cluster
      */
+    @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
     public void start() throws Exception {
         IgniteConfiguration cfg = new IgniteConfiguration();

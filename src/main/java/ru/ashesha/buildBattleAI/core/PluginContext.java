@@ -202,7 +202,7 @@ public class PluginContext {
         commandService.register(arenaCommand);
         // Optionally also expose each public subcommand as a top-level
         // command. Reads the choice from config.yml; defaults to "subcommand"
-        // (the historical behaviour) when the key is absent or the config
+        // (the historical behavior) when the key is absent or the config
         // object is unavailable (e.g. unit tests mock the service out).
         if ("flat".equals(resolveCommandStyle()))
             registerFlatAliases(arenaCommand);
@@ -229,7 +229,7 @@ public class PluginContext {
 
     /**
      * Reads the {@code commands.style} key from {@code config.yml} and
-     * normalises it to lower case. Returns {@code "subcommand"} (the safe
+     * normalizes it to lower case. Returns {@code "subcommand"} (the safe
      * default) when the key is missing, the config object is unavailable
      * (e.g. mocked-out service in unit tests), or the value is malformed.
      */
@@ -240,9 +240,7 @@ public class PluginContext {
         if (cfg == null)
             return "subcommand";
         String raw = cfg.getString("commands.style", "subcommand");
-        return raw == null
-                ? "subcommand"
-                : raw.trim().toLowerCase(java.util.Locale.ROOT);
+        return raw.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     /**
@@ -288,8 +286,9 @@ public class PluginContext {
      */
     private static String flatUsageFor(String sub) {
         switch (sub) {
-            case "create": return "<name>";
-            case "delete": return "<name>";
+            case "create":
+            case "delete":
+                return "<name>";
             case "join":   return "<arena>";
             case "lang":   return "[code]";
             default:       return "";
@@ -369,10 +368,10 @@ public class PluginContext {
         // A null user here is a normal disconnect race, not an error —
         // silently skip instead of spamming the console with warnings.
         User user = PacketEvents.getAPI().getPlayerManager().getUser(player);
-        if (user == null)
-            return;
         try {
             user.sendPacket(packet);
+        } catch (NullPointerException ignored) {
+            // User is null — channel is gone. Normal disconnect
         } catch (Throwable e) {
             plugin.getPluginLogger().warn("Failed to send %s to %s: %s",
                     packet.getClass().getSimpleName(), player.getName(), e.getMessage());

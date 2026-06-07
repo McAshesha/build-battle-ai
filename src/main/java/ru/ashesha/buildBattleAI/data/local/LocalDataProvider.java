@@ -46,6 +46,7 @@ public class LocalDataProvider implements DataProvider {
         this.gson = new GsonBuilder().setPrettyPrinting().create();
     }
 
+    @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
     public void start() {
         if (!dataDir.exists())

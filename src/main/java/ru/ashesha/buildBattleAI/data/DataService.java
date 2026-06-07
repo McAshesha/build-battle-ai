@@ -346,12 +346,7 @@ public class DataService implements BBAIDataService, PluginService {
         long intervalTicks = intervalSec * 20L;
         autoSaveTask = plugin.getServer().getScheduler().runTaskTimerAsynchronously(
                 plugin,
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        provider.flush();
-                    }
-                },
+                () -> provider.flush(),
                 intervalTicks,
                 intervalTicks
         );

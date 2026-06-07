@@ -13,6 +13,7 @@ import ru.ashesha.buildBattleAI.data.api.PlayerData;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.*;
 
 /**
@@ -111,6 +112,7 @@ public class ConfigService implements BBAIConfigService, PluginService {
      *         arena definition files.</li>
      * </ol>
      */
+    @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
     public void enable() {
         File dataFolder = plugin.getDataFolder();
@@ -278,6 +280,7 @@ public class ConfigService implements BBAIConfigService, PluginService {
             saveToFile(arenaConfig, new File(arenaDir, name + ".yml"));
     }
 
+    @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
     public void deleteArenaConfig(@NonNull String name) {
         arenaConfigs.remove(name);
@@ -391,7 +394,7 @@ public class ConfigService implements BBAIConfigService, PluginService {
     private YamlConfiguration loadFromFile(File file) {
         YamlConfiguration config = new YamlConfiguration();
         try {
-            String content = readStream(new FileInputStream(file));
+            String content = readStream(Files.newInputStream(file.toPath()));
             config.loadFromString(content);
         } catch (Throwable e) {
             plugin.getPluginLogger().warn("Failed to load %s: %s", file.getName(), e.getMessage());
@@ -414,7 +417,7 @@ public class ConfigService implements BBAIConfigService, PluginService {
             String content = config.saveToString();
             content = unescapeUnicode(content);
             OutputStreamWriter writer = new OutputStreamWriter(
-                    new FileOutputStream(file), StandardCharsets.UTF_8);
+                    Files.newOutputStream(file.toPath()), StandardCharsets.UTF_8);
             writer.write(content);
             writer.flush();
             writer.close();
@@ -460,12 +463,7 @@ public class ConfigService implements BBAIConfigService, PluginService {
      * @param target the map to populate (key = filename without {@code .yml})
      */
     private void loadDirectory(File dir, Map<String, YamlConfiguration> target) {
-        File[] files = dir.listFiles(new FilenameFilter() {
-            @Override
-            public boolean accept(File d, String name) {
-                return name.endsWith(".yml");
-            }
-        });
+        File[] files = dir.listFiles((d, name) -> name.endsWith(".yml"));
         if (files == null)
             return;
         for (File file : files) {
@@ -505,7 +503,7 @@ public class ConfigService implements BBAIConfigService, PluginService {
      */
     private static String unescapeUnicode(String input) {
         // Fast path: most configs contain no escapes at all
-        if (input.indexOf("\\u") == -1)
+        if (!input.contains("\\u"))
             return input;
         StringBuilder sb = new StringBuilder(input.length());
         for (int i = 0; i < input.length(); i++) {
@@ -589,7 +587,7 @@ public class ConfigService implements BBAIConfigService, PluginService {
             List<String> list = readList(config, key);
             if (list == null && fallback != null)
                 list = readList(fallback, key);
-            return list != null ? list : Collections.<String>emptyList();
+            return list != null ? list : Collections.emptyList();
         }
 
         /**

@@ -7,6 +7,7 @@ import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.config.api.Lang;
 import ru.ashesha.buildBattleAI.game.ArenaState;
+import ru.ashesha.buildBattleAI.game.GameManager;
 import ru.ashesha.buildBattleAI.game.GamePlayer;
 import ru.ashesha.buildBattleAI.game.GameSession;
 import ru.ashesha.buildBattleAI.message.api.BBAIMessageService;
@@ -269,7 +270,6 @@ public final class FeedbackController {
      */
     public void onEvaluated(@NonNull String arenaName,
                             @NonNull UUID playerId,
-                            int themeIndex,
                             @NonNull List<TopKEntry> topK,
                             boolean matched) {
         SessionFeedback sf = sessions.get(arenaName);
@@ -336,7 +336,7 @@ public final class FeedbackController {
             if (message != null)
                 msg.sendActionBar(player, message);
 
-            // Hmm sound — paired with the thinking action bar but gated by
+            // Hmm, sound — paired with the thinking action bar but gated by
             // chance so it isn't oppressive at default 5-second cadence.
             if (sf.cfg.soundOnThinking()
                     && sf.cfg.soundOnThinkingChance() > 0
@@ -640,14 +640,14 @@ public final class FeedbackController {
     private static int clampPercent(float score) {
         int pct = Math.round(score * 100f);
         if (pct < 0) return 0;
-        if (pct > 100) return 100;
-        return pct;
+        return Math.min(pct, 100);
     }
 
     /**
      * Per-arena live state. Captured once at session start so config flips
      * during a game don't take effect mid-round.
      */
+    @SuppressWarnings("MismatchedQueryAndUpdateOfCollection")
     private static final class SessionFeedback {
         final GameSession session;
         final FeedbackConfig cfg;

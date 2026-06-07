@@ -27,7 +27,7 @@ import java.util.logging.Logger;
  * blocks local development.
  * <p>
  * Typical integration point is {@code onLoad()} — before any services or
- * PacketEvents are initialised.
+ * PacketEvents are initialized.
  */
 @UtilityClass
 public class JarIntegrityVerifier {

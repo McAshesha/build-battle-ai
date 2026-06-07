@@ -12,11 +12,10 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Captures and restores a player's full state before entering a game session.
@@ -83,7 +82,7 @@ class PlayerSnapshot {
                     effect.isAmbient(), effect.hasParticles()));
 
         return new PlayerSnapshot(
-                loc.getWorld().getName(),
+                Objects.requireNonNull(loc.getWorld()).getName(),
                 loc.getX(), loc.getY(), loc.getZ(),
                 loc.getYaw(), loc.getPitch(),
                 player.getGameMode(),

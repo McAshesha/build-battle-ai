@@ -11,7 +11,6 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
-import ru.ashesha.buildBattleAI.arena.ArenaManager;
 import ru.ashesha.buildBattleAI.arena.api.Arena;
 import ru.ashesha.buildBattleAI.config.api.Lang;
 import ru.ashesha.buildBattleAI.core.PluginService;
@@ -399,7 +398,7 @@ public class GameManager implements BBAIGameManager, PluginService {
                     if (matched)
                         handleScore(session.arena().name(), playerId, themeIndex);
                     feedback.onEvaluated(session.arena().name(),
-                            playerId, themeIndex, topK, matched);
+                            playerId, topK, matched);
                 });
 
         plugin.getPluginLogger().info("Game started in arena '%s' with %d player(s).",
@@ -662,12 +661,7 @@ public class GameManager implements BBAIGameManager, PluginService {
 
         // Sort players by score (descending)
         List<GamePlayer> sorted = new ArrayList<>(session.players().values());
-        Collections.sort(sorted, new Comparator<GamePlayer>() {
-            @Override
-            public int compare(GamePlayer a, GamePlayer b) {
-                return Integer.compare(b.score(), a.score());
-            }
-        });
+        sorted.sort((a, b) -> Integer.compare(b.score(), a.score()));
 
         // Display results
         for (int i = 0; i < sorted.size(); i++) {
@@ -679,9 +673,9 @@ public class GameManager implements BBAIGameManager, PluginService {
         }
 
         // Announce winner
-        if (sorted.isEmpty() || sorted.get(0).score() == 0) {
+        if (sorted.isEmpty() || sorted.get(0).score() == 0)
             broadcastLocalized(session, "game.ending.no-winner");
-        } else {
+        else {
             int topScore = sorted.get(0).score();
             List<String> winners = new ArrayList<>();
             for (GamePlayer gp : sorted)
@@ -701,14 +695,11 @@ public class GameManager implements BBAIGameManager, PluginService {
                 "%seconds%", "10");
 
         // Schedule restoration after 10 seconds
-        int endTaskId = Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
-            @Override
-            public void run() {
-                restoreAllPlayers(session);
-                session.state(ArenaState.WAITING);
-                sessions.remove(session.arena().name());
-                plugin.getPluginLogger().info("Game ended in arena '%s'.", session.arena().name());
-            }
+        int endTaskId = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            restoreAllPlayers(session);
+            session.state(ArenaState.WAITING);
+            sessions.remove(session.arena().name());
+            plugin.getPluginLogger().info("Game ended in arena '%s'.", session.arena().name());
         }, ENDING_DURATION_TICKS).getTaskId();
 
         session.endingTaskId(endTaskId);
@@ -817,6 +808,7 @@ public class GameManager implements BBAIGameManager, PluginService {
      * Prepares a player for the lobby: clears inventory, effects,
      * sets Adventure mode, full health/food, teleports to lobby.
      */
+    @SuppressWarnings("deprecation")
     private void prepareForLobby(Player player, Arena arena) {
         // Clear inventory and effects
         player.getInventory().clear();
@@ -997,6 +989,7 @@ public class GameManager implements BBAIGameManager, PluginService {
      * @param arenaName   the arena name
      * @param placedBlock the block whose state was placed
      */
+    @SuppressWarnings("deprecation")
     public void applyMirrorPlace(@NonNull UUID playerId,
                                  @NonNull String arenaName,
                                  @NonNull Block placedBlock) {
@@ -1012,13 +1005,11 @@ public class GameManager implements BBAIGameManager, PluginService {
 
         XMaterial mat = XMaterial.matchXMaterial(placedBlock.getType());
         int x = placedBlock.getX(), y = placedBlock.getY(), z = placedBlock.getZ();
-        if (legacy) {
-            // Block.getData() is deprecated on modern Bukkit but valid on 1.8–1.12.
-            //noinspection deprecation
+        // Block.getData() is deprecated on modern Bukkit but valid on 1.8–1.12.
+        if (legacy)
             mirror.setBlock(x, y, z, mat, placedBlock.getData());
-        } else {
+        else
             mirror.setBlock(x, y, z, mat, placedBlock.getBlockData().getAsString());
-        }
     }
 
     /**

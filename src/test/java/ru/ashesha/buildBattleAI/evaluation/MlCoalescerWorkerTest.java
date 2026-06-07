@@ -1,5 +1,6 @@
 package ru.ashesha.buildBattleAI.evaluation;
 
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import ru.ashesha.buildBattleAI.core.PluginLogger;
 import ru.ashesha.buildBattleAI.evaluation.api.EvaluationCallback;
@@ -110,7 +111,7 @@ class MlCoalescerWorkerTest {
         Function<String, EvaluationCallback> registry = arena -> null;
         SyncDispatcher dispatcher = new SyncDispatcher() {
             @Override
-            public void dispatch(Runnable r) {
+            public void dispatch(@NonNull Runnable r) {
                 calls.incrementAndGet();
                 super.dispatch(r);
             }
@@ -213,7 +214,7 @@ class MlCoalescerWorkerTest {
     /** Test dispatcher that runs the callback synchronously on the current thread. */
     static class SyncDispatcher implements MlCoalescerWorker.MainThreadDispatcher {
         @Override
-        public void dispatch(Runnable r) {
+        public void dispatch(@NonNull Runnable r) {
             r.run();
         }
     }

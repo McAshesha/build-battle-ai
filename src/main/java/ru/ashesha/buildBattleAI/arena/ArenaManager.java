@@ -408,7 +408,7 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
         Location loc = player.getLocation();
         ArenaSetupSession session = new ArenaSetupSession(
                 player.getUniqueId(), arenaName, worldName,
-                loc.getWorld().getName(), loc.getX(), loc.getY(), loc.getZ(),
+                Objects.requireNonNull(loc.getWorld()).getName(), loc.getX(), loc.getY(), loc.getZ(),
                 loc.getYaw(), loc.getPitch(), player.getAllowFlight()
         );
         setupSessions.put(player.getUniqueId(), session);
@@ -467,7 +467,7 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
     @Override
     public void handleSetTab(@NonNull Player player, int plotIndex) {
         ArenaSetupSession session = setupSessions.get(player.getUniqueId());
-        if (session == null || !isValidPlot(session, plotIndex))
+        if (session == null || isNotValidPlot(session, plotIndex))
             return;
 
         // Switching to an already-active tab is a no-op (no sound spam).
@@ -484,7 +484,7 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
     @Override
     public void handleSetPictureCorner1(@NonNull Player player, int plotIndex) {
         ArenaSetupSession session = setupSessions.get(player.getUniqueId());
-        if (session == null || !isValidPlot(session, plotIndex))
+        if (session == null || isNotValidPlot(session, plotIndex))
             return;
 
         ArenaSetupSession.PlotSetupData plot = session.getOrCreatePlot(plotIndex);
@@ -517,7 +517,7 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
     @Override
     public void handleSetPictureCorner2(@NonNull Player player, int plotIndex) {
         ArenaSetupSession session = setupSessions.get(player.getUniqueId());
-        if (session == null || !isValidPlot(session, plotIndex))
+        if (session == null || isNotValidPlot(session, plotIndex))
             return;
 
         ArenaSetupSession.PlotSetupData plot = session.getOrCreatePlot(plotIndex);
@@ -549,7 +549,7 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
     @Override
     public void handleSetPictureFace(@NonNull Player player, int plotIndex, @NonNull BlockFace face) {
         ArenaSetupSession session = setupSessions.get(player.getUniqueId());
-        if (session == null || !isValidPlot(session, plotIndex))
+        if (session == null || isNotValidPlot(session, plotIndex))
             return;
 
         ArenaSetupSession.PlotSetupData plot = session.getOrCreatePlot(plotIndex);
@@ -627,7 +627,7 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
     @Override
     public void handleSetSpawn(@NonNull Player player, int plotIndex) {
         ArenaSetupSession session = setupSessions.get(player.getUniqueId());
-        if (session == null || !isValidPlot(session, plotIndex))
+        if (session == null || isNotValidPlot(session, plotIndex))
             return;
 
         ArenaSetupSession.PlotSetupData plot = session.getOrCreatePlot(plotIndex);
@@ -654,7 +654,7 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
     @Override
     public void handleSetCorner1(@NonNull Player player, int plotIndex) {
         ArenaSetupSession session = setupSessions.get(player.getUniqueId());
-        if (session == null || !isValidPlot(session, plotIndex))
+        if (session == null || isNotValidPlot(session, plotIndex))
             return;
 
         ArenaSetupSession.PlotSetupData plot = session.getOrCreatePlot(plotIndex);
@@ -682,7 +682,7 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
     @Override
     public void handleSetCorner2(@NonNull Player player, int plotIndex) {
         ArenaSetupSession session = setupSessions.get(player.getUniqueId());
-        if (session == null || !isValidPlot(session, plotIndex))
+        if (session == null || isNotValidPlot(session, plotIndex))
             return;
 
         ArenaSetupSession.PlotSetupData plot = session.getOrCreatePlot(plotIndex);
@@ -710,7 +710,7 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
     @Override
     public void handleSetCamera(@NonNull Player player, int plotIndex, int cameraIndex) {
         ArenaSetupSession session = setupSessions.get(player.getUniqueId());
-        if (session == null || !isValidPlot(session, plotIndex))
+        if (session == null || isNotValidPlot(session, plotIndex))
             return;
         if (cameraIndex < 1 || cameraIndex > 3)
             return;
@@ -956,8 +956,8 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
     }
 
     /** Validates that a plot index is within the configured player count. */
-    private static boolean isValidPlot(ArenaSetupSession session, int plotIndex) {
-        return session.maxPlayers() != null && plotIndex >= 1 && plotIndex <= session.maxPlayers();
+    private static boolean isNotValidPlot(ArenaSetupSession session, int plotIndex) {
+        return session.maxPlayers() == null || plotIndex < 1 || plotIndex > session.maxPlayers();
     }
 
     /** Rounds a double to one decimal place for display. */
@@ -1148,7 +1148,7 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
 
         // ── Optional game settings ────────────────────────────────────
         msg.sendChat(player, " ");
-        sendSuggestLine(player, lang,
+        sendSuggestLine(player,
                 lang.get("arena.setup.minplayers.label"),
                 session.minPlayers() != null
                         ? lang.get("arena.setup.minplayers.value", "%count%",
@@ -1156,7 +1156,7 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
                         : lang.get("arena.setup.status.optional") + " &8(default: 2)",
                 "/bbai setup minplayers ",
                 lang.get("arena.setup.minplayers.hover"));
-        sendSuggestLine(player, lang,
+        sendSuggestLine(player,
                 lang.get("arena.setup.buildtime.label"),
                 session.buildTime() != null
                         ? lang.get("arena.setup.buildtime.value", "%minutes%",
@@ -1164,7 +1164,7 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
                         : lang.get("arena.setup.status.optional") + " &8(default: 2.5 min)",
                 "/bbai setup buildtime ",
                 lang.get("arena.setup.buildtime.hover"));
-        sendSuggestLine(player, lang,
+        sendSuggestLine(player,
                 lang.get("arena.setup.gametime.label"),
                 session.gameTime() != null
                         ? lang.get("arena.setup.gametime.value", "%minutes%",
@@ -1172,7 +1172,7 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
                         : lang.get("arena.setup.status.optional") + " &8(default: 5 min)",
                 "/bbai setup gametime ",
                 lang.get("arena.setup.gametime.hover"));
-        sendSuggestLine(player, lang,
+        sendSuggestLine(player,
                 lang.get("arena.setup.countdown.label"),
                 session.countdownTime() != null
                         ? lang.get("arena.setup.countdown.value", "%seconds%",
@@ -1260,7 +1260,7 @@ public class ArenaManager implements BBAIArenaManager, PluginService {
      * Sends a line for a setting that uses {@code SUGGEST_COMMAND} so the admin
      * types the value. Used for min players, build time, game time, countdown.
      */
-    private void sendSuggestLine(Player player, Lang lang,
+    private void sendSuggestLine(Player player,
                                  String label, String valueDisplay,
                                  String suggestCommand, String hoverText) {
         ChatMicroService.ChatMessage line = new ChatMicroService.ChatMessage();

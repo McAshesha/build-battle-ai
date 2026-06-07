@@ -25,7 +25,7 @@ public class BlockShape {
      * a {@code "family|mask"} string allocation on every lookup.
      */
     private static final AtomicReferenceArray<double[][]> CONNECTIVITY_SHAPES =
-            new AtomicReferenceArray<double[][]>(3 * 16);
+            new AtomicReferenceArray<>(3 * 16);
     // Fence: 4×16×4 center post
     private static final double[] FENCE_POST = {6 / 16.0, 0, 6 / 16.0, 10 / 16.0, 1, 10 / 16.0};
 
@@ -189,7 +189,7 @@ public class BlockShape {
      * so no per-bucket eviction is needed.
      */
     private static final AtomicReferenceArray<ConcurrentHashMap<String, double[][]>> STATE_SHAPE_CACHES =
-            new AtomicReferenceArray<ConcurrentHashMap<String, double[][]>>(XMaterial.values().length);
+            new AtomicReferenceArray<>(XMaterial.values().length);
 
     // Assigns shapes to materials based on name patterns.
     // The static initializer iterates all XMaterial values and maps each one to
@@ -402,7 +402,7 @@ public class BlockShape {
         int ordinal = material.ordinal();
         ConcurrentHashMap<String, double[][]> bucket = STATE_SHAPE_CACHES.get(ordinal);
         if (bucket == null) {
-            STATE_SHAPE_CACHES.compareAndSet(ordinal, null, new ConcurrentHashMap<String, double[][]>());
+            STATE_SHAPE_CACHES.compareAndSet(ordinal, null, new ConcurrentHashMap<>());
             bucket = STATE_SHAPE_CACHES.get(ordinal);
         }
         double[][] cached = bucket.get(blockState);

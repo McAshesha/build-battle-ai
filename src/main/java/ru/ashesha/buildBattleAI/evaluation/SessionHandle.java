@@ -18,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * timestamps that drive cadence enforcement.
  * <p>
  * The camera index is only touched by the coordinator (main-thread,
- * single-writer) — no synchronisation needed. The lastEvalAt map is a
+ * single-writer) — no synchronization needed. The lastEvalAt map is a
  * {@link ConcurrentHashMap} so future-proof against off-main-thread use.
  */
 @RequiredArgsConstructor
@@ -35,7 +35,7 @@ final class SessionHandle {
     private final @NonNull EvaluationCallback callback;
 
     @Getter(AccessLevel.NONE)
-    private final ConcurrentHashMap<UUID, Long> lastEvalAtNanos = new ConcurrentHashMap<UUID, Long>();
+    private final ConcurrentHashMap<UUID, Long> lastEvalAtNanos = new ConcurrentHashMap<>();
 
     private int currentCameraIndex = 0;
 

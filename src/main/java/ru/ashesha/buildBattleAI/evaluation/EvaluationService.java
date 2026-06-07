@@ -54,12 +54,12 @@ public class EvaluationService implements PluginService, BBAIEvaluationService {
         metrics = new EvaluationMetrics(config.mlBatchMaxSize());
         renderQueue = new RenderQueue(config.renderQueueCapacity());
         mlQueue = new MlQueue(config.mlQueueCapacity());
-        registry = new ConcurrentHashMap<String, SessionHandle>();
+        registry = new ConcurrentHashMap<>();
 
         coordinator = new EvaluationCoordinator(registry, renderQueue, metrics, config.minCadenceMs());
 
-        renderWorkers = new ArrayList<RenderWorker>(config.renderWorkers());
-        renderThreads = new ArrayList<Thread>(config.renderWorkers());
+        renderWorkers = new ArrayList<>(config.renderWorkers());
+        renderThreads = new ArrayList<>(config.renderWorkers());
         for (int i = 0; i < config.renderWorkers(); i++) {
             RenderWorker w = new RenderWorker(i, renderQueue, mlQueue,
                     plugin.getContext().getRenderService(), metrics, logger);

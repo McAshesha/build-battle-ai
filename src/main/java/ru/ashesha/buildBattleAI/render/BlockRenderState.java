@@ -46,7 +46,7 @@ public class BlockRenderState {
      * than thrashing the cache (thundering-herd-safe).
      */
     private static final AtomicReference<Map<String, BlockRenderState>> CACHE_REF =
-            new AtomicReference<Map<String, BlockRenderState>>(new ConcurrentHashMap<String, BlockRenderState>());
+            new AtomicReference<>(new ConcurrentHashMap<>());
 
     // Pre-allocated property needles. The trailing `=` lets `parse()` reuse the
     // same string instances across calls instead of allocating `key + "="` each
@@ -99,9 +99,8 @@ public class BlockRenderState {
      * Returns {@link #DEFAULT} if no block state string is available.
      * <p>
      * Convenience overload that performs the {@link SceneData#getBlockState}
-     * lookup itself. Callers that already hold the raw state string (e.g.
-     * {@link BlockShape#getStatefulShape} which fetched it for its own cache
-     * key) should use {@link #of(String)} instead to avoid the duplicate
+     * lookup itself. Callers that already hold the raw state string
+     * should use {@link #of(String)} instead to avoid the duplicate
      * scene lookup.
      *
      * @param scene the scene data source
@@ -135,7 +134,7 @@ public class BlockRenderState {
         // single replacement instead of repeatedly throwing away just-cached
         // entries (thundering herd).
         if (cache.size() > MAX_CACHE_SIZE)
-            CACHE_REF.compareAndSet(cache, new ConcurrentHashMap<String, BlockRenderState>());
+            CACHE_REF.compareAndSet(cache, new ConcurrentHashMap<>());
         BlockRenderState parsed = parse(blockState);
         CACHE_REF.get().put(blockState, parsed);
         return parsed;
@@ -152,7 +151,7 @@ public class BlockRenderState {
      * Replaces the cache with a fresh empty map. Package-visible for testing.
      */
     static void clearCache() {
-        CACHE_REF.set(new ConcurrentHashMap<String, BlockRenderState>());
+        CACHE_REF.set(new ConcurrentHashMap<>());
     }
 
     /**

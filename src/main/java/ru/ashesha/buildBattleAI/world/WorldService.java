@@ -101,8 +101,9 @@ public class WorldService implements BBAIWorldService, PluginService {
      * The world is created using a {@link VoidChunkGenerator} that emits
      * completely empty chunks — no blocks, no structures, no populators.
      * The resulting world has mob spawning disabled, auto-save off, and
-     * spawn chunks not kept in memory to minimise resource usage.
+     * spawn chunks not kept in memory to minimize resource usage.
      */
+    @SuppressWarnings("deprecation")
     @Override
     public World createEmptyWorld(@NonNull String name) {
         PluginLogger log = plugin.getPluginLogger();
@@ -276,12 +277,11 @@ public class WorldService implements BBAIWorldService, PluginService {
 
         File[] children = dir.listFiles();
         if (children != null)
-            for (File child : children) {
+            for (File child : children)
                 if (child.isDirectory())
                     deleteDirectory(child);
                 else
                     child.delete();
-            }
 
         dir.delete();
     }
@@ -346,7 +346,7 @@ public class WorldService implements BBAIWorldService, PluginService {
          * @param biome  biome grid (unused — default biomes are fine)
          * @return empty chunk data
          */
-        @SuppressWarnings("deprecation")
+        @SuppressWarnings({"deprecation", "NullableProblems"})
         @Override
         public ChunkData generateChunkData(@NonNull World world, @NonNull Random random,
                                            int x, int z, @NonNull BiomeGrid biome) {
@@ -381,7 +381,6 @@ public class WorldService implements BBAIWorldService, PluginService {
          * @param z      chunk Z
          * @return zero-filled byte array representing an air-only chunk
          */
-        @SuppressWarnings("deprecation")
         public byte[] generate(World world, Random random, int x, int z) {
             return EMPTY_CHUNK;
         }

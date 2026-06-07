@@ -64,7 +64,7 @@ class IgniteClientCacheRepository<K, V> implements DataRepository<K, V> {
     @Override
     public Collection<V> getAll() {
         List<V> result = new ArrayList<>();
-        try (QueryCursor<Cache.Entry<K, V>> cursor = cache.query(new ScanQuery<K, V>())) {
+        try (QueryCursor<Cache.Entry<K, V>> cursor = cache.query(new ScanQuery<>())) {
             for (Cache.Entry<K, V> entry : cursor)
                 result.add(entry.getValue());
         }

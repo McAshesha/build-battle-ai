@@ -56,7 +56,7 @@ public final class BuildBattleAI extends JavaPlugin {
         pluginLogger = new PluginLogger(getLogger());
 
 
-        // Integrity gate — must run before any other initialisation.
+        // Integrity gate — must run before any other initialization.
         if (!JarIntegrityVerifier.verify(getClass(), getLogger())) {
             integrityVerified = false;
             pluginLogger.error("JAR integrity verification failed — aborting plugin load.");
@@ -100,7 +100,7 @@ public final class BuildBattleAI extends JavaPlugin {
      * Gracefully shuts down every plugin service through the uniform
      * {@link PluginContext#shutdown()} pipeline, then terminates PacketEvents.
      * <p>
-     * If the plugin was never fully initialised (integrity check failure),
+     * If the plugin was never fully initialized (integrity check failure),
      * the method returns immediately — there is nothing to tear down.
      */
     @Override

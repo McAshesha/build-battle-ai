@@ -24,13 +24,15 @@ import ru.ashesha.buildBattleAI.game.GameManager;
 import ru.ashesha.buildBattleAI.game.api.BBAIGameManager;
 import ru.ashesha.buildBattleAI.game.feedback.SkipThemeItem;
 
+import java.util.Objects;
+
 /**
  * Handles game-related events: block protection, damage cancellation,
  * food level freezing, item drop prevention, and disconnect cleanup.
  * <p>
  * All block place/break events are restricted to the player's assigned
  * zone during the PLAYING state only. Damage and food changes are
- * cancelled for all players in game sessions.
+ * canceled for all players in game sessions.
  */
 public class GameListener extends ListenerService.PluginListener {
 
@@ -133,10 +135,9 @@ public class GameListener extends ListenerService.PluginListener {
             for (BlockState blockState : multi.getReplacedBlockStates())
                 gameManager.applyMirrorPlace(player.getUniqueId(),
                         arenaName, blockState.getBlock());
-        } else {
+        } else
             gameManager.applyMirrorPlace(player.getUniqueId(),
                     arenaName, event.getBlockPlaced());
-        }
     }
 
     /**
@@ -221,7 +222,7 @@ public class GameListener extends ListenerService.PluginListener {
      * {@link BBAIGameManager#skipTheme(Player)}.
      * <p>
      * No {@code ignoreCancelled}: Spigot/Paper fires {@code RIGHT_CLICK_AIR}
-     * with the event pre-cancelled by default (legacy "use" interaction model),
+     * with the event pre-canceled by default (legacy "use" interaction model),
      * so {@code ignoreCancelled=true} would silently swallow every air-click.
      * <p>
      * Hand filter restricts to the main hand so the 1.9+ off-hand mirror-fire
@@ -299,7 +300,7 @@ public class GameListener extends ListenerService.PluginListener {
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onEntityExplode(EntityExplodeEvent event) {
-        String worldName = event.getLocation().getWorld().getName();
+        String worldName = Objects.requireNonNull(event.getLocation().getWorld()).getName();
         if (worldName.startsWith("bbai_"))
             event.setCancelled(true);
     }

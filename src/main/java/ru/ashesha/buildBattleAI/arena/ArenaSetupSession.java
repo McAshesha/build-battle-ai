@@ -11,8 +11,8 @@ import ru.ashesha.buildBattleAI.entity.hologram.HologramService;
 import ru.ashesha.buildBattleAI.entity.npc.NPCService;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -143,10 +143,7 @@ class ArenaSetupSession {
      * @param maxPlots the new maximum plot count
      */
     void trimPlotsAbove(int maxPlots) {
-        Iterator<Map.Entry<Integer, PlotSetupData>> it = plots.entrySet().iterator();
-        while (it.hasNext())
-            if (it.next().getKey() > maxPlots)
-                it.remove();
+        plots.entrySet().removeIf(entry -> entry.getKey() > maxPlots);
     }
 
     /**
@@ -345,19 +342,17 @@ class ArenaSetupSession {
         boolean isFaceAllowed(BlockFace face) {
             if (face == null)
                 return false;
-            switch (pictureGeometryStatus()) {
-                case VALID:
-                    if (isPictureOneByOne())
-                        return face == BlockFace.NORTH || face == BlockFace.SOUTH
-                                || face == BlockFace.EAST || face == BlockFace.WEST;
-                    if (isPictureXYPlane())
-                        return face == BlockFace.NORTH || face == BlockFace.SOUTH;
-                    if (isPictureYZPlane())
-                        return face == BlockFace.EAST || face == BlockFace.WEST;
-                    return false;
-                default:
-                    return false;
+            if (Objects.requireNonNull(pictureGeometryStatus()) == PictureGeometry.VALID) {
+                if (isPictureOneByOne())
+                    return face == BlockFace.NORTH || face == BlockFace.SOUTH
+                            || face == BlockFace.EAST || face == BlockFace.WEST;
+                if (isPictureXYPlane())
+                    return face == BlockFace.NORTH || face == BlockFace.SOUTH;
+                if (isPictureYZPlane())
+                    return face == BlockFace.EAST || face == BlockFace.WEST;
+                return false;
             }
+            return false;
         }
     }
 

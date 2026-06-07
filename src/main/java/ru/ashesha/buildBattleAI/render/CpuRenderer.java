@@ -337,14 +337,13 @@ public class CpuRenderer {
                 bMinX = bMinY = bMinZ = 0;
                 bMaxX = bMaxY = bMaxZ = 0;
                 if (startShape == null) {
-                    double xLo = vx, yLo = vy, zLo = vz;
                     double xHi = vx + 1.0, yHi = vy + 1.0, zHi = vz + 1.0;
-                    if (ox > xLo && ox < xHi
-                            && oy > yLo && oy < yHi
-                            && oz > zLo && oz < zHi) {
-                        bMinX = xLo;
-                        bMinY = yLo;
-                        bMinZ = zLo;
+                    if (ox > (double) vx && ox < xHi
+                            && oy > (double) vy && oy < yHi
+                            && oz > (double) vz && oz < zHi) {
+                        bMinX = vx;
+                        bMinY = vy;
+                        bMinZ = vz;
                         bMaxX = xHi;
                         bMaxY = yHi;
                         bMaxZ = zHi;
@@ -879,7 +878,7 @@ public class CpuRenderer {
      * @param camZ   camera Z position
      * @param yaw    camera yaw (Minecraft convention: 0=south, 90=west, 180=north)
      * @param pitch  camera pitch (-90=up, 0=horizontal, 90=down)
-     * @param outBuf a byte array of exactly {@code WIDTH*HEIGHT*3} bytes;
+     * @param pixels a byte array of exactly {@code WIDTH*HEIGHT*3} bytes;
      *               will be overwritten with the rendered pixel data
      * @return {@code outBuf} (same reference, for fluent chaining)
      * @throws IllegalArgumentException if {@code outBuf} is null or wrong length
@@ -887,15 +886,13 @@ public class CpuRenderer {
     public byte[] render(@NonNull SceneData scene,
                          double camX, double camY, double camZ,
                          float yaw, float pitch,
-                         byte[] outBuf) {
+                         byte[] pixels) {
         final int expectedSize = RendererUtils.WIDTH * RendererUtils.HEIGHT * 3;
-        if (outBuf == null)
+        if (pixels == null)
             throw new IllegalArgumentException("outBuf must not be null");
-        if (outBuf.length != expectedSize)
+        if (pixels.length != expectedSize)
             throw new IllegalArgumentException(
-                    "outBuf length " + outBuf.length + " != expected " + expectedSize);
-
-        byte[] pixels = outBuf;
+                    "outBuf length " + pixels.length + " != expected " + expectedSize);
 
         // Camera basis vectors (Minecraft coordinate system)
         double yawRad = Math.toRadians(yaw);

@@ -4,6 +4,7 @@ import lombok.experimental.UtilityClass;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Objects;
 
 /**
  * Generic reflection utilities for field access, method lookup, and invocation.
@@ -38,7 +39,7 @@ public class ReflectionUtils {
                 current = current.getSuperclass();
             }
         throw new RuntimeException("Field '" + fieldName + "' not found in "
-                + clazz.getName() + " or its superclasses");
+                + Objects.requireNonNull(clazz).getName() + " or its superclasses");
     }
 
     // ── Field get ───────────────────────────────────────────────────────────
@@ -165,7 +166,7 @@ public class ReflectionUtils {
                 current = current.getSuperclass();
             }
         throw new RuntimeException("Method '" + methodName + "' not found in "
-                + clazz.getName() + " or its superclasses");
+                + Objects.requireNonNull(clazz).getName() + " or its superclasses");
     }
 
     // ── Method invocation ───────────────────────────────────────────────────

@@ -20,7 +20,7 @@ import java.util.function.Function;
  * {@code matched} flag and the {@code topK} list).
  * <p>
  * Single-threaded by design — the ONNX session is concurrency-safe, but
- * keeping batch assembly serial removes a class of synchronisation bugs
+ * keeping batch assembly serial removes a class of synchronization bugs
  * and guarantees deterministic batch sizes.
  * <p>
  * The callback registry is queried per-batch — when an arena has been

@@ -10,6 +10,7 @@ import ru.ashesha.buildBattleAI.data.DataRepository;
 import java.io.*;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -79,7 +80,7 @@ class LocalRepository<K, V> implements DataRepository<K, V> {
             return;
         try {
             InputStreamReader reader = new InputStreamReader(
-                    new FileInputStream(file), StandardCharsets.UTF_8);
+                    Files.newInputStream(file.toPath()), StandardCharsets.UTF_8);
             Type mapType = TypeToken.getParameterized(Map.class, keyType, valueType).getType();
             Map<K, V> loaded = gson.fromJson(reader, mapType);
             reader.close();
@@ -128,6 +129,7 @@ class LocalRepository<K, V> implements DataRepository<K, V> {
      * auto-save timer firing while the plugin is shutting down), but
      * reads and writes to the in-memory cache are never blocked.
      */
+    @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
     public synchronized void flush() {
         if (!dirty)
@@ -135,18 +137,16 @@ class LocalRepository<K, V> implements DataRepository<K, V> {
         File temp = new File(file.getParentFile(), file.getName() + ".tmp");
         try {
             OutputStreamWriter writer = new OutputStreamWriter(
-                    new FileOutputStream(temp), StandardCharsets.UTF_8);
+                    Files.newOutputStream(temp.toPath()), StandardCharsets.UTF_8);
             // Snapshot the cache as a regular HashMap for clean JSON output
             gson.toJson(new LinkedHashMap<>(cache), writer);
             writer.flush();
             writer.close();
 
             // Atomic rename — prevents partial files on crash
-            if (!temp.renameTo(file)) {
-                // Fallback for platforms where rename fails if target exists (Windows)
-                if (file.delete())
-                    temp.renameTo(file);
-            }
+            // Fallback for platforms where rename fails if target exists (Windows)
+            if (!temp.renameTo(file) && file.delete())
+                temp.renameTo(file);
             dirty = false;
         } catch (IOException e) {
             System.err.println("[BuildBattleAI] Failed to save " + file.getName() + ": " + e.getMessage());
