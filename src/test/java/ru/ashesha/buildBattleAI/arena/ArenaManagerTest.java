@@ -461,8 +461,8 @@ class ArenaManagerTest {
      * Builds a complete valid arena YAML config with all required fields.
      * Each plot has deterministic coordinates based on its 1-based index.
      */
-    private static YamlConfiguration buildValidArenaConfig(String worldName, int maxPlayers,
-                                                           boolean enabled) {
+    static YamlConfiguration buildValidArenaConfig(String worldName, int maxPlayers,
+                                                   boolean enabled) {
         YamlConfiguration config = new YamlConfiguration();
         config.set("world", worldName);
         config.set("max-players", maxPlayers);
