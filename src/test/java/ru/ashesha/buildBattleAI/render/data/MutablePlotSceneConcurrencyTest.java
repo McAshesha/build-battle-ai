@@ -1,6 +1,7 @@
 package ru.ashesha.buildBattleAI.render.data;
 
 import com.cryptomorin.xseries.XMaterial;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CountDownLatch;
@@ -14,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Tag("stress")
 class MutablePlotSceneConcurrencyTest {
 
     @Test

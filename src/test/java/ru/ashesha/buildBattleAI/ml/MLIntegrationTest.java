@@ -6,6 +6,7 @@ import ai.onnxruntime.OrtSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
@@ -45,6 +46,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Each of these has bitten us in the past, and each fails opaquely on the
  * production server, so explicit JVM-side coverage is worthwhile.
  */
+@Tag("ml-it")
 @EnabledIfSystemProperty(named = "bbai.ml-it", matches = "true")
 class MLIntegrationTest {
 

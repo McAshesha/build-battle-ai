@@ -1,5 +1,7 @@
 package ru.ashesha.buildBattleAI.e2e;
 
+import org.junit.jupiter.api.Tag;
+
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -14,6 +16,7 @@ import java.nio.file.Paths;
  * {@code -Pe2e} Maven profile). See {@link AbstractServerE2ETest} for
  * activation semantics and skip rules.
  */
+@Tag("e2e")
 class Purpur121E2ETest extends AbstractServerE2ETest {
 
     @Override

@@ -1,6 +1,7 @@
 package ru.ashesha.buildBattleAI.integration;
 
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -42,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * (mocked service lifecycle), this rounds out the boot-time coverage that
  * existed before this commit.
  */
+@Tag("smoke")
 class RealPluginBootstrapTest {
 
     /**

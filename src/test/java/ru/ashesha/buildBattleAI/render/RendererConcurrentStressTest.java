@@ -3,6 +3,7 @@ package ru.ashesha.buildBattleAI.render;
 import com.cryptomorin.xseries.XMaterial;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import ru.ashesha.buildBattleAI.render.data.FlatScene;
 import ru.ashesha.buildBattleAI.util.RendererUtils;
@@ -45,6 +46,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * {@code RendererPixelEquivalenceTest#opaqueCubes()}. It is small, fast to
  * render, and produces a clearly non-background image from every angle.
  */
+@Tag("stress")
 class RendererConcurrentStressTest {
 
     /**

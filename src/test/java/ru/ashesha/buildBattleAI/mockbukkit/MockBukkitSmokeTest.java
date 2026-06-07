@@ -4,6 +4,7 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
@@ -20,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * without loading any project code. If this class regresses we know the
  * problem is at the framework/dependency layer, not in our own services.
  */
+@Tag("smoke")
 class MockBukkitSmokeTest {
 
     private ServerMock server;
