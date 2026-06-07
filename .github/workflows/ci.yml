@@ -63,8 +63,12 @@ jobs:
             --clobber
           ls -lh "$MODEL_PATH"
 
-      - name: Build and run unit tests
-        run: mvn -B -ntp clean verify
+      # `pr-gate` profile runs the unit baseline plus the smoke and
+      # integration tiers and the fast (non-nightly-only) ml-it tests.
+      # E2E still runs as a separate step below — both existing E2E
+      # drivers are kept in PR for cheap JAR-shading regression coverage.
+      - name: Build and run PR test gate (unit + smoke + integration + fast ml-it)
+        run: mvn -B -ntp clean verify -P pr-gate
 
       # End-to-end tests spawn real Paper / Purpur subprocesses from
       # Servers/1.8 and Servers/1.21 (both checked into the repo) and
