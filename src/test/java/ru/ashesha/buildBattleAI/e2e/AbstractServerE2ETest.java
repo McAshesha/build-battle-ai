@@ -63,7 +63,7 @@ public abstract class AbstractServerE2ETest {
      * {@link #extractStatsCounter(String, String)}.
      */
     private static final Pattern STATS_COUNTER_PATTERN =
-            Pattern.compile("([A-Za-z0-9_\\-\\.]+)=(\\d+)");
+            Pattern.compile("([A-Za-z][A-Za-z0-9 _\\-\\.]*?)[=:]\\s*(?:§[0-9a-fk-or])?(\\d+)");
 
     /** Buffered tail of every byte of server stdout — used for assertions. */
     private final StringBuilder output = new StringBuilder();
@@ -303,26 +303,30 @@ public abstract class AbstractServerE2ETest {
     }
 
     /**
-     * Parses a single named counter value from a stats log line. The expected
-     * line format is any string containing {@code <counterName>=<number>} where
-     * {@code number} is a non-negative integer. Both the full log output and
-     * individual lines are accepted as {@code output}.
-     * <p>
-     * Example line produced by {@code /bbai stats}:
-     * <pre>
-     *   [BBAI] EvaluationStats completedRenders=14 completedMlBatches=3 ...
-     * </pre>
+     * Parses a single named counter value from a stats log line. Accepts two
+     * shapes:
+     * <ul>
+     *   <li>{@code <counterName>=<number>} — equals-delimited form.</li>
+     *   <li>{@code <counterName>: <number>} — colon-and-space form used by
+     *       the {@code /bbai stats} console output (e.g.
+     *       {@code "Rendered: 0  ML batches: 0  Matches: 0"}). Optional
+     *       legacy color codes ({@code §f}) before the number are tolerated.</li>
+     * </ul>
+     * The matcher trims trailing whitespace from the counter name so
+     * {@code "Rendered "} matches {@code "Rendered"}.
      *
      * @param output      the full server output (or a subsection) to search
-     * @param counterName the exact counter name as it appears in the log line,
-     *                    e.g. {@code "completedRenders"}
+     * @param counterName the counter name as it appears in the log line, e.g.
+     *                    {@code "Rendered"} for the {@code /bbai stats} output
+     *                    or {@code "completedRenders"} for an equals-delimited
+     *                    form
      * @return the parsed {@code long} value, or {@code -1} if the counter is
      *         not found anywhere in {@code output}
      */
     protected static long extractStatsCounter(String output, String counterName) {
         Matcher m = STATS_COUNTER_PATTERN.matcher(output);
         while (m.find()) {
-            if (m.group(1).equals(counterName)) {
+            if (m.group(1).trim().equals(counterName)) {
                 try {
                     return Long.parseLong(m.group(2));
                 } catch (NumberFormatException ignored) {
@@ -350,60 +354,60 @@ public abstract class AbstractServerE2ETest {
      */
     protected static String buildMinimalArenaYaml(String name, int maxPlayers) {
         StringBuilder sb = new StringBuilder();
-        sb.append("name: ").append(name).append('\n');
+        // Root-level fields read by ArenaManager.deserializeArena.
+        sb.append("world: bbai_").append(name).append('\n');
+        sb.append("max-players: ").append(maxPlayers).append('\n');
+        sb.append("enabled: true\n");
+        sb.append("min-players: 1\n");
+        sb.append("build-time: 120\n");
+        sb.append("game-time: 300\n");
+        sb.append("countdown-time: 10\n");
         sb.append("lobby:\n");
-        sb.append("  world: bbai_").append(name).append('\n');
         sb.append("  x: 0.5\n");
         sb.append("  y: 65.0\n");
         sb.append("  z: 0.5\n");
         sb.append("  yaw: 0.0\n");
         sb.append("  pitch: 0.0\n");
         sb.append("spectator:\n");
-        sb.append("  world: bbai_").append(name).append('\n');
         sb.append("  x: 0.5\n");
         sb.append("  y: 80.0\n");
         sb.append("  z: 0.5\n");
         sb.append("  yaw: 0.0\n");
         sb.append("  pitch: -90.0\n");
-        sb.append("min-players: 1\n");
-        sb.append("build-time: 120\n");
-        sb.append("game-time: 300\n");
-        sb.append("countdown-time: 10\n");
+        // Plots are keyed by integer string ('1', '2', ...), not a YAML list —
+        // matches Bukkit YamlConfiguration's nested path lookup that
+        // ArenaManager uses ("plots." + i).
         sb.append("plots:\n");
 
         // Each plot is 8 blocks wide (x: offset*20 to offset*20+7), 8 deep
         // (z: 0 to 7), and 8 tall (y: 64 to 72). Cameras orbit above.
-        for (int i = 0; i < maxPlayers; i++) {
-            int ox = i * 20; // X origin for this plot
+        for (int i = 1; i <= maxPlayers; i++) {
+            int ox = (i - 1) * 20; // X origin for this plot
             int cx = ox + 4; // centre X
-            sb.append("  - spawn:\n");
-            sb.append("      world: bbai_").append(name).append('\n');
+            sb.append("  '").append(i).append("':\n");
+            sb.append("    spawn:\n");
             sb.append("      x: ").append(cx).append(".5\n");
             sb.append("      y: 65.0\n");
             sb.append("      z: 4.5\n");
             sb.append("      yaw: 180.0\n");
             sb.append("      pitch: 0.0\n");
             sb.append("    corner1:\n");
-            sb.append("      world: bbai_").append(name).append('\n');
-            sb.append("      x: ").append(ox).append(".0\n");
-            sb.append("      y: 64.0\n");
-            sb.append("      z: 0.0\n");
+            sb.append("      x: ").append(ox).append('\n');
+            sb.append("      y: 64\n");
+            sb.append("      z: 0\n");
             sb.append("    corner2:\n");
-            sb.append("      world: bbai_").append(name).append('\n');
-            sb.append("      x: ").append(ox + 7).append(".0\n");
-            sb.append("      y: 72.0\n");
-            sb.append("      z: 7.0\n");
-            // Camera 1 — front view (south, looking north)
+            sb.append("      x: ").append(ox + 7).append('\n');
+            sb.append("      y: 72\n");
+            sb.append("      z: 7\n");
+            // Camera 1 — front view (south of plot, looking north)
             sb.append("    camera1:\n");
-            sb.append("      world: bbai_").append(name).append('\n');
             sb.append("      x: ").append(cx).append(".5\n");
             sb.append("      y: 68.0\n");
             sb.append("      z: -8.0\n");
             sb.append("      yaw: 0.0\n");
             sb.append("      pitch: -20.0\n");
-            // Camera 2 — side view (east, looking west)
+            // Camera 2 — side view (east of plot, looking west)
             sb.append("    camera2:\n");
-            sb.append("      world: bbai_").append(name).append('\n');
             sb.append("      x: ").append(ox + 16).append(".0\n");
             sb.append("      y: 68.0\n");
             sb.append("      z: 4.5\n");
@@ -411,24 +415,21 @@ public abstract class AbstractServerE2ETest {
             sb.append("      pitch: -20.0\n");
             // Camera 3 — top-down view
             sb.append("    camera3:\n");
-            sb.append("      world: bbai_").append(name).append('\n');
             sb.append("      x: ").append(cx).append(".5\n");
             sb.append("      y: 80.0\n");
             sb.append("      z: 4.5\n");
             sb.append("      yaw: 0.0\n");
             sb.append("      pitch: -75.0\n");
-            // Picture region — a 2×2 block face on the south wall of the plot
+            // Picture region — a 2×1 block face on the south wall of the plot.
             sb.append("    picture:\n");
             sb.append("      corner1:\n");
-            sb.append("        world: bbai_").append(name).append('\n');
-            sb.append("        x: ").append(cx - 1).append(".0\n");
-            sb.append("        y: 66.0\n");
-            sb.append("        z: -1.0\n");
+            sb.append("        x: ").append(cx - 1).append('\n');
+            sb.append("        y: 66\n");
+            sb.append("        z: -1\n");
             sb.append("      corner2:\n");
-            sb.append("        world: bbai_").append(name).append('\n');
-            sb.append("        x: ").append(cx).append(".0\n");
-            sb.append("        y: 67.0\n");
-            sb.append("        z: -1.0\n");
+            sb.append("        x: ").append(cx).append('\n');
+            sb.append("        y: 67\n");
+            sb.append("        z: -1\n");
             sb.append("      face: SOUTH\n");
         }
 

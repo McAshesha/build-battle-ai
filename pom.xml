@@ -427,6 +427,9 @@
                             <includes>
                                 <include>**/e2e/**Test.java</include>
                             </includes>
+                            <!-- Override the parent's excludedGroups so @Tag("e2e")
+                                 tests are reachable here. -->
+                            <excludedGroups combine.self="override"></excludedGroups>
                             <systemPropertyVariables>
                                 <bbai.e2e>true</bbai.e2e>
                             </systemPropertyVariables>

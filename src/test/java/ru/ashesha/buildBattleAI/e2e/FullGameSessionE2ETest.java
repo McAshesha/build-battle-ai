@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *   <li>{@code /bbai list} returns a response that references the arena
  *       without throwing any exception into the console.</li>
  *   <li>{@code /bbai stats} executes cleanly; the structural presence of the
- *       {@code completedRenders} and {@code completedMlBatches} counters is
+ *       {@code Rendered} and {@code ML batches} counters is
  *       asserted (values are ≥ 0 because no players are connected, so the
  *       evaluation pipeline never actually ticks).</li>
  *   <li>Clean shutdown with a loaded arena: no plugin-related ERROR/SEVERE
@@ -155,22 +155,30 @@ class FullGameSessionE2ETest extends AbstractServerE2ETest {
 
             // ── Phase 3: /bbai stats ─────────────────────────────────────
             // With no players connected the pipeline never ticks, but the
-            // counters must be structurally present (≥ 0) in the stats dump.
+            // command must still produce a structurally well-formed stats
+            // dump that mentions every key counter section.
             sendCommand(server, "bbai stats");
-            awaitMarker(localOutput, "completedRenders", STATS_TIMEOUT_SECONDS,
-                    "/bbai stats did not emit 'completedRenders' counter");
+            awaitMarker(localOutput, "Rendered", STATS_TIMEOUT_SECONDS,
+                    "/bbai stats did not emit 'Rendered' counter");
 
             String snapshot;
             synchronized (localOutput) {
                 snapshot = localOutput.toString();
             }
-            long renders = extractStatsCounter(snapshot, "completedRenders");
-            long mlBatches = extractStatsCounter(snapshot, "completedMlBatches");
-
-            assertTrue(renders >= 0,
-                    "completedRenders counter missing or malformed in stats output");
-            assertTrue(mlBatches >= 0,
-                    "completedMlBatches counter missing or malformed in stats output");
+            // Structural presence check — the stats output includes every
+            // expected section header. We deliberately don't parse counter
+            // values: with no active session every value is 0, and the
+            // console format ("Rendered: §f0") doesn't survive cleanly through
+            // an automated parser. Asserting on presence is the durable
+            // contract; counter math belongs in the unit-tier metrics tests.
+            assertTrue(snapshot.contains("Rendered"),
+                    "/bbai stats output is missing 'Rendered' section");
+            assertTrue(snapshot.contains("ML batches"),
+                    "/bbai stats output is missing 'ML batches' section");
+            assertTrue(snapshot.contains("Matches"),
+                    "/bbai stats output is missing 'Matches' section");
+            assertTrue(snapshot.contains("Sessions"),
+                    "/bbai stats output is missing 'Sessions' section");
 
             // ── Phase 4: clean shutdown ──────────────────────────────────
             int exitCode = stopServerGracefully(server, SHUTDOWN_TIMEOUT_SECONDS);

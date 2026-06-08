@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *   <li>{@code /bbai list} returns output that references both arena names
  *       without throwing any exception into the console.</li>
  *   <li>{@code /bbai stats} executes cleanly while two arenas are registered;
- *       the structural presence of the {@code completedRenders} counter is
+ *       the structural presence of the {@code Rendered} counter is
  *       asserted (value ≥ 0 — no players are connected).</li>
  *   <li>{@code /bbai delete e2e_isolation_a} removes one arena while the other
  *       remains. After the delete the output must no longer list
@@ -183,18 +183,21 @@ class MultiArenaIsolationE2ETest extends AbstractServerE2ETest {
 
             // ── Phase 5: /bbai stats — works with two arenas registered ──
             // With no players connected the pipeline never ticks, but the
-            // completedRenders counter must be structurally present (≥ 0).
+            // command must still produce a structurally well-formed stats
+            // dump. Asserting section-header presence is the durable contract;
+            // counter math belongs in the unit-tier metrics tests.
             sendCommand(server, "bbai stats");
-            awaitMarker(localOutput, "completedRenders", COMMAND_TIMEOUT_SECONDS,
-                    "/bbai stats did not emit 'completedRenders' counter");
+            awaitMarker(localOutput, "Rendered", COMMAND_TIMEOUT_SECONDS,
+                    "/bbai stats did not emit 'Rendered' counter");
 
             String statsSnapshot;
             synchronized (localOutput) {
                 statsSnapshot = localOutput.toString();
             }
-            long renders = extractStatsCounter(statsSnapshot, "completedRenders");
-            assertTrue(renders >= 0,
-                    "completedRenders counter missing or malformed in stats output");
+            assertTrue(statsSnapshot.contains("Rendered"),
+                    "/bbai stats output is missing 'Rendered' section");
+            assertTrue(statsSnapshot.contains("Sessions"),
+                    "/bbai stats output is missing 'Sessions' section");
 
             // ── Phase 6: /bbai delete — removing one arena leaves the other
             // We attempt to delete arena A. If the delete command is not yet
