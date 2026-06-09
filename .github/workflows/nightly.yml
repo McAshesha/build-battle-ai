@@ -1,0 +1,113 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-suite
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  # Bump this tag in lockstep with ci.yml whenever the ONNX model is replaced.
+  MODEL_RELEASE_TAG: ml-model-v1
+  MODEL_PATH: src/main/resources/models/custom_convnext_embeddings.onnx
+
+jobs:
+  full-suite:
+    name: Full suite + JMH
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Cache ONNX model
+        id: cache-model
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.MODEL_PATH }}
+          key: onnx-model-${{ env.MODEL_RELEASE_TAG }}
+
+      - name: Download ONNX model from Release
+        if: steps.cache-model.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$MODEL_PATH")"
+          gh release download "$MODEL_RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern 'custom_convnext_embeddings.onnx' \
+            --output "$MODEL_PATH" \
+            --clobber
+          ls -lh "$MODEL_PATH"
+
+      # nightly profile runs everything except bench: unit + smoke + integration +
+      # stress + e2e + ml-it + nightly-only tagged tests. E2E tests that require
+      # a running server will auto-skip via Assumptions.assumeTrue when the local
+      # Servers/1.21/start.command is absent in the runner environment.
+      - name: Full suite (unit + smoke + integration + stress + e2e + ml-it)
+        run: mvn -B -ntp clean verify -P nightly
+
+      - name: Compile JMH benchmark sources
+        run: mvn -B -ntp test-compile -P bench
+
+      - name: Run JMH benches
+        # -wi 3  warm-up iterations
+        # -i  5  measurement iterations
+        # -f  1  single JVM fork per benchmark
+        # JSON results land in target/jmh.json for the comparison step.
+        run: |
+          mvn -B -ntp -P bench exec:java \
+            -Dexec.mainClass=org.openjdk.jmh.Main \
+            -Dexec.args="-rf json -rff target/jmh.json -wi 3 -i 5 -f 1"
+
+      # continue-on-error keeps the job alive so the issue-filing and artifact-
+      # upload steps always execute; the outcome is re-raised in the final step.
+      - name: Compare against baseline
+        id: compare
+        continue-on-error: true
+        run: tools/compare-jmh.sh .github/perf-baselines/jmh.json target/jmh.json
+
+      - name: File perf-regression issue
+        if: failure() || steps.compare.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "Perf regression $(date -u +%Y-%m-%d)" \
+            --label perf-regression \
+            --body-file target/jmh-regression.md
+
+      - name: Upload JMH results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jmh-results-${{ github.run_id }}
+          path: target/jmh.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      # Re-raise the comparison failure after the issue and artifact steps have
+      # run so the workflow exits non-zero and the schedule UI shows red.
+      - name: Fail job on perf regression
+        if: steps.compare.outcome == 'failure'
+        run: |
+          echo "Perf regression detected — see filed GitHub issue and uploaded JMH artifact." >&2
+          exit 1
