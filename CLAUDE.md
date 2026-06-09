@@ -195,16 +195,20 @@ Profile-to-tag mapping:
 | `-P pr-gate` | Unit + smoke + integration + fast ml-it; excludes e2e + bench + stress + nightly-only |
 | `-P nightly` | Everything except `bench` (benches run via `exec:java`) |
 | `-P smoke` / `-P integration` / `-P stress` | Just that one tag (overrides parent's excludedGroups) |
-| `-P e2e` / `-P ml-it` | Existing pattern-based profiles (unchanged) |
+| `-P e2e` / `-P ml-it` | Re-include the e2e / ml-it tag and the file-pattern excludes; `-P ml-it` also excludes `nightly-only` so the TTA bench stays in `-P nightly` only |
 | `-P bench` | JMH source-root attachment (unchanged) |
+
+Surefire `<includes>` (default) discovers four name patterns: `*Test.java`, `*Tests.java`, `Test*.java`, `*IT.java`, `*Stress.java`. New stress tests MUST end in `*Stress.java` or `*StressTest.java`; new integration tests use `*IT.java`. Adding a new suffix requires extending the `<includes>` block in `pom.xml`.
 
 How to add a new non-unit test:
 
 1. Decide the cheapest tier that catches the failure. Smoke for "did it load?"; integration for "do two services agree?"; stress for "does it hold under concurrent load?"; e2e for "does a real server play a full game?"; bench for "is the latency budget intact?".
-2. Put the file under `src/test/java/ru/ashesha/buildBattleAI/<tag>/<domain>/`.
+2. Put the file under `src/test/java/ru/ashesha/buildBattleAI/<tag>/<domain>/`. **For package-private production members (e.g. `RenderQueue`, `MlQueue`, `EvalJob`)**, put the test under the production package (`ru.ashesha.buildBattleAI.evaluation`) so it has access — the `@Tag` (not the directory) is what drives discovery.
 3. Add `@Tag("<tag>")` at the class level. Use `@Tag("nightly-only")` as a SECONDARY tag for tests that should skip PR CI.
-4. If the test needs MockBukkit + a default world + silent players, extend `ru.ashesha.buildBattleAI.support.IntegrationTestSupport`.
-5. Javadoc the class: name the risk ID from the spec, name the invariant, name why this tier (not unit).
+4. If the test needs MockBukkit + a default world + silent players, extend `ru.ashesha.buildBattleAI.support.IntegrationTestSupport`. For E2E driver tests, extend `e2e.AbstractServerE2ETest` and override `serverDirectory()` + `serverFlavor()`; reuse the protected helpers `launchServerWithPluginRefresh`, `stopServerGracefully`, `preSeedArenaYaml`, `buildMinimalArenaYaml`, `waitForMarker`, `sendCommand`, `output()`, `extractStatsCounter`.
+5. Javadoc the class: name the risk ID from the spec, name the invariant, name threading/timing assumptions, name why this tier (not unit).
+
+**JMH benches.** `src/jmh/java/` is the source root. Two layout options: `bench/` package for benches that touch only public API (`RendererBenchmark`, `PaletteBenchmark`, `MlBatchingBenchmark`, `MlServiceWarmupBenchmark`); production package (e.g. `evaluation/`) for benches that need package-private access (`EvaluationPipelineBenchmark`, `MlQueueBenchmark`). Build via `mvn test-compile -Pbench`; run via `mvn -Pbench exec:java -Dexec.args="<ClassName> -wi 3 -i 5 -f 1 -rf json -rff target/jmh.json"`. The nightly workflow runs ALL benches and compares against `.github/perf-baselines/jmh.json` via `tools/compare-jmh.sh` (thresholds: +25% mean for `avgt` mode, +35% for sample-mode p99). Refresh the baseline via the manual `update-perf-baseline.yml` workflow after deliberate perf changes.
 
 ## Testing Gotchas
 
@@ -216,6 +220,16 @@ How to add a new non-unit test:
 - `MLServiceTest` exercises the **disabled mode** path (no ONNX model on the test classpath). Full inference can't be tested in CI — integration testing via `/bbaitest run [-tta]` on the local 1.21 server.
 - `GameListenerTest` mocks `BBAIGameManager` via the **concrete `GameManager` class** (not the interface) because the listener casts to call package-visible helpers (`getPlayerPlotIndex`, `markPlayerZoneDirty`, `applyMirrorPlace`, `applyMirrorBreak`).
 - Evaluation pipeline tests live under `test/.../evaluation/`: `EvalConfigTest`, `EvalJobTest`, `RenderQueueTest`, `MlQueueTest`, `RenderWorkerTest`, `MlCoalescerWorkerTest`, `EvaluationCoordinatorTest`, `EvaluationMetricsTest`, `SessionHandleTest`, `EvaluationServiceLifecycleTest`, `EvaluationServiceStatsTest`. The coordinator + workers + queues are deliberately Bukkit-free — they take collaborators by interface and are unit-tested with plain JUnit. Lifecycle/stats tests use MockBukkit + `MockedConstruction` for the chained service set.
+- **IDE Lombok diagnostics are noise.** Eclipse JDT / VS Code's Java extension don't run the Lombok annotation processor by default, so they flag `unknown method getPluginLogger()`, `unknown method className()`, `constructor MLService(BuildBattleAI) is undefined`, etc. on test files. Trust `mvn test-compile` — these never block a Maven build.
+- **Stale Lombok build artifacts.** If you see `mvn test-compile` failing on existing tests after an unrelated edit, run `mvn clean test-compile` once — incremental compilation can leave stale generated accessors behind.
+- **E2E driver zombies.** Process.destroyForcibly() on the bash wrapper does NOT reap its spawned Purpur JVM. If an E2E test fails or is interrupted, kill leftover `purpur` processes (`pkill -9 -f purpur`) and remove `Servers/1.21/world/session.lock` before the next run. The `bash start.command` indirection also prevents SIGTERM forwarding — `ForceShutdownDuringPlayE2ETest.sigtermLeavesNoCorruption` is `@Disabled` on this basis.
+- **E2E arena YAML format.** Generate via `AbstractServerE2ETest.buildMinimalArenaYaml(name, maxPlayers)` — NOT a custom YAML list. Plots must be keyed (`plots.'1'.spawn`), not list-typed, because `ArenaManager.deserializeArena` uses `config.getString("plots." + i + ".spawn")` path lookups.
+- **Known production gaps documented via `@Disabled` tests:**
+  - DATA-01: `LocalRepository.load` corruption logs to `System.err`, not `PluginLogger.warn`.
+  - DATA-02: `DataService.shutdown` nulls non-volatile `provider` field without memory barrier → autosave runnable NPEs under concurrent shutdown. Fix: declare `provider` as `volatile` OR local-var guard in the lambda.
+  - DATA-04: `LocalRepository.flush` `IOException` logs to `System.err`, not `PluginLogger.error`.
+  - GAME-11: `GameManager.startGameTickTimer` build-time expiry: `mirror.clearAll()` is not wrapped in try/catch, so a throw leaves `themeIndex` un-advanced while side-state already cleared.
+  - ML-08: No NaN/Infinity guard in `centroids.json` parser — corrupted floats propagate to the embedding-comparison hot path.
 
 ## Obfuscation Awareness
 
@@ -232,6 +246,8 @@ All automation lives under `.github/`. Workflows share the `deploy-mc-1.8` concu
 | Workflow | Trigger | Purpose |
 |---|---|---|
 | `ci.yml` | PR + push to `main`, `workflow_dispatch` | `mvn verify` → `surefire:test -Pe2e` → `surefire:test -Pml-it`. On `push main` also deploys the **lite** JAR to the VPS via the inline ControlMaster SSH path. ONNX model is restored from the `ml-model-v1` GitHub Release tag and cached between runs. |
+| `nightly.yml` | `cron: 0 3 * * *`, `workflow_dispatch` | Full `-P nightly` suite (unit + smoke + integration + stress + e2e + ml-it incl. `nightly-only`), then JMH suite via `exec:java` with `-rf json -rff target/jmh.json`, then `tools/compare-jmh.sh` against `.github/perf-baselines/jmh.json`. On perf regression files a `perf-regression`-labelled GitHub issue with `target/jmh-regression.md` body. Uploads raw `jmh-results-<run_id>` artifact (30-day retention) every run. Concurrency group `nightly-suite`, `cancel-in-progress: false`. |
+| `update-perf-baseline.yml` | Manual (`workflow_dispatch`) | Re-runs the JMH suite and commits the fresh JSON to `.github/perf-baselines/jmh.json` (idempotent — skips commit if byte-identical). Required `reason` input embedded in the commit message. Used after deliberate perf changes (e.g. renderer rewrite, ORT version bump). |
 | `release.yml` | Manual (`workflow_dispatch`) | Builds the **signed + obfuscated** full and lite JARs, publishes a GitHub Release with both JARs and both ProGuard mapping files (`proguard-mapping-<ver>.txt` + `proguard-mapping-lite-<ver>.txt`), then commits the snapshot bump. Inputs: `version` (optional — defaults to current pom minus `-SNAPSHOT`), `release_notes` (optional Markdown body), `obfuscation_level` (`obfuscate-light` / `obfuscate` / `obfuscate-heavy`). The release commit + tag point at the released pom; the snapshot-bump commit comes **after** the tag so the tag is reproducible. |
 | `deploy-release.yml` | Manual | Pulls a previously-published Release's JAR (flavour: `lite` or `full`, tag: empty = latest) and swaps it onto the VPS. Used for roll-backs and out-of-band redeploys without re-running CI. |
 | `server-{start,stop,restart}.yml` | Manual | Idempotent `systemctl` operations on `mc-1.8.service`. Start / restart truncate `logs/latest.log` before action and poll for `Done (…)` within 120 s. |
