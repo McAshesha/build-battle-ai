@@ -1,0 +1,129 @@
+name: Update JMH Perf Baseline
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why are you updating the baseline? (e.g. 'optimised RenderWorker hot path')"
+        required: true
+        type: string
+
+concurrency:
+  # Only one baseline update at a time; never cancel mid-bench.
+  group: perf-baseline-update
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  # Bump this tag in lockstep with ci.yml whenever the ONNX model is replaced.
+  MODEL_RELEASE_TAG: ml-model-v1
+  MODEL_PATH: src/main/resources/models/custom_convnext_embeddings.onnx
+
+jobs:
+  update-baseline:
+    name: Run JMH suite and commit baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository (with push credentials)
+        uses: actions/checkout@v4
+        with:
+          # RELEASE_PAT allows the subsequent git push to bypass classic branch
+          # protection on main (same pattern used by release.yml).
+          token: ${{ secrets.RELEASE_PAT }}
+          fetch-depth: 1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Cache ONNX model
+        id: cache-model
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.MODEL_PATH }}
+          key: onnx-model-${{ env.MODEL_RELEASE_TAG }}
+
+      - name: Download ONNX model from Release
+        if: steps.cache-model.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$MODEL_PATH")"
+          gh release download "$MODEL_RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern 'custom_convnext_embeddings.onnx' \
+            --output "$MODEL_PATH" \
+            --clobber
+          ls -lh "$MODEL_PATH"
+
+      - name: Compile JMH benchmark sources
+        run: mvn -B -ntp test-compile -P bench
+
+      - name: Run full JMH suite
+        # -wi 3  warm-up iterations
+        # -i  5  measurement iterations
+        # -f  1  fork count (single JVM fork per benchmark)
+        # JSON output lands in target/jmh.json for the next step.
+        run: |
+          mvn -B -ntp -P bench exec:java \
+            -Dexec.mainClass=org.openjdk.jmh.Main \
+            -Dexec.args="-rf json -rff target/jmh.json -wi 3 -i 5 -f 1"
+
+      - name: Validate JMH output
+        run: |
+          set -euo pipefail
+          if [ ! -f target/jmh.json ]; then
+            echo "ERROR: target/jmh.json was not produced by JMH." >&2
+            exit 1
+          fi
+          size=$(wc -c < target/jmh.json)
+          if [ "$size" -lt 2 ]; then
+            echo "ERROR: target/jmh.json is empty." >&2
+            exit 1
+          fi
+          echo "JMH output OK — $size bytes"
+          # Print a one-line summary of how many benchmarks ran.
+          python3 -c "
+          import json, sys
+          data = json.load(open('target/jmh.json'))
+          print(f'Benchmarks recorded: {len(data)}')
+          for entry in data[:5]:
+              print(' ', entry.get('benchmark', '?'))
+          if len(data) > 5:
+              print(f'  ... and {len(data) - 5} more')
+          "
+
+      - name: Install new baseline
+        run: |
+          set -euo pipefail
+          mkdir -p .github/perf-baselines
+          cp target/jmh.json .github/perf-baselines/jmh.json
+
+      - name: Commit and push baseline
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add .github/perf-baselines/jmh.json
+
+          if git diff --quiet --cached; then
+            echo "No baseline change — jmh.json is byte-identical to the existing file. Nothing to commit."
+            exit 0
+          fi
+
+          git commit -m "chore: update JMH perf baseline (workflow run #${{ github.run_id }})
+
+Reason: ${{ github.event.inputs.reason }}
+
+Triggered by: ${{ github.actor }}"
+
+          git push
