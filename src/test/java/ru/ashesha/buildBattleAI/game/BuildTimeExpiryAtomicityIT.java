@@ -31,52 +31,46 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Integration test — covers GAME-11.
+ * Integration test for GAME-11.
  *
- * <h2>Option chosen: B — real bug documented, test disabled</h2>
+ * <h2>Risk: GAME-11</h2>
+ * <p>In {@code GameManager.startGameTickTimer} the build-time-expiry branch
+ * runs three side-effects in sequence:
+ * <ol>
+ *   <li>{@code clearZone(...)} wipes the in-world build zone;</li>
+ *   <li>{@code mirror.clearAll()} wipes the render mirror;</li>
+ *   <li>{@code gp.advanceTheme(...)} + {@code gp.resetBuildTime(...)} advance
+ *       the player state to the new round.</li>
+ * </ol>
+ * Without a guard on step 2, a throw from {@code clearAll()} would skip step
+ * 3 — leaving the player on the same theme with the world zone already
+ * cleared. That non-atomic half-commit is the GAME-11 bug.
  *
- * <p>The build-time expiry path in
- * {@code GameManager.startGameTickTimer} (lines 473–496) executes
- * {@code mirror.clearAll()} <em>before</em> {@code gp.advanceTheme(...)},
- * with <strong>no try-catch</strong> around either call. If
- * {@code clearAll()} throws at runtime (e.g., write-lock interrupted or
- * any future code path that rethrows), control never reaches
- * {@code advanceTheme} — the player's {@code themeIndex} stays unchanged
- * while the build zone has already been (partially) wiped. The two
- * operations are not atomic: a failure mid-way leaves the game state in
- * an inconsistent "zone cleared but theme not advanced" half-commit.
+ * <h3>Fix verified by this test</h3>
+ * <p>{@code clearAll()} is wrapped in {@code try { } catch (Throwable t)} so
+ * step 3 always runs. The catch path logs via {@code PluginLogger.error}.
  *
  * <h3>What the tests cover</h3>
  * <ol>
- *   <li>{@link #happyPathBothOperationsComplete} — verifies that under
- *       normal (non-throwing) conditions the expiry tick advances
- *       {@code themeIndex} AND leaves the mirror all-AIR. This pins the
- *       happy-path behaviour and acts as a regression detector.</li>
- *   <li>{@link #clearAllThrowingSkipsAdvanceTheme} — documents the
- *       non-atomic ordering bug. It is marked
- *       {@link Disabled @Disabled} because {@link MutablePlotScene} is
- *       {@code final} and cannot be subclassed or mocked without the
- *       Mockito inline mock-maker extension, which is not currently
- *       installed. When GAME-11 is fixed (wrap the two operations in a
- *       try-catch / compensating rollback), this test should be enabled
- *       and updated to assert the corrected behaviour.</li>
+ *   <li>{@link #happyPathBothOperationsComplete} — pins the no-throw case as
+ *       a regression detector: theme advances AND mirror cleared.</li>
+ *   <li>{@link #clearAllThrowingSkipsAdvanceTheme} — drives a mocked
+ *       {@code MutablePlotScene} whose {@code clearAll()} throws; asserts
+ *       theme still advances and build time still resets.</li>
  * </ol>
  *
- * <h3>Production file reference</h3>
- * {@code GameManager.java}, method {@code startGameTickTimer},
- * lines 481–485:
- * <pre>
- *   MutablePlotScene m = session.mirror(gp.plotIndex());
- *   if (m != null)
- *       m.clearAll();               // ← throws? advanceTheme is skipped
- *   gp.clearZoneDirty();
- *   gp.advanceTheme(session.themes().size());   // ← never reached on throw
- * </pre>
+ * <h3>Why integration tier</h3>
+ * The tests exercise {@code GameManager} together with {@code GameSession},
+ * the per-tick Bukkit scheduler hook (captured via Mockito), and a real or
+ * mocked {@code MutablePlotScene} — multiple collaborators wired together,
+ * which is what integration tier protects.
  */
 @Tag("integration")
 class BuildTimeExpiryAtomicityIT {
@@ -269,27 +263,21 @@ class BuildTimeExpiryAtomicityIT {
         }
     }
 
-    // ── test 2: non-atomic ordering bug (disabled — GAME-11) ─────────────
+    // ── test 2: clearAll throw still advances theme (GAME-11 fix verified) ─
 
     /**
-     * Documents the non-atomic ordering bug: if {@code clearAll()} throws,
-     * {@code advanceTheme} is never called, leaving the player stuck on the
-     * same theme with an empty build zone.
+     * Invariant: when {@code mirror.clearAll()} throws during build-time
+     * expiry, the player's {@code themeIndex} must still advance and
+     * {@code buildTimeRemaining} must still reset — the in-world zone has
+     * already been cleared above, so leaving the per-player counters frozen
+     * would create a "cleared zone, same theme" inconsistent state (GAME-11).
      *
-     * <p>This test is <strong>disabled</strong> because {@link MutablePlotScene}
-     * is {@code final} and cannot be subclassed or mocked without the Mockito
-     * inline mock-maker extension ({@code mockito-extensions/
-     * org.mockito.plugins.MockMaker} with value {@code mock-maker-inline}).
-     * Adding the extension globally risks destabilising the existing test
-     * suite; enabling it was deferred until GAME-11 is fixed at the production
-     * level. When fixed, remove the {@code @Disabled} and update the
-     * assertion to reflect the corrected atomic behaviour.
+     * <p>The test installs a Mockito-mocked {@code MutablePlotScene} whose
+     * {@code clearAll()} throws and drives one tick of the game-tick runnable.
+     * Asserts both invariants hold.
      *
-     * <p>Underlying bug location: {@code GameManager.startGameTickTimer},
-     * lines 481–485. The fix should either wrap both operations in a
-     * try-catch/finally (re-throw after advancing theme) or rearrange so
-     * {@code advanceTheme} is called first and {@code clearAll} second,
-     * keeping the window of inconsistency as short as possible.
+     * <p>Mockito 5's default inline mock-maker handles the {@code final}
+     * {@code MutablePlotScene} class — no extension is required.
      */
     @Test
     @DisplayName("GAME-11: mirror.clearAll() throwing still advances themeIndex (atomic expiry)")
@@ -326,7 +314,7 @@ class BuildTimeExpiryAtomicityIT {
             // Install a mirror whose clearAll() throws. Mockito 5's default
             // inline mock-maker can mock the final MutablePlotScene class.
             MutablePlotScene throwingMirror = mock(MutablePlotScene.class);
-            org.mockito.Mockito.doThrow(new RuntimeException("simulated clearAll failure"))
+            doThrow(new RuntimeException("simulated clearAll failure"))
                     .when(throwingMirror).clearAll();
             session.installMirror(0, throwingMirror);
 
@@ -346,7 +334,7 @@ class BuildTimeExpiryAtomicityIT {
                     "themeIndex must advance even if mirror.clearAll() throws");
 
             // ── invariant: clearAll was attempted ───────────────────────────
-            org.mockito.Mockito.verify(throwingMirror).clearAll();
+            verify(throwingMirror).clearAll();
 
             // ── invariant: build time was reset for the new round ───────────
             assertEquals(arena.buildTime(), gp.buildTimeRemaining(),
