@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
+import ru.ashesha.buildBattleAI.core.PluginLogger;
 import ru.ashesha.buildBattleAI.data.api.PlayerData;
 
 import java.io.File;
@@ -16,6 +18,9 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 /**
  * Integration test covering risk <b>DATA-04</b>: Disk full / read-only filesystem.
@@ -46,10 +51,12 @@ class DiskFailureEscalationIT {
     File tempDir;
 
     private Gson gson;
+    private PluginLogger logger;
 
     @BeforeEach
     void setUp() {
         gson = new GsonBuilder().setPrettyPrinting().create();
+        logger = mock(PluginLogger.class);
     }
 
     /**
@@ -90,7 +97,7 @@ class DiskFailureEscalationIT {
         File dataFile = new File(tempDir, "players.json");
 
         LocalRepository<UUID, PlayerData> repo =
-                new LocalRepository<>(dataFile, gson, UUID.class, PlayerData.class);
+                new LocalRepository<>(dataFile, gson, UUID.class, PlayerData.class, logger);
 
         // Pre-populate in-memory state so dirty flag is set before we lock the dir
         UUID uuid = UUID.randomUUID();
@@ -117,7 +124,7 @@ class DiskFailureEscalationIT {
 
         File dataFile = new File(tempDir, "players.json");
         LocalRepository<UUID, PlayerData> repo =
-                new LocalRepository<>(dataFile, gson, UUID.class, PlayerData.class);
+                new LocalRepository<>(dataFile, gson, UUID.class, PlayerData.class, logger);
 
         UUID uuid1 = UUID.randomUUID();
         repo.put(uuid1, new PlayerData(uuid1, "BeforeFailure"));
@@ -156,7 +163,7 @@ class DiskFailureEscalationIT {
 
         File dataFile = new File(tempDir, "players.json");
         LocalRepository<UUID, PlayerData> repo =
-                new LocalRepository<>(dataFile, gson, UUID.class, PlayerData.class);
+                new LocalRepository<>(dataFile, gson, UUID.class, PlayerData.class, logger);
 
         UUID uuid = UUID.randomUUID();
         repo.put(uuid, new PlayerData(uuid, "EventualPersist"));
@@ -183,29 +190,33 @@ class DiskFailureEscalationIT {
     // -- logging contract (known gap, fix pending) ------------------------------
 
     /**
-     * DATA-04 logging: the spec requires that a flush failure is escalated through
+     * DATA-04 logging: verifies that a flush failure is escalated through
      * {@link ru.ashesha.buildBattleAI.core.PluginLogger#error} so that server
-     * administrators can diagnose disk problems from the server console (not just
-     * from redirected {@code System.err}).
-     *
-     * <p><b>Current implementation gap:</b> production code in
-     * {@link LocalRepository#flush()} calls {@code System.err.println} instead
-     * of {@code PluginLogger.error}. The test is disabled until the production
-     * code is fixed and {@code PluginLogger} is injectable into
-     * {@code LocalRepository}. See DATA-04 in the design document.
-     *
-     * <p>Once the fix lands: remove the {@code @Disabled} annotation, inject a
-     * {@code PluginLogger} mock into the repository constructor, and verify that
-     * {@code error(...)} was called with a message containing the file name.
+     * administrators can diagnose disk problems from the server console.
      */
     @Test
-    @Disabled("DATA-04: production logs to System.err, not PluginLogger.error — small fix pending")
-    void flushFailureEscalatesToPluginLogger() {
-        // TODO: inject a PluginLogger mock into LocalRepository, make the directory
-        //       read-only, call flush(), and verify that PluginLogger.error was
-        //       invoked with a message containing the file name.
-        //       Remove @Disabled when implemented.
-        fail("Not implemented — awaiting PluginLogger injection in LocalRepository");
+    void flushFailureEscalatesToPluginLogger() throws IOException {
+        assumePosixSupported();
+
+        File dataFile = new File(tempDir, "players.json");
+        PluginLogger logger = mock(PluginLogger.class);
+
+        LocalRepository<UUID, PlayerData> repo =
+                new LocalRepository<>(dataFile, gson, UUID.class, PlayerData.class, logger);
+
+        UUID uuid = UUID.randomUUID();
+        repo.put(uuid, new PlayerData(uuid, "DiskFullPlayer"));
+
+        // Make the directory read-only so the .tmp file cannot be created.
+        makeReadOnly(tempDir);
+
+        repo.flush(); // must not throw
+
+        // Verify error log call referencing the file name.
+        ArgumentCaptor<String> formatCaptor = ArgumentCaptor.forClass(String.class);
+        verify(logger).error(formatCaptor.capture(), any(Object[].class));
+        assertTrue(formatCaptor.getValue().contains("%s") || formatCaptor.getValue().contains(dataFile.getName()),
+                "error() format must reference the file (got: " + formatCaptor.getValue() + ")");
     }
 
     // -- helpers ---------------------------------------------------------------

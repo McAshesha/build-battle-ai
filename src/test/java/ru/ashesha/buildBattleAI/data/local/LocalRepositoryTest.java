@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import ru.ashesha.buildBattleAI.core.PluginLogger;
 import ru.ashesha.buildBattleAI.data.api.ArenaStats;
 import ru.ashesha.buildBattleAI.data.api.PlayerData;
 
@@ -15,6 +16,7 @@ import java.util.Collection;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 
 /**
  * Tests for {@link LocalRepository}.
@@ -29,6 +31,7 @@ class LocalRepositoryTest {
     File tempDir;
 
     private Gson gson;
+    private final PluginLogger logger = mock(PluginLogger.class);
 
     @BeforeEach
     void setUp() {
@@ -119,7 +122,7 @@ class LocalRepositoryTest {
     void flushWritesDataToFile() {
         File file = new File(tempDir, "players.json");
         LocalRepository<UUID, PlayerData> repo =
-                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class, logger);
 
         UUID uuid = UUID.randomUUID();
         repo.put(uuid, new PlayerData(uuid, "Steve"));
@@ -135,7 +138,7 @@ class LocalRepositoryTest {
     void flushIsNoOpWhenNotDirty() {
         File file = new File(tempDir, "players.json");
         LocalRepository<UUID, PlayerData> repo =
-                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class, logger);
 
         // No puts — flush should not create the file
         repo.flush();
@@ -146,7 +149,7 @@ class LocalRepositoryTest {
     void flushResetsCleanState() {
         File file = new File(tempDir, "players.json");
         LocalRepository<UUID, PlayerData> repo =
-                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class, logger);
 
         UUID key = UUID.randomUUID();
         repo.put(key, new PlayerData(key, "Test"));
@@ -166,14 +169,14 @@ class LocalRepositoryTest {
 
         // Write data, then create a new repo that loads from the same file
         LocalRepository<UUID, PlayerData> repo1 =
-                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class, logger);
         UUID uuid = UUID.randomUUID();
         repo1.put(uuid, new PlayerData(uuid, "Steve"));
         repo1.flush();
 
         // New repo should load persisted data
         LocalRepository<UUID, PlayerData> repo2 =
-                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class, logger);
         repo2.load();
 
         PlayerData loaded = repo2.get(uuid);
@@ -186,7 +189,7 @@ class LocalRepositoryTest {
     void loadFromNonexistentFileStartsEmpty() {
         File file = new File(tempDir, "nonexistent.json");
         LocalRepository<UUID, PlayerData> repo =
-                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class, logger);
         repo.load(); // should not throw
         assertTrue(repo.getAll().isEmpty());
     }
@@ -197,7 +200,7 @@ class LocalRepositoryTest {
         file.createNewFile();
 
         LocalRepository<UUID, PlayerData> repo =
-                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class, logger);
         repo.load(); // should not throw
         assertTrue(repo.getAll().isEmpty());
     }
@@ -208,7 +211,7 @@ class LocalRepositoryTest {
     void playerDataFieldsSurviveRoundTrip() {
         File file = new File(tempDir, "players.json");
         LocalRepository<UUID, PlayerData> repo =
-                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class, logger);
 
         UUID uuid = UUID.randomUUID();
         PlayerData original = new PlayerData(uuid, "Steve");
@@ -225,7 +228,7 @@ class LocalRepositoryTest {
 
         // Reload in a fresh repo
         LocalRepository<UUID, PlayerData> repo2 =
-                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class, logger);
         repo2.load();
 
         PlayerData loaded = repo2.get(uuid);
@@ -245,7 +248,7 @@ class LocalRepositoryTest {
     void arenaStatsSurviveRoundTrip() {
         File file = new File(tempDir, "arenas.json");
         LocalRepository<String, ArenaStats> repo =
-                new LocalRepository<>(file, gson, String.class, ArenaStats.class);
+                new LocalRepository<>(file, gson, String.class, ArenaStats.class, logger);
 
         ArenaStats original = new ArenaStats("lobby");
         original.totalGames(42);
@@ -259,7 +262,7 @@ class LocalRepositoryTest {
 
         // Reload
         LocalRepository<String, ArenaStats> repo2 =
-                new LocalRepository<>(file, gson, String.class, ArenaStats.class);
+                new LocalRepository<>(file, gson, String.class, ArenaStats.class, logger);
         repo2.load();
 
         ArenaStats loaded = repo2.get("lobby");
@@ -276,7 +279,7 @@ class LocalRepositoryTest {
     void multipleEntriesSurviveRoundTrip() {
         File file = new File(tempDir, "players.json");
         LocalRepository<UUID, PlayerData> repo =
-                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class, logger);
 
         UUID uuid1 = UUID.randomUUID();
         UUID uuid2 = UUID.randomUUID();
@@ -285,7 +288,7 @@ class LocalRepositoryTest {
         repo.flush();
 
         LocalRepository<UUID, PlayerData> repo2 =
-                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class, logger);
         repo2.load();
 
         assertEquals(2, repo2.getAll().size());
@@ -299,7 +302,7 @@ class LocalRepositoryTest {
     void flushDoesNotLeaveTmpFileOnSuccess() {
         File file = new File(tempDir, "data.json");
         LocalRepository<UUID, PlayerData> repo =
-                new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
+                new LocalRepository<>(file, gson, UUID.class, PlayerData.class, logger);
 
         UUID key = UUID.randomUUID();
         repo.put(key, new PlayerData(key, "Test"));
@@ -313,7 +316,7 @@ class LocalRepositoryTest {
 
     private LocalRepository<UUID, PlayerData> playerRepo(String filename) {
         File file = new File(tempDir, filename);
-        return new LocalRepository<>(file, gson, UUID.class, PlayerData.class);
+        return new LocalRepository<>(file, gson, UUID.class, PlayerData.class, logger);
     }
 
     private static String readFile(File file) {

@@ -3,6 +3,7 @@ package ru.ashesha.buildBattleAI.data.local;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import lombok.NonNull;
+import ru.ashesha.buildBattleAI.core.PluginLogger;
 import ru.ashesha.buildBattleAI.data.DataProvider;
 import ru.ashesha.buildBattleAI.data.DataRepository;
 
@@ -33,6 +34,9 @@ public class LocalDataProvider implements DataProvider {
     /** Shared Gson instance with pretty-printing enabled. */
     private final Gson gson;
 
+    /** Logger forwarded to each repository for I/O failure reporting. */
+    private final PluginLogger logger;
+
     /** Name to repository mapping — repositories are lazily created and cached. */
     private final Map<String, LocalRepository<?, ?>> repositories = new HashMap<>();
 
@@ -40,9 +44,11 @@ public class LocalDataProvider implements DataProvider {
      * Creates a local data provider that stores files in the given directory.
      *
      * @param dataDir the data directory (created on {@link #start()} if missing)
+     * @param logger  logger forwarded to each repository for I/O failure reporting
      */
-    public LocalDataProvider(@NonNull File dataDir) {
+    public LocalDataProvider(@NonNull File dataDir, @NonNull PluginLogger logger) {
         this.dataDir = dataDir;
+        this.logger = logger;
         this.gson = new GsonBuilder().setPrettyPrinting().create();
     }
 
@@ -59,7 +65,7 @@ public class LocalDataProvider implements DataProvider {
         LocalRepository<K, V> repo = (LocalRepository<K, V>) repositories.get(name);
         if (repo == null) {
             File file = new File(dataDir, name + ".json");
-            repo = new LocalRepository<>(file, gson, keyType, valueType);
+            repo = new LocalRepository<>(file, gson, keyType, valueType, logger);
             repo.load();
             repositories.put(name, repo);
         }

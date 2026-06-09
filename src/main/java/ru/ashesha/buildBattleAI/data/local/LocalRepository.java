@@ -5,6 +5,7 @@ import com.google.gson.reflect.TypeToken;
 import lombok.AccessLevel;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import ru.ashesha.buildBattleAI.core.PluginLogger;
 import ru.ashesha.buildBattleAI.data.DataRepository;
 
 import java.io.*;
@@ -57,6 +58,10 @@ class LocalRepository<K, V> implements DataRepository<K, V> {
     @NonNull
     private final Class<V> valueType;
 
+    /** Logger used to report I/O failures to the server console. */
+    @NonNull
+    private final PluginLogger logger;
+
     /**
      * In-memory cache. ConcurrentHashMap provides lock-free reads and
      * atomic puts — no explicit synchronization needed for CRUD operations.
@@ -88,7 +93,7 @@ class LocalRepository<K, V> implements DataRepository<K, V> {
                 cache.putAll(loaded);
         } catch (Throwable e) {
             // Log but don't fail — start with empty cache on corrupt file
-            System.err.println("[BuildBattleAI] Failed to load " + file.getName() + ": " + e.getMessage());
+            logger.warn("Failed to load %s: %s", file.getName(), e.getMessage());
         }
     }
 
@@ -149,7 +154,7 @@ class LocalRepository<K, V> implements DataRepository<K, V> {
                 temp.renameTo(file);
             dirty = false;
         } catch (IOException e) {
-            System.err.println("[BuildBattleAI] Failed to save " + file.getName() + ": " + e.getMessage());
+            logger.error("Failed to save %s: %s", file.getName(), e.getMessage());
             // Clean up temp file on failure
             if (temp.exists())
                 temp.delete();

@@ -242,7 +242,7 @@ public class DataService implements BBAIDataService, PluginService {
     private DataProvider createLocalProvider(YamlConfiguration config) {
         String dir = config.getString("data.local.directory", "data");
         File dataDir = new File(plugin.getDataFolder(), dir);
-        return new LocalDataProvider(dataDir);
+        return new LocalDataProvider(dataDir, plugin.getPluginLogger());
     }
 
     /**
