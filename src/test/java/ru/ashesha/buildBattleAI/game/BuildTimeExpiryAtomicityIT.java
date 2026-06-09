@@ -4,7 +4,6 @@ import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitScheduler;
 import org.bukkit.scheduler.BukkitTask;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -293,25 +292,65 @@ class BuildTimeExpiryAtomicityIT {
      * keeping the window of inconsistency as short as possible.
      */
     @Test
-    @Disabled("GAME-11: open production bug — clearAll() before advanceTheme() with no try-catch; "
-            + "if clearAll throws, themeIndex is not advanced. "
-            + "Cannot enable until MutablePlotScene is mockable (add mockito inline extension) "
-            + "or the production code is fixed to be atomic.")
-    @DisplayName("GAME-11 (bug): clearAll throwing leaves themeIndex unchanged — non-atomic expiry")
-    void clearAllThrowingSkipsAdvanceTheme() {
-        // GAME-11 bug scenario (implementation deferred — see @Disabled reason above):
-        //
-        // 1. Install a MutablePlotScene spy/mock whose clearAll() throws RuntimeException.
-        // 2. Drive one game-tick with buildTimeRemaining = 0.
-        // 3. Assert gp.themeIndex() is UNCHANGED (the bug: advanceTheme was skipped).
-        //
-        // After the fix, this should instead assert BOTH that a rollback or
-        // compensation happened AND that themeIndex advanced correctly.
-        //
-        // Expected post-fix behaviour (one of):
-        //   a) clearAll completes (no throw) because the write path is made safe,
-        //      so the ordering question becomes moot.
-        //   b) If clearAll throws, a try-finally ensures advanceTheme still runs.
-        throw new UnsupportedOperationException("Test body not implemented — see @Disabled reason");
+    @DisplayName("GAME-11: mirror.clearAll() throwing still advances themeIndex (atomic expiry)")
+    void clearAllThrowingSkipsAdvanceTheme() throws Exception {
+        List<String> themes = Arrays.asList(
+                "cat", "sword", "ball", "house", "tree", "glasses",
+                "ship", "tower", "car", "plane");
+        Arena.PlotData plot = mock(Arena.PlotData.class);
+        when(plot.corner1X()).thenReturn(0);  when(plot.corner2X()).thenReturn(9);
+        when(plot.corner1Y()).thenReturn(60); when(plot.corner2Y()).thenReturn(70);
+        when(plot.corner1Z()).thenReturn(0);  when(plot.corner2Z()).thenReturn(9);
+        when(plot.spawn()).thenReturn(null);
+
+        @SuppressWarnings("unchecked")
+        List<Arena.PlotData> plots = mock(List.class);
+        when(plots.get(0)).thenReturn(plot);
+
+        Arena arena = buildArena(plots);
+        BukkitScheduler scheduler = mock(BukkitScheduler.class);
+
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+            GameManager manager = buildManager(scheduler, bukkit);
+
+            GameSession session = new GameSession(arena);
+            session.setThemes(themes);
+            session.gameTimeRemaining(300);
+            session.state(ArenaState.PLAYING);
+
+            UUID pid = UUID.randomUUID();
+            PlayerSnapshot snapshot = mock(PlayerSnapshot.class);
+            GamePlayer gp = new GamePlayer(pid, "Bob", 0, snapshot, 0);
+            session.addPlayer(gp);
+
+            // Install a mirror whose clearAll() throws. Mockito 5's default
+            // inline mock-maker can mock the final MutablePlotScene class.
+            MutablePlotScene throwingMirror = mock(MutablePlotScene.class);
+            org.mockito.Mockito.doThrow(new RuntimeException("simulated clearAll failure"))
+                    .when(throwingMirror).clearAll();
+            session.installMirror(0, throwingMirror);
+
+            injectSession(manager, session);
+
+            Runnable tick = captureGameTickRunnable(manager, session, scheduler);
+
+            int themeIndexBefore = gp.themeIndex();
+
+            // Execute one game tick — clearAll throws, but advanceTheme MUST still run.
+            tick.run();
+
+            // ── invariant: theme advanced despite clearAll failure ──────────
+            assertEquals(
+                    (themeIndexBefore + 1) % themes.size(),
+                    gp.themeIndex(),
+                    "themeIndex must advance even if mirror.clearAll() throws");
+
+            // ── invariant: clearAll was attempted ───────────────────────────
+            org.mockito.Mockito.verify(throwingMirror).clearAll();
+
+            // ── invariant: build time was reset for the new round ───────────
+            assertEquals(arena.buildTime(), gp.buildTimeRemaining(),
+                    "buildTimeRemaining must be reset after clearAll failure too");
+        }
     }
 }

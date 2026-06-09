@@ -478,9 +478,19 @@ public class GameManager implements BBAIGameManager, PluginService {
                         clearZone(arenaWorld, arena.plots().get(gp.plotIndex()));
                     // Mirror is session-scoped: wipe it so the next render-tick
                     // doesn't keep showing the expired build to the ML model.
+                    // GAME-11: clearAll() must not skip the advanceTheme/reset
+                    // pair — the world zone is already cleared above, so the
+                    // per-player counters MUST advance to keep state consistent.
                     MutablePlotScene m = session.mirror(gp.plotIndex());
-                    if (m != null)
-                        m.clearAll();
+                    if (m != null) {
+                        try {
+                            m.clearAll();
+                        } catch (Throwable t) {
+                            plugin.getPluginLogger().error(
+                                    "mirror.clearAll() failed for arena %s player %s: %s",
+                                    arena.name(), gp.playerId(), t.getMessage());
+                        }
+                    }
                     gp.clearZoneDirty();
                     gp.advanceTheme(session.themes().size());
                     gp.resetBuildTime(arena.buildTime());
