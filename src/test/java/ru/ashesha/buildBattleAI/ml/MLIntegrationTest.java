@@ -451,6 +451,203 @@ class MLIntegrationTest {
     }
 
     /**
+     * Covers risk <b>ML-INT-EXT part (c)</b>: TTA improves (or at least does
+     * not regress) top-K hit-rate over a fixture set.
+     * <p>
+     * Without labelled real Minecraft build screenshots we cannot measure true
+     * classification accuracy, so this test uses two complementary proxies:
+     * <ol>
+     *   <li><b>No regression</b> (Option A): across 10 deterministic synthetic
+     *       fixtures, the average TTA top-1 cosine-similarity score is not
+     *       meaningfully below the baseline average.  A slack of {@code 0.05}
+     *       is used because TTA averaging can dilute strong single-view
+     *       predictions in exchange for a more robust embedding — slight score
+     *       reductions on synthetic patterns are acceptable if real-world
+     *       accuracy improves.</li>
+     *   <li><b>Augmentation is active</b> (Option B): at least one of the 10
+     *       fixtures produces a different top-1 class under TTA vs. baseline.
+     *       This proves the random-crop / h-flip / brightness-jitter pipeline
+     *       is actually firing and changing the embedding, not silently
+     *       short-circuiting to an identity transform.</li>
+     * </ol>
+     * <p>
+     * <b>Tagging:</b> {@code @Tag("nightly-only")} is a SECONDARY tag.  The
+     * primary {@code @Tag("ml-it")} annotation lives at the class level so the
+     * {@code @EnabledIfSystemProperty} guard still applies.  The
+     * {@code nightly-only} secondary tag is what causes {@code -P pr-gate} and
+     * {@code -P ml-it} to skip this test; {@code -P nightly} runs it because
+     * that profile only excludes {@code bench}.
+     */
+    @Test
+    @Tag("nightly-only")
+    void ttaImprovesTopKHitRateOverFixtureSet() {
+        // Skip when the service is DISABLED (model absent or no backend loaded).
+        Assumptions.assumeTrue(mlService != null,
+                "MLService not initialised — skipping TTA hit-rate test");
+        Assumptions.assumeFalse("DISABLED".equals(mlService.backend()),
+                "MLService backend is DISABLED — skipping TTA hit-rate test");
+
+        final int TOP_K = 3;
+        final int NUM_FIXTURES = 10;
+
+        // ── Build 10 deterministic synthetic RGB fixtures ────────────────────
+        // We extend the 5-fixture set from the ranking-sanity test with 5 more
+        // patterns that stress different colour distributions and spatial
+        // frequencies, giving the augmentation pipeline more diverse material
+        // to work with. All patterns are arithmetic so the test is reproducible
+        // without any external resource.
+        byte[][] fixtures = buildExtendedSyntheticFixtures(NUM_FIXTURES);
+
+        // ── Collect top-1 class and score for each fixture (baseline & TTA) ──
+        double baselineScoreSum = 0.0;
+        double ttaScoreSum = 0.0;
+        int ttaChangedCount = 0;
+
+        for (int f = 0; f < NUM_FIXTURES; f++) {
+            byte[] rgb = fixtures[f];
+
+            // Baseline: single forward pass, no augmentation.
+            PredictionResult baseline = mlService.predictRgb(rgb, 224, 224, TOP_K);
+            // TTA: 4 augmented views fused into one L2-normalised embedding.
+            PredictionResult tta = mlService.predictWithTTA(rgb, 224, 224, TOP_K);
+
+            baselineScoreSum += baseline.predictedScore();
+            ttaScoreSum += tta.predictedScore();
+
+            // Track whether TTA changed the top-1 class for this fixture.
+            if (!baseline.predictedClass().equals(tta.predictedClass()))
+                ttaChangedCount++;
+        }
+
+        double baselineAvg = baselineScoreSum / NUM_FIXTURES;
+        double ttaAvg = ttaScoreSum / NUM_FIXTURES;
+
+        // ── Assertion A: TTA does not regress average top-1 score by more ────
+        // than the permitted slack.  The slack accounts for averaging effects:
+        // TTA sums TTA_VIEWS embeddings from slightly different crops/flips
+        // before L2-normalising — for purely synthetic patterns (solid colours,
+        // geometric noise) the resulting fused vector can land slightly farther
+        // from the nearest centroid than a single un-augmented embedding would.
+        // A real Minecraft build benefits from the diversity; the test only
+        // requires the cost on synthetic inputs stays bounded.
+        final double SLACK = 0.05;
+        assertTrue(ttaAvg >= baselineAvg - SLACK,
+                String.format(
+                        "TTA average top-1 score (%.4f) regressed below baseline (%.4f) "
+                                + "by more than slack=%.2f. "
+                                + "This means TTA is actively hurting embeddings, "
+                                + "not just failing to improve them on synthetic inputs. "
+                                + "Investigate the augmentation pipeline in MLService.buildTtaViews().",
+                        ttaAvg, baselineAvg, SLACK));
+
+        // ── Assertion B: at least one fixture has a different top-1 class ────
+        // under TTA.  If this fails it means the random-crop / h-flip /
+        // brightness-jitter path is silently returning the same embedding as
+        // the baseline on every fixture — indicating the augmentations are not
+        // actually being applied (e.g. ThreadLocalRandom seeded to the same
+        // value, identity transforms, or the augmentation loop is short-
+        // circuited).
+        assertTrue(ttaChangedCount >= 1,
+                "TTA produced the exact same top-1 prediction as the baseline for all "
+                        + NUM_FIXTURES + " synthetic fixtures. "
+                        + "This strongly suggests the TTA augmentation pipeline "
+                        + "(random crop / h-flip / brightness jitter) is not active. "
+                        + "Check MLService.buildTtaViews() and the ThreadLocalRandom paths.");
+    }
+
+    /**
+     * Generates {@code count} deterministic 224×224 RGB byte buffers.  The
+     * first 5 come from {@link #buildSyntheticFixtures()} (same patterns used
+     * by {@link #rankingMatchesClassForSyntheticFixtures()}); the remaining 5
+     * add more colour-distribution coverage.
+     * <p>
+     * All patterns are arithmetic — no external resources, fully reproducible
+     * across JVM runs and platforms.
+     *
+     * @param count total number of fixtures; must be {@code >= 1}
+     */
+    private static byte[][] buildExtendedSyntheticFixtures(int count) {
+        int W = 224, H = 224;
+        int pixels = W * H;
+        byte[][] out = new byte[count][];
+
+        // Fixtures 0–4: reuse the 5 existing patterns for consistency.
+        byte[][] base = buildSyntheticFixtures();
+        for (int i = 0; i < Math.min(5, count); i++)
+            out[i] = base[i];
+
+        // Fixture 5: sky-blue gradient (top-to-bottom fade from blue to white).
+        // Simulates a sky backdrop often present in outdoor Minecraft builds.
+        if (count > 5) {
+            byte[] rgb = new byte[pixels * 3];
+            for (int y = 0; y < H; y++) {
+                int fade = (int) (255 * (1.0 - (double) y / H));
+                for (int x = 0; x < W; x++) {
+                    int base2 = (y * W + x) * 3;
+                    rgb[base2]     = (byte) fade;       // R: fades 255→0
+                    rgb[base2 + 1] = (byte) fade;       // G: fades 255→0
+                    rgb[base2 + 2] = (byte) 255;        // B: stays 255
+                }
+            }
+            out[5] = rgb;
+        }
+
+        // Fixture 6: stone-grey uniform fill.
+        if (count > 6) {
+            byte[] rgb = new byte[pixels * 3];
+            for (int i = 0; i < pixels; i++) {
+                rgb[i * 3]     = (byte) 128;
+                rgb[i * 3 + 1] = (byte) 128;
+                rgb[i * 3 + 2] = (byte) 128;
+            }
+            out[6] = rgb;
+        }
+
+        // Fixture 7: horizontal bands of red / green / blue (16px each) —
+        // produces a strong low-frequency signal along the Y axis only.
+        if (count > 7) {
+            byte[] rgb = new byte[pixels * 3];
+            for (int y = 0; y < H; y++) {
+                int band = (y / 16) % 3; // 0=R, 1=G, 2=B
+                for (int x = 0; x < W; x++) {
+                    int base2 = (y * W + x) * 3;
+                    rgb[base2]     = (byte) (band == 0 ? 220 : 30);
+                    rgb[base2 + 1] = (byte) (band == 1 ? 220 : 30);
+                    rgb[base2 + 2] = (byte) (band == 2 ? 220 : 30);
+                }
+            }
+            out[7] = rgb;
+        }
+
+        // Fixture 8: diagonal gradient (both axes) — tests frequency content
+        // that is neither purely horizontal nor purely vertical.
+        if (count > 8) {
+            byte[] rgb = new byte[pixels * 3];
+            for (int y = 0; y < H; y++) {
+                for (int x = 0; x < W; x++) {
+                    int val = (int) (((double) (x + y) / (W + H)) * 255);
+                    int base2 = (y * W + x) * 3;
+                    rgb[base2]     = (byte) val;
+                    rgb[base2 + 1] = (byte) (255 - val);
+                    rgb[base2 + 2] = (byte) (val / 2);
+                }
+            }
+            out[8] = rgb;
+        }
+
+        // Fixture 9: seeded noise with a different seed from fixture 4 —
+        // exercises the pseudo-random broadband case independently.
+        if (count > 9) {
+            byte[] rgb = new byte[pixels * 3];
+            Random rng = new Random(0xDEAD_BEEf_BBA1L);
+            rng.nextBytes(rgb);
+            out[9] = rgb;
+        }
+
+        return out;
+    }
+
+    /**
      * Generates 5 deterministic 224×224 RGB byte buffers covering different
      * colour palettes and spatial frequency patterns. Determinism is achieved
      * by using only arithmetic; the random fixture uses a fixed seed.

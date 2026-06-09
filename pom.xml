@@ -466,8 +466,10 @@
                                 <include>**/MLIntegrationTest.java</include>
                             </includes>
                             <!-- Override the parent's excludedGroups so @Tag("ml-it")
-                                 tests are reachable here. -->
-                            <excludedGroups combine.self="override"></excludedGroups>
+                                 tests are reachable here, but keep nightly-only tests
+                                 out of this convenience profile — they belong to the
+                                 nightly run, not to developer ad-hoc ml-it runs. -->
+                            <excludedGroups combine.self="override">nightly-only</excludedGroups>
                             <systemPropertyVariables>
                                 <bbai.ml-it>true</bbai.ml-it>
                             </systemPropertyVariables>
