@@ -337,6 +337,120 @@ class MLIntegrationTest {
     }
 
     /**
+     * Covers risk <b>ML-INT-EXT part (b)</b>: batched inference matches
+     * single-call inference.
+     * <p>
+     * {@link MLService#embedBatchRgb} runs all images through the ONNX session
+     * as one batch (or as multiple batches when count exceeds the session's
+     * configured max), whereas {@link MLService#embedRgb} submits a single
+     * image. Both paths share the same preprocessing logic and the same
+     * {@code OrtSession} — the results should be numerically identical within
+     * floating-point rounding tolerance.
+     * <p>
+     * The test asserts:
+     * <ol>
+     *   <li>B = 4 images: each {@code batched[i]} matches {@code single[i]}
+     *       component-wise within {@code 1e-4} absolute tolerance.</li>
+     *   <li>B = 1 image: degenerate batch must equal the single-call result
+     *       within the same tolerance (catches batch-dim squeeze bugs).</li>
+     *   <li>Every embedding has L2 norm in [0.99, 1.01] (the model is supposed
+     *       to emit L2-normalized embeddings).</li>
+     *   <li>No NaN or Infinity in any component.</li>
+     * </ol>
+     * If the batched path diverges beyond the threshold the test is left
+     * failing (not {@code @Disabled}) so CI surfaces the regression
+     * immediately.
+     */
+    @Test
+    void batchedInferenceMatchesSingleCallInference() {
+        // Skip when the service is DISABLED (model absent or no backend loaded).
+        Assumptions.assumeTrue(mlService != null,
+                "MLService not initialised — skipping batched-inference test");
+        Assumptions.assumeFalse("DISABLED".equals(mlService.backend()),
+                "MLService backend is DISABLED — skipping batched-inference test");
+
+        final int W = 224, H = 224;
+        final int B = 4;
+        // Absolute tolerance for component-wise comparison.  ORT's internal
+        // reduction order within a batch differs from B == 1 runs, so
+        // bit-exact equality is not guaranteed — 1e-4 covers float32 rounding
+        // across all tested backends (CPU, CoreML, DirectML).
+        final float TOLERANCE = 1e-4f;
+
+        // ── Build B distinct deterministic 224×224 RGB images ────────────────
+        // Different seed per image to ensure meaningfully different content and
+        // avoid accidental cancellation in the batch tensor.
+        byte[][] images = new byte[B][];
+        for (int i = 0; i < B; i++) {
+            byte[] rgb = new byte[W * H * 3];
+            new Random(0xBBA1_0001L + i).nextBytes(rgb);
+            images[i] = rgb;
+        }
+
+        // ── Single-call embeddings ────────────────────────────────────────────
+        float[][] single = new float[B][];
+        for (int i = 0; i < B; i++)
+            single[i] = mlService.embedRgb(images[i], W, H);
+
+        // ── Batched embeddings (B = 4) ────────────────────────────────────────
+        float[][] batched = mlService.embedBatchRgb(images, W, H);
+
+        assertEquals(B, batched.length,
+                "embedBatchRgb must return exactly B=" + B + " embeddings");
+
+        for (int i = 0; i < B; i++) {
+            float[] sv = single[i];
+            float[] bv = batched[i];
+
+            assertEquals(sv.length, bv.length,
+                    "Embedding dim must match for image " + i
+                            + ": single=" + sv.length + " batched=" + bv.length);
+
+            // Component-wise comparison, NaN check, and L2-norm accumulator
+            // all in one pass to keep the hot loop tight.
+            double sumSq = 0.0;
+            for (int j = 0; j < sv.length; j++) {
+                assertFalse(Float.isNaN(bv[j]),
+                        "NaN in batched embedding[" + i + "][" + j + "]");
+                assertFalse(Float.isInfinite(bv[j]),
+                        "Infinity in batched embedding[" + i + "][" + j + "]");
+                float diff = Math.abs(sv[j] - bv[j]);
+                assertTrue(diff < TOLERANCE,
+                        "Component mismatch at image=" + i + " dim=" + j
+                                + ": single=" + sv[j] + " batched=" + bv[j]
+                                + " diff=" + diff + " > tolerance=" + TOLERANCE);
+                sumSq += (double) bv[j] * bv[j];
+            }
+
+            // L2 norm of the batched embedding must be approximately 1.0 —
+            // the model is trained to emit L2-normalized embeddings.
+            double norm = Math.sqrt(sumSq);
+            assertTrue(norm > 0.99 && norm < 1.01,
+                    "L2 norm of batched embedding[" + i + "] should be ~1.0 but was " + norm);
+        }
+
+        // ── B = 1 degenerate-batch case ───────────────────────────────────────
+        // Catches bugs where the batch-dim is squeezed (rank-2 output becomes
+        // rank-1) and the code accidentally returns the wrong slice.
+        float[][] singleItemBatch = mlService.embedBatchRgb(
+                new byte[][]{images[0]}, W, H);
+        assertEquals(1, singleItemBatch.length,
+                "embedBatchRgb with 1 image must return exactly 1 embedding");
+
+        float[] sv0 = single[0];
+        float[] bv0 = singleItemBatch[0];
+        assertEquals(sv0.length, bv0.length,
+                "Embedding dim must match for the B=1 degenerate-batch case");
+        for (int j = 0; j < sv0.length; j++) {
+            float diff = Math.abs(sv0[j] - bv0[j]);
+            assertTrue(diff < TOLERANCE,
+                    "B=1 batch mismatch at dim=" + j
+                            + ": single=" + sv0[j] + " batched=" + bv0[j]
+                            + " diff=" + diff + " > tolerance=" + TOLERANCE);
+        }
+    }
+
+    /**
      * Generates 5 deterministic 224×224 RGB byte buffers covering different
      * colour palettes and spatial frequency patterns. Determinism is achieved
      * by using only arithmetic; the random fixture uses a fixed seed.
