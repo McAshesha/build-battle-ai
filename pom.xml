@@ -465,6 +465,9 @@
                             <includes>
                                 <include>**/MLIntegrationTest.java</include>
                             </includes>
+                            <!-- Override the parent's excludedGroups so @Tag("ml-it")
+                                 tests are reachable here. -->
+                            <excludedGroups combine.self="override"></excludedGroups>
                             <systemPropertyVariables>
                                 <bbai.ml-it>true</bbai.ml-it>
                             </systemPropertyVariables>
