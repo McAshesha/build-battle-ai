@@ -58,7 +58,7 @@ class LocalRepository<K, V> implements DataRepository<K, V> {
     @NonNull
     private final Class<V> valueType;
 
-    /** Logger used to report I/O failures to the server console. */
+    /** DATA-01/04: routes load/flush failures through PluginLogger instead of System.err. */
     @NonNull
     private final PluginLogger logger;
 

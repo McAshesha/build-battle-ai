@@ -10,6 +10,7 @@ import ru.ashesha.buildBattleAI.data.api.PlayerData;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.attribute.PosixFilePermission;
@@ -18,7 +19,6 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -180,7 +180,7 @@ class DiskFailureEscalationIT {
         // The file must now exist and contain the data that was pending
         assertTrue(dataFile.exists(),
                 "JSON file must exist after the recovery flush");
-        String content = new String(Files.readAllBytes(dataFile.toPath()), "UTF-8");
+        String content = new String(Files.readAllBytes(dataFile.toPath()), StandardCharsets.UTF_8);
         assertTrue(content.contains("EventualPersist"),
                 "Pending data must appear in the file after the recovery flush");
         assertTrue(content.contains(uuid.toString()),
@@ -199,7 +199,6 @@ class DiskFailureEscalationIT {
         assumePosixSupported();
 
         File dataFile = new File(tempDir, "players.json");
-        PluginLogger logger = mock(PluginLogger.class);
 
         LocalRepository<UUID, PlayerData> repo =
                 new LocalRepository<>(dataFile, gson, UUID.class, PlayerData.class, logger);
@@ -212,11 +211,15 @@ class DiskFailureEscalationIT {
 
         repo.flush(); // must not throw
 
-        // Verify error log call referencing the file name.
+        // Verify error log call with a format string and the file name as first arg.
         ArgumentCaptor<String> formatCaptor = ArgumentCaptor.forClass(String.class);
-        verify(logger).error(formatCaptor.capture(), any(Object[].class));
-        assertTrue(formatCaptor.getValue().contains("%s") || formatCaptor.getValue().contains(dataFile.getName()),
-                "error() format must reference the file (got: " + formatCaptor.getValue() + ")");
+        ArgumentCaptor<Object[]> argsCaptor = ArgumentCaptor.forClass(Object[].class);
+        verify(logger).error(formatCaptor.capture(), argsCaptor.capture());
+
+        assertTrue(formatCaptor.getValue().contains("%s"),
+                "error() format must use printf-style %s placeholders (got: " + formatCaptor.getValue() + ")");
+        assertEquals(dataFile.getName(), argsCaptor.getValue()[0],
+                "error() first arg must be the file name");
     }
 
     // -- helpers ---------------------------------------------------------------
