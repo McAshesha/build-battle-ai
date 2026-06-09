@@ -58,8 +58,13 @@ public class DataService implements BBAIDataService, PluginService {
 
     // ── runtime state (populated in enable, cleared in shutdown) ────────────
 
-    /** The active storage backend, or {@code null} if disabled. */
-    private DataProvider provider;
+    /**
+     * The active storage backend, or {@code null} if disabled.
+     *
+     * <p>Declared {@code volatile} so {@link #shutdown()} writing {@code null}
+     * is immediately visible to the async autosave lambda — see DATA-02.
+     */
+    private volatile DataProvider provider;
 
     /** Player data repository, keyed by player UUID. */
     private DataRepository<UUID, PlayerData> playerRepo;
@@ -346,7 +351,14 @@ public class DataService implements BBAIDataService, PluginService {
         long intervalTicks = intervalSec * 20L;
         autoSaveTask = plugin.getServer().getScheduler().runTaskTimerAsynchronously(
                 plugin,
-                () -> provider.flush(),
+                () -> {
+                    // Capture provider into a local — shutdown() may null the
+                    // field concurrently (DATA-02). volatile guarantees the
+                    // local-and-the-flush-call see the same snapshot.
+                    DataProvider p = provider;
+                    if (p != null)
+                        p.flush();
+                },
                 intervalTicks,
                 intervalTicks
         );

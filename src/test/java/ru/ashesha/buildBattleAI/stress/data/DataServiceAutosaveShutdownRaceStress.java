@@ -4,7 +4,6 @@ import org.bukkit.Server;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.scheduler.BukkitScheduler;
 import org.bukkit.scheduler.BukkitTask;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -130,8 +129,6 @@ class DataServiceAutosaveShutdownRaceStress {
      *
      * <p>This test is disabled until the production fix lands.
      */
-    @Disabled("DATA-02: real race — autosave lambda NPEs when shutdown() nulls provider; "
-            + "reproduce: mvn -B -ntp clean test -Dtest=DataServiceAutosaveShutdownRaceStress -P stress")
     @Test
     void shutdownDuringFlush() throws Throwable {
         ExecutorService pool = Executors.newFixedThreadPool(FLUSH_THREADS);
