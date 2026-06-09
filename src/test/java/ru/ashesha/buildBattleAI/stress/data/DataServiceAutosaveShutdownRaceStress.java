@@ -126,8 +126,6 @@ class DataServiceAutosaveShutdownRaceStress {
      * <p><b>Fix:</b> declare {@code provider} as {@code volatile}, or guard the
      * {@code provider.flush()} call with a null-check inside the lambda:
      * {@code () -> { DataProvider p = provider; if (p != null) p.flush(); }}.
-     *
-     * <p>This test is disabled until the production fix lands.
      */
     @Test
     void shutdownDuringFlush() throws Throwable {

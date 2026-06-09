@@ -74,9 +74,9 @@ public class LocalDataProvider implements DataProvider {
 
     @Override
     public void flush() {
-        // Synchronize on the map so a concurrent stop() cannot clear entries
-        // mid-iteration — the autosave lambda calls flush() while shutdown()
-        // calls stop(), which could otherwise cause ConcurrentModificationException.
+        // DATA-02 companion: stop() may call repositories.clear() while the
+        // autosave lambda is mid-iteration here. Holding the same monitor
+        // both places serialises clear vs. iteration → no CME.
         synchronized (repositories) {
             for (LocalRepository<?, ?> repo : repositories.values())
                 repo.flush();
