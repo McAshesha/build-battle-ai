@@ -788,12 +788,6 @@ public class MLService implements BBAIMLService, PluginService {
     // ── internal helpers — centroid table ──────────────────────────────────
 
     /**
-     * Container for the JSON deserialization of the bundled centroids file.
-     * The on-disk format is produced by {@code train_pipeline.py} and bundles
-     * the centroid matrix together with the class list and pre-processing
-     * metadata (which we ignore here — the model itself encodes that contract).
-     */
-    /**
      * Outcome of parsing a {@code centroids.json} payload. Either:
      * <ul>
      *   <li>{@code ok=true} with a non-null {@code classes} + {@code vectors} pair, or</li>

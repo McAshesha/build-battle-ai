@@ -267,19 +267,18 @@ class CentroidsJsonRobustnessIT {
     }
 
     /**
-     * ML-08 injection: NaN / Infinity values in vectors.
-     * Gson deserialises them as {@code Double.NaN} / {@code Double.POSITIVE_INFINITY}
-     * which survive the null check but will propagate into the float array —
-     * the l2Normalize call would then produce a NaN norm.
+     * ML-08 NaN/Infinity injection: a JSON payload with a {@code NaN} float
+     * literal must produce a failed parse result so the caller falls back to
+     * synthetic centroids.
      *
-     * <p><b>Disabled:</b> same injection constraint as
-     * {@link #truncatedJsonFallsBackGracefully()}.
-     *
-     * <p><b>Additional note:</b> the current {@code loadCentroidsFromJson()}
-     * does not explicitly guard against NaN/Infinity values after float-cast —
-     * only the dim check gates the per-row loop. This is a latent ML-08 gap:
-     * a production fix should validate {@code Float.isFinite(v[j])} and return
-     * {@code false} if any value is non-finite.
+     * <p>The production fix has two layers: {@code Double.isFinite} guards the
+     * inner parsing loop, and the outer {@code catch (Throwable t)} catches
+     * Gson exceptions. By default Gson's strict parser rejects {@code NaN}
+     * literals — so this test exercises the {@code catch (Throwable t)} branch
+     * rather than the {@code isFinite} guard directly. A future test could
+     * deliver a deserialised {@code Double.NaN} through a lenient Gson path
+     * to exercise the guard end-to-end; doing so is not required to verify
+     * the spec contract ("NaN payload triggers fail").
      */
     @Test
     void nanInfinityValuesFallsBackGracefully() {
