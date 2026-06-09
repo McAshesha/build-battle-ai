@@ -12,7 +12,9 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import lombok.Value;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
+import ru.ashesha.buildBattleAI.core.PluginLogger;
 import ru.ashesha.buildBattleAI.core.PluginService;
 import ru.ashesha.buildBattleAI.ml.api.BBAIMLService;
 import ru.ashesha.buildBattleAI.ml.api.PredictionResult;
@@ -791,6 +793,33 @@ public class MLService implements BBAIMLService, PluginService {
      * the centroid matrix together with the class list and pre-processing
      * metadata (which we ignore here — the model itself encodes that contract).
      */
+    /**
+     * Outcome of parsing a {@code centroids.json} payload. Either:
+     * <ul>
+     *   <li>{@code ok=true} with a non-null {@code classes} + {@code vectors} pair, or</li>
+     *   <li>{@code ok=false} with both {@code classes} and {@code vectors} null —
+     *       the caller must fall back to {@code initFallbackCentroids()}.</li>
+     * </ul>
+     *
+     * <p>Package-private so tests in {@code ru.ashesha.buildBattleAI.ml} can
+     * call {@link #parseCentroidsJson(Reader, PluginLogger)} with corrupted
+     * payloads without touching the bundled resource stream.
+     */
+    @Value
+    static class CentroidParseResult {
+        boolean ok;
+        List<String> classes;
+        float[][] vectors;
+
+        static CentroidParseResult fail() {
+            return new CentroidParseResult(false, null, null);
+        }
+
+        static CentroidParseResult success(List<String> classes, float[][] vectors) {
+            return new CentroidParseResult(true, classes, vectors);
+        }
+    }
+
     @SuppressWarnings("MismatchedQueryAndUpdateOfCollection")
     private static final class CentroidsBundle {
         List<String> classes;
@@ -817,50 +846,88 @@ public class MLService implements BBAIMLService, PluginService {
         }
         try {
             Reader reader = new InputStreamReader(in, StandardCharsets.UTF_8);
+            CentroidParseResult result = parseCentroidsJson(reader, plugin.getPluginLogger());
+            if (!result.isOk())
+                return false;
+            applyCentroids(result.getClasses(), result.getVectors());
+            return true;
+        } finally {
+            try {
+                in.close();
+            } catch (IOException ignored) {
+            }
+        }
+    }
+
+    /**
+     * Parses a centroids JSON payload from an arbitrary {@link Reader}.
+     * Extracted from {@link #loadCentroidsFromJson()} so tests can feed
+     * synthetic corruption modes without owning the classpath resource.
+     *
+     * <p>Returns {@link CentroidParseResult#fail()} on:
+     * <ul>
+     *   <li>Gson parsing exceptions (truncated JSON, garbage bytes, wrong types)</li>
+     *   <li>Null bundle (empty file, {@code null} literal, wrong root structure)</li>
+     *   <li>Class-count / vector-count mismatch</li>
+     *   <li>Wrong vector dimension</li>
+     *   <li>Non-finite ({@code NaN} or {@code Infinity}) float component (ML-08)</li>
+     * </ul>
+     *
+     * <p>Package-private — part of the {@code ml} package test surface only.
+     * Do not call from production code outside {@code MLService}.
+     *
+     * @param reader the JSON payload (caller owns close)
+     * @param logger logger for diagnostic messages on parse failure
+     * @return parsed result; caller invokes {@link #applyCentroids} on success
+     */
+    static CentroidParseResult parseCentroidsJson(Reader reader, PluginLogger logger) {
+        try {
             Gson gson = new Gson();
             Type bundleType = new TypeToken<CentroidsBundle>() {
             }.getType();
             CentroidsBundle bundle = gson.fromJson(reader, bundleType);
             if (bundle == null || bundle.classes == null || bundle.centroids == null) {
-                plugin.getPluginLogger().warn("Centroids JSON missing required fields — using fallback.");
-                return false;
+                logger.warn("Centroids JSON missing required fields — using fallback.");
+                return CentroidParseResult.fail();
             }
             if (bundle.classes.size() != bundle.centroids.size()) {
-                plugin.getPluginLogger().warn(
+                logger.warn(
                         "Centroids JSON has %d classes but %d vectors — using fallback.",
                         bundle.classes.size(), bundle.centroids.size());
-                return false;
+                return CentroidParseResult.fail();
             }
 
             float[][] vectors = new float[bundle.centroids.size()][];
             for (int i = 0; i < bundle.centroids.size(); i++) {
                 List<Double> row = bundle.centroids.get(i);
                 if (row.size() != EMBEDDING_DIM) {
-                    plugin.getPluginLogger().warn(
+                    logger.warn(
                             "Centroid %d ('%s') has dim %d, expected %d — using fallback.",
                             i, bundle.classes.get(i), row.size(), EMBEDDING_DIM);
-                    return false;
+                    return CentroidParseResult.fail();
                 }
                 float[] v = new float[EMBEDDING_DIM];
-                for (int j = 0; j < EMBEDDING_DIM; j++)
-                    v[j] = row.get(j).floatValue();
+                for (int j = 0; j < EMBEDDING_DIM; j++) {
+                    double d = row.get(j);
+                    if (!Double.isFinite(d)) {
+                        // ML-08: NaN/Infinity in centroid breaks cosine scoring.
+                        logger.warn(
+                                "Centroid %d ('%s') component %d is non-finite (%s) — using fallback.",
+                                i, bundle.classes.get(i), j, String.valueOf(d));
+                        return CentroidParseResult.fail();
+                    }
+                    v[j] = (float) d;
+                }
                 // Defensive re-normalization: the on-disk vectors are unit-
                 // norm already, but a small numerical drift after float-cast
                 // is cheap to fix and prevents a subtle skew in cosine scores.
                 l2Normalize(v);
                 vectors[i] = v;
             }
-            applyCentroids(new ArrayList<>(bundle.classes), vectors);
-            return true;
+            return CentroidParseResult.success(new ArrayList<>(bundle.classes), vectors);
         } catch (Throwable t) {
-            plugin.getPluginLogger().warn("Failed to parse centroids JSON: %s — using fallback.",
-                    t.getMessage());
-            return false;
-        } finally {
-            try {
-                in.close();
-            } catch (IOException ignored) {
-            }
+            logger.warn("Failed to parse centroids JSON: %s — using fallback.", t.getMessage());
+            return CentroidParseResult.fail();
         }
     }
 

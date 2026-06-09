@@ -2,7 +2,6 @@ package ru.ashesha.buildBattleAI.ml;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -11,6 +10,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import ru.ashesha.buildBattleAI.BuildBattleAI;
 import ru.ashesha.buildBattleAI.core.PluginLogger;
 
+import java.io.Reader;
+import java.io.StringReader;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
@@ -20,6 +21,7 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -66,17 +68,11 @@ import static org.mockito.Mockito.when;
  * {@code src/main/resources}), making the classpath the mandatory runtime
  * dependency that qualifies this as integration tier.
  *
- * <h3>Injection-infeasibility note</h3>
- * {@code loadCentroidsFromJson()} reads via
- * {@code MLService.class.getResourceAsStream(CENTROIDS_RESOURCE)}. The path
- * ({@code /models/centroids.json}) is a static final constant and the
- * classloader is the plugin classloader — there is no API hook to substitute a
- * corrupted stream without either a custom {@code ClassLoader} wrapping the
- * real one, or a production-code refactor to accept an {@code InputStream}
- * parameter. Both approaches are out of scope per project policy. Corruption
- * modes that require stream injection are therefore documented via
- * {@link Disabled} with a reference back to this risk ID so they can be
- * enabled after a future refactor makes injection feasible.
+ * <h3>Injection hook</h3>
+ * {@code parseCentroidsJson(Reader, PluginLogger)} is a package-private static
+ * method extracted from {@code loadCentroidsFromJson()} specifically to allow
+ * this test class to feed arbitrary payloads directly, bypassing the classpath
+ * resource stream. The corruption-mode tests below use this hook.
  */
 @Tag("integration")
 @TestInstance(TestInstance.Lifecycle.PER_METHOD)
@@ -217,12 +213,10 @@ class CentroidsJsonRobustnessIT {
                 corruptionMode + ": classNames.size() must equal centroidVectors.length");
     }
 
-    // ── documented-infeasible corruption-injection modes ──────────────────
-    // The following tests are @Disabled because loadCentroidsFromJson() reads
-    // via MLService.class.getResourceAsStream(CENTROIDS_RESOURCE) with no
-    // injectable InputStream hook.  Each test documents the gap for ML-08 so
-    // it is easy to re-enable after a future production refactor that accepts
-    // an InputStream or Reader parameter.
+    // ── corruption-injection modes (ML-08) ────────────────────────────────
+    // The following tests use MLService.parseCentroidsJson(Reader, PluginLogger)
+    // to inject synthetic corruption modes directly, without touching the
+    // bundled classpath resource.
 
     /**
      * ML-08 injection: truncated JSON causes {@code loadCentroidsFromJson()} to
@@ -235,12 +229,19 @@ class CentroidsJsonRobustnessIT {
      * ML-08 once {@code loadCentroidsFromJson(InputStream)} is factored out.
      */
     @Test
-    @Disabled("ML-08: cannot inject truncated JSON without refactoring "
-            + "loadCentroidsFromJson to accept an InputStream parameter")
     void truncatedJsonFallsBackGracefully() {
-        // When injection is possible: feed a JSON string ending mid-object,
-        // call loadCentroidsFromJson(new StringReader("{\"classes\":[\"cube\"")),
-        // assert returns false, then assert initFallbackCentroids state.
+        PluginLogger mockLogger = mock(PluginLogger.class);
+        Reader reader = new StringReader("{\"classes\":[\"cube\"],\"centroids\":[[0.1,0.2");
+
+        MLService.CentroidParseResult result =
+                MLService.parseCentroidsJson(reader, mockLogger);
+
+        assertFalse(result.isOk(),
+                "Truncated JSON must produce a failed parse result");
+        assertNull(result.getClasses(),
+                "Failed result must carry null classes");
+        assertNull(result.getVectors(),
+                "Failed result must carry null vectors");
     }
 
     /**
@@ -252,12 +253,17 @@ class CentroidsJsonRobustnessIT {
      * {@link #truncatedJsonFallsBackGracefully()}.
      */
     @Test
-    @Disabled("ML-08: cannot inject wrong-dim JSON without refactoring "
-            + "loadCentroidsFromJson to accept an InputStream parameter")
     void wrongDimensionVectorsFallsBackGracefully() {
-        // When injection is possible: build a JSON with vectors of length 64,
-        // assert loadCentroidsFromJson returns false (dim mismatch log path),
-        // assert centroid state is the fallback.
+        PluginLogger mockLogger = mock(PluginLogger.class);
+        // 3 floats instead of 128 — dim mismatch
+        Reader reader = new StringReader(
+                "{\"classes\":[\"cube\"],\"centroids\":[[0.1,0.2,0.3]]}");
+
+        MLService.CentroidParseResult result =
+                MLService.parseCentroidsJson(reader, mockLogger);
+
+        assertFalse(result.isOk(),
+                "Wrong-dim vectors must produce a failed parse result");
     }
 
     /**
@@ -276,13 +282,23 @@ class CentroidsJsonRobustnessIT {
      * {@code false} if any value is non-finite.
      */
     @Test
-    @Disabled("ML-08: cannot inject NaN/Infinity JSON without refactoring "
-            + "loadCentroidsFromJson to accept an InputStream parameter; "
-            + "additionally the current implementation does not guard against "
-            + "non-finite float values — see ML-08 latent gap note in Javadoc")
     void nanInfinityValuesFallsBackGracefully() {
-        // When injection is possible: feed {"classes":["cube"],"centroids":[[NaN,...]]}
-        // assert returns false, assert fallback state.
+        PluginLogger mockLogger = mock(PluginLogger.class);
+        // Build a full-dim payload but plant NaN at position 5.
+        StringBuilder vec = new StringBuilder("[");
+        for (int i = 0; i < 128; i++) {
+            if (i > 0) vec.append(",");
+            vec.append(i == 5 ? "NaN" : "0.1");
+        }
+        vec.append("]");
+        Reader reader = new StringReader(
+                "{\"classes\":[\"cube\"],\"centroids\":[" + vec + "]}");
+
+        MLService.CentroidParseResult result =
+                MLService.parseCentroidsJson(reader, mockLogger);
+
+        assertFalse(result.isOk(),
+                "NaN component must produce a failed parse result");
     }
 
     /**
@@ -293,11 +309,15 @@ class CentroidsJsonRobustnessIT {
      * {@link #truncatedJsonFallsBackGracefully()}.
      */
     @Test
-    @Disabled("ML-08: cannot inject empty-file stream without refactoring "
-            + "loadCentroidsFromJson to accept an InputStream parameter")
     void emptyFileFallsBackGracefully() {
-        // When injection is possible: feed an empty InputStream,
-        // assert Gson returns null bundle → returns false → fallback state.
+        PluginLogger mockLogger = mock(PluginLogger.class);
+        Reader reader = new StringReader("");
+
+        MLService.CentroidParseResult result =
+                MLService.parseCentroidsJson(reader, mockLogger);
+
+        assertFalse(result.isOk(),
+                "Empty payload must produce a failed parse result (Gson returns null bundle)");
     }
 
     /**
@@ -310,12 +330,15 @@ class CentroidsJsonRobustnessIT {
      * {@link #truncatedJsonFallsBackGracefully()}.
      */
     @Test
-    @Disabled("ML-08: cannot inject wrong-structure JSON without refactoring "
-            + "loadCentroidsFromJson to accept an InputStream parameter")
     void wrongStructureFallsBackGracefully() {
-        // When injection is possible: feed {"wrong_key": 42},
-        // assert Gson maps to a CentroidsBundle with null classes/centroids
-        // → returns false → fallback state.
+        PluginLogger mockLogger = mock(PluginLogger.class);
+        Reader reader = new StringReader("{\"wrong_key\":42}");
+
+        MLService.CentroidParseResult result =
+                MLService.parseCentroidsJson(reader, mockLogger);
+
+        assertFalse(result.isOk(),
+                "Missing required keys must produce a failed parse result");
     }
 
     // ── production JSON structural sanity (enabled, no injection needed) ───
