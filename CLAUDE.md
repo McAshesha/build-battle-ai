@@ -224,13 +224,6 @@ How to add a new non-unit test:
 - **Stale Lombok build artifacts.** If you see `mvn test-compile` failing on existing tests after an unrelated edit, run `mvn clean test-compile` once — incremental compilation can leave stale generated accessors behind.
 - **E2E driver zombies.** Process.destroyForcibly() on the bash wrapper does NOT reap its spawned Purpur JVM. If an E2E test fails or is interrupted, kill leftover `purpur` processes (`pkill -9 -f purpur`) and remove `Servers/1.21/world/session.lock` before the next run. The `bash start.command` indirection also prevents SIGTERM forwarding — `ForceShutdownDuringPlayE2ETest.sigtermLeavesNoCorruption` is `@Disabled` on this basis.
 - **E2E arena YAML format.** Generate via `AbstractServerE2ETest.buildMinimalArenaYaml(name, maxPlayers)` — NOT a custom YAML list. Plots must be keyed (`plots.'1'.spawn`), not list-typed, because `ArenaManager.deserializeArena` uses `config.getString("plots." + i + ".spawn")` path lookups.
-- **Known production gaps documented via `@Disabled` tests:**
-  - DATA-01: `LocalRepository.load` corruption logs to `System.err`, not `PluginLogger.warn`.
-  - DATA-02: `DataService.shutdown` nulls non-volatile `provider` field without memory barrier → autosave runnable NPEs under concurrent shutdown. Fix: declare `provider` as `volatile` OR local-var guard in the lambda.
-  - DATA-04: `LocalRepository.flush` `IOException` logs to `System.err`, not `PluginLogger.error`.
-  - GAME-11: `GameManager.startGameTickTimer` build-time expiry: `mirror.clearAll()` is not wrapped in try/catch, so a throw leaves `themeIndex` un-advanced while side-state already cleared.
-  - ML-08: No NaN/Infinity guard in `centroids.json` parser — corrupted floats propagate to the embedding-comparison hot path.
-
 ## Obfuscation Awareness
 
 ProGuard config in `proguard/`: `base.pro` (shared keep rules) + `light.pro`/`standard.pro`/`heavy.pro` (level-specific). All levels use rename-only (`-dontshrink -dontoptimize`) because the shaded JAR's incomplete class hierarchy prevents safe shrinking. Mapping for deobfuscating stack traces: `target/proguard-mapping.txt`.
