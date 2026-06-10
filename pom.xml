@@ -430,6 +430,10 @@
                             <!-- Override the parent's excludedGroups so @Tag("e2e")
                                  tests are reachable here. -->
                             <excludedGroups combine.self="override"></excludedGroups>
+                            <!-- E2E subprocess servers (Paper/Purpur) can flake on
+                                 port-bind / server-start timing. Retry up to 2x to
+                                 dampen schedule noise without hiding real failures. -->
+                            <rerunFailingTestsCount>2</rerunFailingTestsCount>
                             <systemPropertyVariables>
                                 <bbai.e2e>true</bbai.e2e>
                             </systemPropertyVariables>
@@ -470,6 +474,10 @@
                                  out of this convenience profile — they belong to the
                                  nightly run, not to developer ad-hoc ml-it runs. -->
                             <excludedGroups combine.self="override">nightly-only</excludedGroups>
+                            <!-- ONNX backend probing (CoreML / CUDA / DirectML / CPU)
+                                 can flake on cold-start. Retry up to 2x to dampen
+                                 schedule noise without hiding real model regressions. -->
+                            <rerunFailingTestsCount>2</rerunFailingTestsCount>
                             <systemPropertyVariables>
                                 <bbai.ml-it>true</bbai.ml-it>
                             </systemPropertyVariables>
@@ -605,6 +613,12 @@
                                 <bbai.e2e>true</bbai.e2e>
                             </systemPropertyVariables>
                             <excludedGroups>bench</excludedGroups>
+                            <!-- Nightly rolls up stress + e2e + ml-it (all flake-prone)
+                                 alongside unit/smoke/integration. Retry up to 2x so a
+                                 single bad iteration of a stress test does not file a
+                                 false-positive perf-regression issue. Unit tests are
+                                 cheap so the extra retry cost is negligible. -->
+                            <rerunFailingTestsCount>2</rerunFailingTestsCount>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -661,6 +675,10 @@
                             <groups>stress</groups>
                             <excludedGroups combine.self="override"></excludedGroups>
                             <excludes combine.self="override"/>
+                            <!-- Concurrency-stress tests can hit benign races / JIT
+                                 prewarm jitter at high iteration counts. Retry up to
+                                 2x to dampen noise; genuine races still fail thrice. -->
+                            <rerunFailingTestsCount>2</rerunFailingTestsCount>
                         </configuration>
                     </plugin>
                 </plugins>

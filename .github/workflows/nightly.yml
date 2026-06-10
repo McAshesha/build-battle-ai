@@ -19,8 +19,47 @@ env:
   MODEL_PATH: src/main/resources/models/custom_convnext_embeddings.onnx
 
 jobs:
+  # Skip the cron-scheduled nightly when no commits landed on main in the
+  # last 24 hours — otherwise we burn Actions minutes re-running the same
+  # green build night after night. workflow_dispatch (manual trigger) and
+  # the legacy /repository_dispatch path always pass through this gate.
+  check-activity:
+    name: Check recent activity
+    runs-on: ubuntu-latest
+    outputs:
+      has-changes: ${{ steps.check.outputs.has-changes }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Detect commits in last 24h
+        id: check
+        run: |
+          set -euo pipefail
+          # Manual dispatch always runs — useful for re-runs after a fix.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "has-changes=true" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch — running nightly suite."
+            exit 0
+          fi
+          # Compare the latest commit's author-date against now. 86400s = 24h.
+          last_ts=$(git log -1 --format=%ct)
+          now_ts=$(date -u +%s)
+          diff=$(( now_ts - last_ts ))
+          if [ "$diff" -lt 86400 ]; then
+            echo "has-changes=true" >> "$GITHUB_OUTPUT"
+            echo "Last commit was $diff seconds ago (< 24h) — running nightly."
+          else
+            echo "has-changes=false" >> "$GITHUB_OUTPUT"
+            echo "Last commit was $diff seconds ago (≥ 24h) — skipping nightly."
+          fi
+
   full-suite:
     name: Full suite + JMH
+    needs: check-activity
+    if: needs.check-activity.outputs.has-changes == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
